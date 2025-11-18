@@ -743,30 +743,11 @@ class Game {
     const mixerData = this.mixers.get(playerId);
     if (!mixerData) return;
 
-    // Play footstep sound for current player when walking
-    if (isMoving && playerId === this.playerId) {
-      // Check if we should play a footstep (roughly every 0.3 seconds during walk cycle)
-      const isCurrentPlayer = playerId === this.playerId;
-      if (isCurrentPlayer && !mixerData.lastFootstepTime) {
-        mixerData.lastFootstepTime = 0;
-        mixerData.footstepInterval = 0.3; // Time between footsteps (in seconds)
-      }
-
-      if (isCurrentPlayer) {
-        const currentTime = performance.now() / 1000; // Convert to seconds
-        if (
-          currentTime - mixerData.lastFootstepTime >=
-          mixerData.footstepInterval
-        ) {
-          this.soundManager.playFootstep(this.footstepCounter);
-          this.footstepCounter++;
-          mixerData.lastFootstepTime = currentTime;
-        }
-      }
-    }
-
     const { mixer } = mixerData;
     const limbs = mixer.userData;
+
+    // Store previous walk cycle for footstep detection
+    const previousWalkCycle = limbs.walkCycle || 0;
 
     // Update walk cycle
     if (isMoving) {
@@ -778,6 +759,25 @@ class Game {
       if (Math.abs(limbs.walkCycle) < 0.01) {
         limbs.walkCycle = 0;
         mixerData.isMoving = false;
+      }
+    }
+
+    // Sync footstep sound with leg animation (only for current player)
+    if (isMoving && playerId === this.playerId) {
+      // Detect when legs hit the ground (when sin wave crosses zero going down)
+      const currentSin = Math.sin(limbs.walkCycle);
+      const previousSin = Math.sin(previousWalkCycle);
+
+      // Left leg hits ground when sin goes from positive to negative (crosses 0 downward from PI)
+      // Right leg hits ground when sin goes from negative to positive (crosses 0 upward from 0)
+
+      // Check for zero crossings
+      const crossedZeroUp = previousSin < 0 && currentSin >= 0; // Right leg hits ground
+      const crossedZeroDown = previousSin > 0 && currentSin <= 0; // Left leg hits ground
+
+      if (crossedZeroUp || crossedZeroDown) {
+        // Play footstep sound synced with leg contact
+        this.soundManager.playFootstep(crossedZeroUp ? 0 : 1); // 0 = right, 1 = left
       }
     }
 
