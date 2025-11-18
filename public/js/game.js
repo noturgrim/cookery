@@ -67,6 +67,10 @@ class Game {
     this.soundManager = new SoundManager();
     this.footstepCounter = 0; // Track which foot is stepping
 
+    // Emote/Voice wheel
+    this.emoteWheelActive = false;
+    this.selectedEmote = null;
+
     this.initWelcomeScreen();
   }
 
@@ -385,11 +389,40 @@ class Game {
   async loadSoundEffects() {
     console.log("🔊 Loading sound effects...");
 
-    // Load footstep sound
-    await this.soundManager.loadSound("footstep", "/sounds/step.mp3");
+    // Helper function to try loading sound with multiple formats
+    const tryLoadSound = async (name, basePath) => {
+      const formats = [".m4a", ".mp3", ".ogg", ".wav"];
+
+      for (const format of formats) {
+        const success = await this.soundManager.loadSound(
+          name,
+          basePath + format
+        );
+        if (success) {
+          console.log(`✅ Loaded ${name} as ${format}`);
+          return true;
+        }
+      }
+
+      console.warn(`⚠️ Could not load ${name} in any format`);
+      return false;
+    };
+
+    // Load footstep sound (supports multiple formats)
+    await tryLoadSound("footstep", "/sounds/step");
 
     // Load UI sounds (optional)
-    await this.soundManager.loadSound("click", "/sounds/click.mp3");
+    await tryLoadSound("click", "/sounds/click");
+
+    // Load voice/emote sounds (supports mp3, m4a, ogg, wav)
+    await tryLoadSound("hello", "/sounds/voices/hello");
+    await tryLoadSound("help", "/sounds/voices/help");
+    await tryLoadSound("yes", "/sounds/voices/yes");
+    await tryLoadSound("no", "/sounds/voices/no");
+    await tryLoadSound("thanks", "/sounds/voices/thanks");
+    await tryLoadSound("hurry", "/sounds/voices/hurry");
+    await tryLoadSound("nice", "/sounds/voices/nice");
+    await tryLoadSound("oops", "/sounds/voices/oops");
 
     console.log("🔊 Sound effects loaded!");
   }
@@ -1101,15 +1134,42 @@ class Game {
         console.log(`📦 Obstacle ${id} updated by another player`);
       }
     });
+
+    // Handle emote/voice from other players
+    this.socket.on("playerEmote", (data) => {
+      const { playerId, emote } = data;
+
+      // Don't play for own player (already played locally)
+      if (playerId === this.playerId) return;
+
+      // Calculate distance for spatial audio
+      const currentPlayer = this.players.get(this.playerId);
+      const otherPlayer = this.players.get(playerId);
+
+      if (currentPlayer && otherPlayer) {
+        const dx = currentPlayer.mesh.position.x - otherPlayer.mesh.position.x;
+        const dz = currentPlayer.mesh.position.z - otherPlayer.mesh.position.z;
+        const distance = Math.sqrt(dx * dx + dz * dz);
+
+        // Play voice with spatial audio
+        this.soundManager.playVoice(emote, distance, false);
+
+        // Show visual indicator
+        this.showVoiceIndicator(playerId, emote);
+      }
+    });
   }
 
   /**
-   * INPUT HANDLING - Click to Move Only
+   * INPUT HANDLING - Click to Move + Emote Wheel
    * WASD controls disabled - using point-and-click movement
    */
   setupInput() {
     // Click to move
     window.addEventListener("click", (e) => this.handleClick(e));
+
+    // Emote wheel (Hold T key)
+    this.setupEmoteWheel();
     window.addEventListener("mousemove", (e) => this.handleMouseMove(e));
     window.addEventListener("mousedown", (e) => this.handleMouseDown(e));
     window.addEventListener("mouseup", (e) => this.handleMouseUp(e));
@@ -1120,6 +1180,135 @@ class Game {
         this.toggleEditMode();
       }
     });
+  }
+
+  /**
+   * Setup emote/voice wheel (Hold T key)
+   */
+  setupEmoteWheel() {
+    const container = document.getElementById("emote-wheel-container");
+    const emoteOptions = document.querySelectorAll(".emote-option");
+
+    // Show wheel when T is pressed
+    window.addEventListener("keydown", (e) => {
+      if ((e.key === "t" || e.key === "T") && !this.emoteWheelActive) {
+        e.preventDefault();
+        this.emoteWheelActive = true;
+        container.classList.add("active");
+      }
+    });
+
+    // Hide wheel and play sound when T is released
+    window.addEventListener("keyup", (e) => {
+      if ((e.key === "t" || e.key === "T") && this.emoteWheelActive) {
+        e.preventDefault();
+        this.emoteWheelActive = false;
+        container.classList.remove("active");
+
+        // Play selected emote
+        if (this.selectedEmote) {
+          this.playEmote(this.selectedEmote);
+          this.selectedEmote = null;
+        }
+
+        // Remove all highlights
+        emoteOptions.forEach((opt) => opt.classList.remove("highlighted"));
+      }
+    });
+
+    // Highlight emotes on hover
+    emoteOptions.forEach((option) => {
+      option.addEventListener("mouseenter", () => {
+        if (this.emoteWheelActive) {
+          emoteOptions.forEach((opt) => opt.classList.remove("highlighted"));
+          option.classList.add("highlighted");
+          this.selectedEmote = option.dataset.emote;
+        }
+      });
+
+      // Click to select (alternative to hold-release)
+      option.addEventListener("click", (e) => {
+        if (this.emoteWheelActive) {
+          e.stopPropagation();
+          this.playEmote(option.dataset.emote);
+          this.emoteWheelActive = false;
+          container.classList.remove("active");
+          emoteOptions.forEach((opt) => opt.classList.remove("highlighted"));
+        }
+      });
+    });
+  }
+
+  /**
+   * Play an emote/voice sound
+   */
+  playEmote(emoteName) {
+    console.log(`🎵 Playing emote: ${emoteName}`);
+
+    // Play sound locally
+    this.soundManager.playVoice(emoteName, 0, true);
+
+    // Send to server so other players can hear
+    this.socket.emit("playEmote", {
+      playerId: this.playerId,
+      emote: emoteName,
+    });
+
+    // Show visual indicator above player
+    this.showVoiceIndicator(this.playerId, emoteName);
+  }
+
+  /**
+   * Show voice indicator above a player
+   */
+  showVoiceIndicator(playerId, emoteName) {
+    const player = this.players.get(playerId);
+    if (!player || !player.mesh) return;
+
+    // Get emoji for the emote
+    const emoteEmojis = {
+      hello: "👋",
+      help: "🆘",
+      yes: "✅",
+      no: "❌",
+      thanks: "🙏",
+      hurry: "⏰",
+      nice: "😄",
+      oops: "😅",
+    };
+
+    // Create indicator element
+    const indicator = document.createElement("div");
+    indicator.className = "voice-indicator";
+    indicator.textContent = emoteEmojis[emoteName] || "💬";
+    indicator.style.position = "absolute";
+    indicator.style.zIndex = "1000";
+
+    document.body.appendChild(indicator);
+
+    // Position above player (update every frame)
+    const updatePosition = () => {
+      if (!player.mesh || !indicator.parentElement) return;
+
+      const vector = player.mesh.position.clone();
+      vector.y += 3; // Above the player
+      vector.project(this.camera);
+
+      const x = (vector.x * 0.5 + 0.5) * window.innerWidth;
+      const y = (-(vector.y * 0.5) + 0.5) * window.innerHeight;
+
+      indicator.style.left = x + "px";
+      indicator.style.top = y + "px";
+    };
+
+    // Update position for 2 seconds
+    const intervalId = setInterval(updatePosition, 16);
+
+    // Remove after 2 seconds
+    setTimeout(() => {
+      clearInterval(intervalId);
+      indicator.remove();
+    }, 2000);
   }
 
   /**

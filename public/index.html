@@ -16,6 +16,7 @@
     </script>
 
     <link rel="stylesheet" href="/css/styles.css" />
+    <link rel="stylesheet" href="/css/emote-wheel.css" />
 
     <style>
       * {
@@ -182,6 +183,57 @@
     </div>
 
     <div id="game-container"></div>
+
+    <!-- Emote/Voice Wheel -->
+    <div id="emote-wheel-container">
+      <div id="emote-wheel">
+        <div class="emote-wheel-center">Hold T<br />Select Voice</div>
+
+        <div class="emote-option" data-emote="hello">
+          <span>👋</span>
+          <span class="emote-option-label">Hello</span>
+        </div>
+
+        <div class="emote-option" data-emote="help">
+          <span>🆘</span>
+          <span class="emote-option-label">Help!</span>
+        </div>
+
+        <div class="emote-option" data-emote="yes">
+          <span>✅</span>
+          <span class="emote-option-label">Yes</span>
+        </div>
+
+        <div class="emote-option" data-emote="no">
+          <span>❌</span>
+          <span class="emote-option-label">No</span>
+        </div>
+
+        <div class="emote-option" data-emote="thanks">
+          <span>🙏</span>
+          <span class="emote-option-label">Thanks</span>
+        </div>
+
+        <div class="emote-option" data-emote="hurry">
+          <span>⏰</span>
+          <span class="emote-option-label">Hurry!</span>
+        </div>
+
+        <div class="emote-option" data-emote="nice">
+          <span>😄</span>
+          <span class="emote-option-label">Nice!</span>
+        </div>
+
+        <div class="emote-option" data-emote="oops">
+          <span>😅</span>
+          <span class="emote-option-label">Oops</span>
+        </div>
+      </div>
+
+      <div id="emote-help">
+        Hold <strong>T</strong> and hover to select • Release to play
+      </div>
+    </div>
 
     <!-- Settings Button -->
     <button id="settings-btn" title="Settings (Change Name/Character)">

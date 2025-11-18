@@ -71,6 +71,38 @@ export class SoundManager {
   }
 
   /**
+   * Play voice/emote sound with spatial audio
+   * @param {string} emoteName - Name of the emote/voice sound
+   * @param {number} distance - Distance from listener
+   * @param {boolean} isOwnPlayer - Whether this is the current player
+   */
+  playVoice(emoteName, distance = 0, isOwnPlayer = true) {
+    if (!this.enabled) return;
+
+    // Calculate volume based on distance (spatial audio)
+    let volume = 0.5; // Base volume for own voice (50%)
+
+    if (!isOwnPlayer) {
+      // Other players' voices get quieter with distance
+      const maxHearingDistance = 40; // Max distance to hear voices
+
+      if (distance > maxHearingDistance) {
+        return; // Too far away, don't play sound
+      }
+
+      // Volume falls off with distance: 40% at close range, fading to 0%
+      const distanceFactor = 1 - distance / maxHearingDistance;
+      volume = 0.4 * distanceFactor; // Max 40% for other players
+    }
+
+    // Play the voice sound
+    this.play(emoteName, {
+      volume: volume,
+      playbackRate: 1.0, // No pitch variation for voices
+    });
+  }
+
+  /**
    * Play footstep sound (special handling for walking)
    * @param {number} stepNumber - Which foot (0 = right, 1 = left)
    * @param {number} distance - Distance from listener (optional, for spatial audio)

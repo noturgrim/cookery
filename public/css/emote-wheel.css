@@ -1,0 +1,180 @@
+/* Emote/Voice Wheel Styles */
+#emote-wheel-container {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  z-index: 1500;
+  pointer-events: none;
+}
+
+#emote-wheel-container.active {
+  display: flex;
+  pointer-events: all;
+}
+
+#emote-wheel {
+  position: relative;
+  width: 300px;
+  height: 300px;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.8);
+  border: 3px solid rgba(255, 215, 0, 0.8);
+  box-shadow: 0 0 30px rgba(255, 215, 0, 0.5);
+}
+
+.emote-wheel-center {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 80px;
+  height: 80px;
+  background: rgba(255, 215, 0, 0.2);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  color: white;
+  text-align: center;
+  font-weight: bold;
+  z-index: 10;
+}
+
+.emote-option {
+  position: absolute;
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  background: rgba(102, 126, 234, 0.3);
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-size: 28px;
+  color: white;
+}
+
+.emote-option-label {
+  font-size: 10px;
+  margin-top: 4px;
+  color: white;
+  font-weight: bold;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8);
+}
+
+.emote-option:hover,
+.emote-option.highlighted {
+  background: rgba(255, 215, 0, 0.6);
+  border-color: rgba(255, 215, 0, 1);
+  transform: scale(1.15);
+  box-shadow: 0 0 20px rgba(255, 215, 0, 0.8);
+}
+
+/* Position emotes around the circle */
+.emote-option:nth-child(1) {
+  /* Top */
+  top: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.emote-option:nth-child(2) {
+  /* Top Right */
+  top: 30px;
+  right: 30px;
+}
+
+.emote-option:nth-child(3) {
+  /* Right */
+  top: 50%;
+  right: 10px;
+  transform: translateY(-50%);
+}
+
+.emote-option:nth-child(4) {
+  /* Bottom Right */
+  bottom: 30px;
+  right: 30px;
+}
+
+.emote-option:nth-child(5) {
+  /* Bottom */
+  bottom: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.emote-option:nth-child(6) {
+  /* Bottom Left */
+  bottom: 30px;
+  left: 30px;
+}
+
+.emote-option:nth-child(7) {
+  /* Left */
+  top: 50%;
+  left: 10px;
+  transform: translateY(-50%);
+}
+
+.emote-option:nth-child(8) {
+  /* Top Left */
+  top: 30px;
+  left: 30px;
+}
+
+/* Voice indicator above player */
+.voice-indicator {
+  position: absolute;
+  top: -40px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(255, 215, 0, 0.9);
+  color: #333;
+  padding: 5px 12px;
+  border-radius: 20px;
+  font-size: 20px;
+  font-weight: bold;
+  animation: voiceBounce 0.5s ease-out;
+  pointer-events: none;
+  z-index: 100;
+  white-space: nowrap;
+}
+
+@keyframes voiceBounce {
+  0% {
+    transform: translateX(-50%) scale(0);
+    opacity: 0;
+  }
+  50% {
+    transform: translateX(-50%) scale(1.2);
+  }
+  100% {
+    transform: translateX(-50%) scale(1);
+    opacity: 1;
+  }
+}
+
+/* Help text */
+#emote-help {
+  position: absolute;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(0, 0, 0, 0.8);
+  color: white;
+  padding: 10px 20px;
+  border-radius: 10px;
+  font-size: 14px;
+  z-index: 100;
+}
+
