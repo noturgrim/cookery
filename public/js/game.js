@@ -650,28 +650,10 @@ class Game {
   }
 
   /**
-   * INPUT HANDLING - WASD to 3D Vector Movement
-   * Translates key presses to movement in X and Z axes (Y is height)
+   * INPUT HANDLING - Click to Move Only
+   * WASD controls disabled - using point-and-click movement
    */
   setupInput() {
-    // Keydown event
-    window.addEventListener("keydown", (e) => {
-      const key = this.keyMap[e.code];
-      if (key && !this.inputState[key]) {
-        this.inputState[key] = true;
-        this.sendInput();
-      }
-    });
-
-    // Keyup event
-    window.addEventListener("keyup", (e) => {
-      const key = this.keyMap[e.code];
-      if (key && this.inputState[key]) {
-        this.inputState[key] = false;
-        this.sendInput();
-      }
-    });
-
     // Click to move
     window.addEventListener("click", (e) => this.handleClick(e));
     window.addEventListener("mousemove", (e) => this.handleMouseMove(e));
@@ -789,13 +771,10 @@ class Game {
   }
 
   /**
-   * Send input state to server
-   * Server processes input and updates authoritative position
+   * Send input state to server (deprecated - using click-to-move only)
    */
   sendInput() {
-    if (this.socket) {
-      this.socket.emit("input", this.inputState);
-    }
+    // No longer needed - click-to-move only
   }
 
   /**

@@ -34,7 +34,7 @@ const gameState = {
 const SERVER_TICK_RATE = 30; // 30 updates per second
 const PLAYER_SPEED = 0.15; // Units per tick
 const PLAYER_SIZE = { width: 1, height: 2, depth: 1 }; // Player AABB dimensions
-const GRID_SIZE = 0.7; // Grid cell size for pathfinding (larger = safer paths)
+const GRID_SIZE = 0.8; // Grid cell size for pathfinding (larger = safer paths)
 
 // AABB Collision Detection
 const checkAABBCollision = (box1, box2) => {
@@ -120,7 +120,7 @@ class AStarPathfinder {
     }
 
     // Check collision with obstacles (with bigger buffer zone)
-    const SAFETY_MARGIN = 0.8; // Extra space around obstacles
+    const SAFETY_MARGIN = 1.5; // Extra space around obstacles (increased for safety)
     for (const obstacle of this.obstacles) {
       const halfWidth = obstacle.width / 2;
       const halfDepth = obstacle.depth / 2;
@@ -177,17 +177,28 @@ class AStarPathfinder {
       z: Math.round(goal.z / this.gridSize) * this.gridSize,
     };
 
+    // Check if start or goal is blocked
+    if (!this.isWalkable(start.x, start.z)) {
+      // Find nearest walkable position for start
+      start = this.findNearestWalkable(start);
+    }
+    if (!this.isWalkable(goal.x, goal.z)) {
+      // Find nearest walkable position for goal
+      goal = this.findNearestWalkable(goal);
+    }
+
     const openSet = [start];
+    const closedSet = new Set();
     const cameFrom = new Map();
     const gScore = new Map();
     const fScore = new Map();
 
-    const key = (node) => `${node.x},${node.z}`;
+    const key = (node) => `${node.x.toFixed(2)},${node.z.toFixed(2)}`;
     gScore.set(key(start), 0);
     fScore.set(key(start), this.heuristic(start, goal));
 
     let iterations = 0;
-    const MAX_ITERATIONS = 1000;
+    const MAX_ITERATIONS = 2000; // Increased iterations
 
     while (openSet.length > 0 && iterations < MAX_ITERATIONS) {
       iterations++;
@@ -195,11 +206,15 @@ class AStarPathfinder {
       // Get node with lowest fScore
       openSet.sort((a, b) => fScore.get(key(a)) - fScore.get(key(b)));
       const current = openSet.shift();
+      const currentKey = key(current);
+
+      // Add to closed set
+      closedSet.add(currentKey);
 
       // Check if we reached the goal
       if (
-        Math.abs(current.x - goal.x) < this.gridSize &&
-        Math.abs(current.z - goal.z) < this.gridSize
+        Math.abs(current.x - goal.x) < this.gridSize * 1.5 &&
+        Math.abs(current.z - goal.z) < this.gridSize * 1.5
       ) {
         // Reconstruct path
         const path = [goal];
@@ -208,40 +223,154 @@ class AStarPathfinder {
           path.unshift(temp);
           temp = cameFrom.get(key(temp));
         }
-        return path;
+
+        // Simplify path (remove unnecessary waypoints)
+        return this.simplifyPath(path);
       }
 
       // Check neighbors
       const neighbors = this.getNeighbors(current);
       for (const neighborData of neighbors) {
         const neighbor = { x: neighborData.x, z: neighborData.z };
+        const neighborKey = key(neighbor);
+
+        // Skip if in closed set
+        if (closedSet.has(neighborKey)) {
+          continue;
+        }
+
         const tentativeGScore =
-          gScore.get(key(current)) + neighborData.cost * this.gridSize;
+          gScore.get(currentKey) + neighborData.cost * this.gridSize;
 
         if (
-          !gScore.has(key(neighbor)) ||
-          tentativeGScore < gScore.get(key(neighbor))
+          !gScore.has(neighborKey) ||
+          tentativeGScore < gScore.get(neighborKey)
         ) {
-          cameFrom.set(key(neighbor), current);
-          gScore.set(key(neighbor), tentativeGScore);
+          cameFrom.set(neighborKey, current);
+          gScore.set(neighborKey, tentativeGScore);
           fScore.set(
-            key(neighbor),
+            neighborKey,
             tentativeGScore + this.heuristic(neighbor, goal)
           );
 
-          if (!openSet.some((n) => key(n) === key(neighbor))) {
+          if (!openSet.some((n) => key(n) === neighborKey)) {
             openSet.push(neighbor);
           }
         }
       }
     }
 
-    // No path found, return direct path
+    // No path found, try to find closest reachable point
+    console.log(`⚠️ No path found after ${iterations} iterations`);
     return [start, goal];
+  }
+
+  // Find nearest walkable position
+  findNearestWalkable(pos) {
+    const searchRadius = 3; // Search within 3 units
+    const step = this.gridSize;
+    let bestPos = pos;
+    let bestDistance = Infinity;
+
+    for (let dx = -searchRadius; dx <= searchRadius; dx += step) {
+      for (let dz = -searchRadius; dz <= searchRadius; dz += step) {
+        const testX = pos.x + dx;
+        const testZ = pos.z + dz;
+
+        if (this.isWalkable(testX, testZ)) {
+          const distance = Math.sqrt(dx * dx + dz * dz);
+          if (distance < bestDistance) {
+            bestDistance = distance;
+            bestPos = { x: testX, z: testZ };
+          }
+        }
+      }
+    }
+
+    return bestPos;
+  }
+
+  // Simplify path by removing unnecessary waypoints
+  simplifyPath(path) {
+    if (path.length <= 2) return path;
+
+    const simplified = [path[0]];
+
+    for (let i = 1; i < path.length - 1; i++) {
+      const prev = path[i - 1];
+      const current = path[i];
+      const next = path[i + 1];
+
+      // Check if we can skip this waypoint (line of sight check)
+      if (!this.hasLineOfSight(prev, next)) {
+        simplified.push(current);
+      }
+    }
+
+    simplified.push(path[path.length - 1]);
+    return simplified;
+  }
+
+  // Check if there's a clear line between two points
+  hasLineOfSight(a, b) {
+    const dx = b.x - a.x;
+    const dz = b.z - a.z;
+    const distance = Math.sqrt(dx * dx + dz * dz);
+    const steps = Math.ceil(distance / (this.gridSize * 0.5));
+
+    for (let i = 0; i <= steps; i++) {
+      const t = i / steps;
+      const x = a.x + dx * t;
+      const z = a.z + dz * t;
+
+      if (!this.isWalkable(x, z)) {
+        return false;
+      }
+    }
+
+    return true;
   }
 }
 
 const pathfinder = new AStarPathfinder(gameState.obstacles);
+
+// Calculate repulsion force from obstacles
+const getObstacleRepulsion = (player) => {
+  let repulsionX = 0;
+  let repulsionZ = 0;
+  const REPULSION_RANGE = 2.0; // Distance at which repulsion starts
+  const REPULSION_STRENGTH = 0.08; // Force multiplier
+
+  for (const obstacle of gameState.obstacles) {
+    const dx = player.x - obstacle.x;
+    const dz = player.z - obstacle.z;
+    const distance = Math.sqrt(dx * dx + dz * dz);
+
+    // Calculate edge distance (closest point on obstacle)
+    const halfWidth = obstacle.width / 2;
+    const halfDepth = obstacle.depth / 2;
+
+    // Distance from obstacle surface
+    const surfaceDistance = Math.max(
+      Math.abs(dx) - halfWidth,
+      Math.abs(dz) - halfDepth,
+      0
+    );
+
+    if (surfaceDistance < REPULSION_RANGE) {
+      // Apply repulsion force (stronger when closer)
+      const forceMagnitude =
+        REPULSION_STRENGTH * (1 - surfaceDistance / REPULSION_RANGE);
+
+      if (distance > 0) {
+        repulsionX += (dx / distance) * forceMagnitude;
+        repulsionZ += (dz / distance) * forceMagnitude;
+      }
+    }
+  }
+
+  return { x: repulsionX, z: repulsionZ };
+};
 
 // Process player input and update position
 const processPlayerInput = (player) => {
@@ -255,8 +384,8 @@ const processPlayerInput = (player) => {
     const dz = nextWaypoint.z - player.z;
     const distance = Math.sqrt(dx * dx + dz * dz);
 
-    // If reached waypoint, move to next
-    if (distance < 0.5) {
+    // If reached waypoint, move to next (increased tolerance)
+    if (distance < 0.8) {
       player.path.shift();
       if (player.path.length === 0) {
         player.moveTarget = null;
@@ -281,14 +410,23 @@ const processPlayerInput = (player) => {
           player.stuckCounter = (player.stuckCounter || 0) + 1;
 
           // If stuck for too long, recalculate path
-          if (player.stuckCounter > 30) {
+          if (player.stuckCounter > 20) {
             console.log(`Player ${player.id} stuck, recalculating path`);
             player.path = null;
             player.stuckCounter = 0;
 
-            // Try to recalculate path
+            // Try to recalculate path from current position
             if (player.moveTarget) {
-              const start = { x: player.x, z: player.z };
+              // Move slightly away from obstacle before recalculating
+              const randomOffset = {
+                x: (Math.random() - 0.5) * 0.5,
+                z: (Math.random() - 0.5) * 0.5,
+              };
+
+              const start = {
+                x: player.x + randomOffset.x,
+                z: player.z + randomOffset.z,
+              };
               const path = pathfinder.findPath(start, player.moveTarget);
               if (path.length > 1) {
                 player.path = path;
@@ -315,19 +453,14 @@ const processPlayerInput = (player) => {
       deltaX = (dx / distance) * PLAYER_SPEED;
       deltaZ = (dz / distance) * PLAYER_SPEED;
     }
-  } else if (player.input) {
-    // Fallback to WASD input
-    if (player.input.w) deltaZ -= PLAYER_SPEED;
-    if (player.input.s) deltaZ += PLAYER_SPEED;
-    if (player.input.a) deltaX -= PLAYER_SPEED;
-    if (player.input.d) deltaX += PLAYER_SPEED;
+  }
+  // WASD controls removed - click-to-move only
 
-    // Normalize diagonal movement
-    if (deltaX !== 0 && deltaZ !== 0) {
-      const magnitude = Math.sqrt(deltaX * deltaX + deltaZ * deltaZ);
-      deltaX = (deltaX / magnitude) * PLAYER_SPEED;
-      deltaZ = (deltaZ / magnitude) * PLAYER_SPEED;
-    }
+  // Apply obstacle repulsion force to prevent sticking
+  if (deltaX !== 0 || deltaZ !== 0) {
+    const repulsion = getObstacleRepulsion(player);
+    deltaX += repulsion.x;
+    deltaZ += repulsion.z;
   }
 
   // Validate and apply movement
@@ -446,7 +579,7 @@ io.on("connection", (socket) => {
       });
 
       console.log(
-        `Player ${socket.id} pathfinding to (${target.x.toFixed(
+        `🗺️ Player ${socket.id} pathfinding to (${target.x.toFixed(
           2
         )}, ${target.z.toFixed(2)}) - ${path.length} waypoints`
       );
