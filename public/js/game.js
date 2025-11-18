@@ -50,10 +50,131 @@ class Game {
     this.isDraggingObstacle = false;
     this.dragOffset = new THREE.Vector3();
 
-    this.init();
+    // Player customization
+    this.playerName = "";
+    this.playerSkin = 0; // Index of character model
+    this.availableSkins = [
+      { id: 0, name: "Chef A", char: "character-a" },
+      { id: 1, name: "Chef B", char: "character-b" },
+      { id: 2, name: "Chef C", char: "character-c" },
+      { id: 3, name: "Chef D", char: "character-d" },
+      { id: 4, name: "Chef E", char: "character-e" },
+      { id: 5, name: "Chef F", char: "character-f" },
+      { id: 6, name: "Chef G", char: "character-g" },
+      { id: 7, name: "Chef H", char: "character-h" },
+    ];
+
+    this.initWelcomeScreen();
+  }
+
+  /**
+   * Initialize welcome screen and settings
+   */
+  initWelcomeScreen() {
+    // Check if player data exists in localStorage
+    const savedName = localStorage.getItem("supercooked_playerName");
+    const savedSkin = localStorage.getItem("supercooked_playerSkin");
+
+    if (savedName && savedSkin !== null) {
+      // Auto-start with saved data
+      this.playerName = savedName;
+      this.playerSkin = parseInt(savedSkin);
+      document.getElementById("welcome-modal").classList.add("hidden");
+      this.init();
+    } else {
+      // Show welcome modal
+      this.setupWelcomeModal();
+    }
+
+    // Setup settings button
+    document.getElementById("settings-btn").addEventListener("click", () => {
+      this.showSettings();
+    });
+  }
+
+  /**
+   * Setup welcome modal
+   */
+  setupWelcomeModal() {
+    const skinSelector = document.getElementById("skin-selector");
+
+    // Generate skin options
+    this.availableSkins.forEach((skin) => {
+      const option = document.createElement("div");
+      option.className = "skin-option";
+      option.dataset.skinId = skin.id;
+      option.dataset.name = skin.name;
+      option.textContent = "👨‍🍳";
+      option.style.filter = `hue-rotate(${skin.id * 45}deg)`;
+
+      if (skin.id === 0) {
+        option.classList.add("selected");
+        this.playerSkin = 0;
+      }
+
+      option.addEventListener("click", () => {
+        document.querySelectorAll(".skin-option").forEach((o) => {
+          o.classList.remove("selected");
+        });
+        option.classList.add("selected");
+        this.playerSkin = skin.id;
+      });
+
+      skinSelector.appendChild(option);
+    });
+
+    // Handle start button
+    document.getElementById("start-game-btn").addEventListener("click", () => {
+      const nameInput = document.getElementById("player-name");
+      const name = nameInput.value.trim();
+
+      if (name.length < 2) {
+        nameInput.style.border = "2px solid red";
+        nameInput.placeholder = "Name must be at least 2 characters!";
+        return;
+      }
+
+      this.playerName = name;
+
+      // Save to localStorage
+      localStorage.setItem("supercooked_playerName", this.playerName);
+      localStorage.setItem("supercooked_playerSkin", this.playerSkin);
+
+      // Hide modal and start game
+      document.getElementById("welcome-modal").classList.add("hidden");
+      this.init();
+    });
+
+    // Allow Enter key to submit
+    document.getElementById("player-name").addEventListener("keypress", (e) => {
+      if (e.key === "Enter") {
+        document.getElementById("start-game-btn").click();
+      }
+    });
+  }
+
+  /**
+   * Show settings to change name/skin
+   */
+  showSettings() {
+    const modal = document.getElementById("welcome-modal");
+    modal.classList.remove("hidden");
+
+    // Pre-fill current values
+    document.getElementById("player-name").value = this.playerName;
+
+    // Update selected skin
+    document.querySelectorAll(".skin-option").forEach((option) => {
+      option.classList.remove("selected");
+      if (parseInt(option.dataset.skinId) === this.playerSkin) {
+        option.classList.add("selected");
+      }
+    });
   }
 
   init() {
+    if (this.scene) return; // Already initialized
+
     this.setupScene();
     this.setupLights();
     this.createFloor();
@@ -208,11 +329,11 @@ class Game {
 
     // Use GLB model if available, otherwise fallback to primitives
     if (this.characterModels.length > 0) {
-      // Deterministically select a character model based on player ID
-      const modelIndex =
-        Math.abs(
-          playerData.id.split("").reduce((a, b) => a + b.charCodeAt(0), 0)
-        ) % this.characterModels.length;
+      // Use player's selected skin or random if not available
+      let modelIndex = playerData.skinIndex || 0;
+      if (modelIndex >= this.characterModels.length) {
+        modelIndex = modelIndex % this.characterModels.length;
+      }
       const modelData = this.characterModels[modelIndex];
       const characterModel = modelData.scene.clone();
 
@@ -297,10 +418,11 @@ class Game {
       color: playerData.color,
     });
 
-    // Add name tag for current player
-    if (playerData.id === this.playerId) {
-      this.createNameTag(group, "You", 0x00ff00);
-    }
+    // Add name tag for all players
+    const isCurrentPlayer = playerData.id === this.playerId;
+    const nameColor = isCurrentPlayer ? 0x00ff00 : 0xffffff;
+    const displayName = playerData.name || (isCurrentPlayer ? "You" : "Player");
+    this.createNameTag(group, displayName, nameColor);
   }
 
   /**
@@ -601,6 +723,14 @@ class Game {
    */
   setupSocket() {
     this.socket = io();
+
+    // Send player customization immediately on connection
+    this.socket.on("connect", () => {
+      this.socket.emit("playerCustomization", {
+        name: this.playerName,
+        skinIndex: this.playerSkin,
+      });
+    });
 
     // Initialize game state
     this.socket.on("init", (data) => {

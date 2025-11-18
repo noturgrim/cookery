@@ -512,6 +512,8 @@ const gameLoop = () => {
       z: p.z,
       rotation: p.rotation,
       color: p.color,
+      name: p.name,
+      skinIndex: p.skinIndex,
     })),
   };
 
@@ -525,7 +527,7 @@ setInterval(gameLoop, 1000 / SERVER_TICK_RATE);
 io.on("connection", (socket) => {
   console.log(`Player connected: ${socket.id}`);
 
-  // Initialize new player with random spawn position
+  // Initialize new player with random spawn position (without customization yet)
   const newPlayer = {
     id: socket.id,
     x: Math.random() * 4 - 2,
@@ -533,6 +535,8 @@ io.on("connection", (socket) => {
     z: Math.random() * 4 - 2,
     rotation: 0,
     color: `hsl(${Math.random() * 360}, 70%, 60%)`,
+    name: "Player",
+    skinIndex: 0,
     input: { w: false, s: false, a: false, d: false },
     moveTarget: null, // Click-to-move target
     path: null, // A* pathfinding waypoints
@@ -542,15 +546,26 @@ io.on("connection", (socket) => {
 
   gameState.players.set(socket.id, newPlayer);
 
-  // Send initial game state to new player
-  socket.emit("init", {
-    playerId: socket.id,
-    players: Array.from(gameState.players.values()),
-    obstacles: gameState.obstacles,
-  });
+  // Handle player customization
+  socket.on("playerCustomization", (data) => {
+    const player = gameState.players.get(socket.id);
+    if (player) {
+      player.name = data.name || "Player";
+      player.skinIndex = data.skinIndex || 0;
 
-  // Notify other players
-  socket.broadcast.emit("playerJoined", newPlayer);
+      // Now send initial game state
+      socket.emit("init", {
+        playerId: socket.id,
+        players: Array.from(gameState.players.values()),
+        obstacles: gameState.obstacles,
+      });
+
+      // Notify other players
+      io.emit("playerJoined", player);
+
+      console.log(`👨‍🍳 ${player.name} (${socket.id}) joined the kitchen!`);
+    }
+  });
 
   // Handle player input updates
   socket.on("input", (inputState) => {

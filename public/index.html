@@ -15,6 +15,8 @@
       }
     </script>
 
+    <link rel="stylesheet" href="/css/styles.css" />
+
     <style>
       * {
         margin: 0;
@@ -149,7 +151,42 @@
     </style>
   </head>
   <body>
+    <!-- Welcome Modal -->
+    <div id="welcome-modal">
+      <div class="modal-content">
+        <h2>🍳 Welcome to Supercooked!</h2>
+        <p>Choose your name and character</p>
+
+        <div class="input-group">
+          <label for="player-name">Your Name</label>
+          <input
+            type="text"
+            id="player-name"
+            placeholder="Enter your chef name..."
+            maxlength="20"
+            autocomplete="off"
+          />
+        </div>
+
+        <div class="input-group">
+          <label>Choose Your Character</label>
+          <div class="skin-selector" id="skin-selector">
+            <!-- Character options will be generated here -->
+          </div>
+        </div>
+
+        <button class="btn-primary" id="start-game-btn">
+          Start Cooking! 👨‍🍳
+        </button>
+      </div>
+    </div>
+
     <div id="game-container"></div>
+
+    <!-- Settings Button -->
+    <button id="settings-btn" title="Settings (Change Name/Character)">
+      ⚙️
+    </button>
 
     <div id="ui-overlay">
       <div id="controls-info">
