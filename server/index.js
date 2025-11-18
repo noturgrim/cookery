@@ -560,6 +560,29 @@ io.on("connection", (socket) => {
     }
   });
 
+  // Handle obstacle updates from clients
+  socket.on("updateObstacle", (data) => {
+    const { id, x, y, z } = data;
+
+    // Find and update the obstacle
+    const obstacle = gameState.obstacles.find((obs) => obs.id === id);
+    if (obstacle) {
+      obstacle.x = x;
+      obstacle.y = y;
+      obstacle.z = z;
+
+      // Broadcast update to all clients
+      io.emit("obstacleUpdated", { id, x, y, z });
+
+      // Recreate pathfinder with updated obstacles
+      pathfinder.obstacles = gameState.obstacles;
+
+      console.log(
+        `📦 Obstacle ${id} moved to (${x.toFixed(2)}, ${z.toFixed(2)})`
+      );
+    }
+  });
+
   // Handle click-to-move with pathfinding
   socket.on("moveTo", (target) => {
     const player = gameState.players.get(socket.id);

@@ -44,6 +44,12 @@ class Game {
     this.targetPosition = null; // Click destination
     this.pathLine = null; // Visual path trace
 
+    // Obstacle editing
+    this.editMode = false; // Toggle with 'E' key
+    this.selectedObstacle = null;
+    this.isDraggingObstacle = false;
+    this.dragOffset = new THREE.Vector3();
+
     this.init();
   }
 
@@ -448,6 +454,14 @@ class Game {
     obstacle.castShadow = true;
     obstacle.receiveShadow = true;
 
+    // Store obstacle data for editing
+    obstacle.userData = {
+      id: obstacleData.id,
+      width: obstacleData.width,
+      height: obstacleData.height,
+      depth: obstacleData.depth,
+    };
+
     this.scene.add(obstacle);
     this.obstacles.push(obstacle);
   }
@@ -647,6 +661,16 @@ class Game {
         this.drawPathTrace(data.path);
       }
     });
+
+    // Handle obstacle updates from server
+    this.socket.on("obstacleUpdated", (data) => {
+      const { id, x, y, z } = data;
+      const obstacle = this.obstacles.find((obs) => obs.userData.id === id);
+      if (obstacle) {
+        obstacle.position.set(x, y, z);
+        console.log(`📦 Obstacle ${id} updated by another player`);
+      }
+    });
   }
 
   /**
@@ -657,21 +681,151 @@ class Game {
     // Click to move
     window.addEventListener("click", (e) => this.handleClick(e));
     window.addEventListener("mousemove", (e) => this.handleMouseMove(e));
+    window.addEventListener("mousedown", (e) => this.handleMouseDown(e));
+    window.addEventListener("mouseup", (e) => this.handleMouseUp(e));
+
+    // Toggle edit mode with 'E' key
+    window.addEventListener("keydown", (e) => {
+      if (e.code === "KeyE") {
+        this.toggleEditMode();
+      }
+    });
   }
 
   /**
-   * Handle mouse move for raycasting
+   * Handle mouse move for raycasting and dragging
    */
   handleMouseMove(event) {
     // Calculate mouse position in normalized device coordinates (-1 to +1)
     this.mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
     this.mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+
+    // Handle obstacle dragging
+    if (this.isDraggingObstacle && this.selectedObstacle) {
+      this.raycaster.setFromCamera(this.mouse, this.camera);
+
+      // Intersect with an invisible plane at obstacle height
+      const plane = new THREE.Plane(
+        new THREE.Vector3(0, 1, 0),
+        -this.selectedObstacle.position.y
+      );
+      const intersection = new THREE.Vector3();
+
+      this.raycaster.ray.intersectPlane(plane, intersection);
+
+      if (intersection) {
+        // Update obstacle position (subtract offset for accurate placement)
+        this.selectedObstacle.position.x = intersection.x - this.dragOffset.x;
+        this.selectedObstacle.position.z = intersection.z - this.dragOffset.z;
+      }
+    }
   }
 
   /**
-   * Handle click to move
+   * Toggle edit mode for moving obstacles
+   */
+  toggleEditMode() {
+    this.editMode = !this.editMode;
+
+    // Update obstacle colors to indicate edit mode
+    this.obstacles.forEach((obstacle) => {
+      if (this.editMode) {
+        obstacle.material.color.setHex(0xff6b6b); // Red tint in edit mode
+        obstacle.material.emissive.setHex(0x330000);
+      } else {
+        obstacle.material.color.setHex(0x8b4513); // Brown (normal)
+        obstacle.material.emissive.setHex(0x000000);
+      }
+    });
+
+    console.log(
+      this.editMode
+        ? "🔧 Edit Mode ON - Click and drag tables"
+        : "✅ Edit Mode OFF"
+    );
+
+    // Update UI
+    this.updateEditModeUI();
+  }
+
+  /**
+   * Update UI to show edit mode status
+   */
+  updateEditModeUI() {
+    const controlsInfo = document.querySelector("#controls-info h3");
+    if (controlsInfo) {
+      if (this.editMode) {
+        controlsInfo.textContent = "🔧 Edit Mode - Drag Tables";
+        controlsInfo.style.color = "#ff6b6b";
+      } else {
+        controlsInfo.textContent = "Controls";
+        controlsInfo.style.color = "#4caf50";
+      }
+    }
+  }
+
+  /**
+   * Handle mouse down for obstacle dragging
+   */
+  handleMouseDown(event) {
+    if (!this.editMode) return;
+
+    this.raycaster.setFromCamera(this.mouse, this.camera);
+    const intersects = this.raycaster.intersectObjects(this.obstacles);
+
+    if (intersects.length > 0) {
+      this.selectedObstacle = intersects[0].object;
+      this.isDraggingObstacle = true;
+
+      // Calculate offset from obstacle center
+      const point = intersects[0].point;
+      this.dragOffset.copy(point).sub(this.selectedObstacle.position);
+
+      // Highlight selected obstacle
+      this.selectedObstacle.material.emissive.setHex(0x660000);
+
+      console.log(`📦 Selected obstacle: ${this.selectedObstacle.userData.id}`);
+    }
+  }
+
+  /**
+   * Handle mouse up to finish dragging
+   */
+  handleMouseUp(event) {
+    if (this.isDraggingObstacle && this.selectedObstacle) {
+      // Send new position to server
+      if (this.socket) {
+        this.socket.emit("updateObstacle", {
+          id: this.selectedObstacle.userData.id,
+          x: this.selectedObstacle.position.x,
+          y: this.selectedObstacle.position.y,
+          z: this.selectedObstacle.position.z,
+        });
+      }
+
+      console.log(
+        `✅ Moved ${
+          this.selectedObstacle.userData.id
+        } to (${this.selectedObstacle.position.x.toFixed(
+          2
+        )}, ${this.selectedObstacle.position.z.toFixed(2)})`
+      );
+    }
+
+    this.isDraggingObstacle = false;
+    if (this.selectedObstacle) {
+      this.selectedObstacle.material.emissive.setHex(0x330000);
+      this.selectedObstacle = null;
+    }
+  }
+
+  /**
+   * Handle click to move or interact with obstacles
    */
   handleClick(event) {
+    // If in edit mode, don't move player
+    if (this.editMode) return;
+
     // Update raycaster
     this.raycaster.setFromCamera(this.mouse, this.camera);
 
