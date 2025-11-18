@@ -72,13 +72,32 @@ export class SoundManager {
 
   /**
    * Play footstep sound (special handling for walking)
+   * @param {number} stepNumber - Which foot (0 = right, 1 = left)
+   * @param {number} distance - Distance from listener (optional, for spatial audio)
+   * @param {boolean} isOwnPlayer - Whether this is the current player's footstep
    */
-  playFootstep(stepNumber = 0) {
+  playFootstep(stepNumber = 0, distance = 0, isOwnPlayer = true) {
     if (!this.enabled) return;
+
+    // Calculate volume based on distance (spatial audio)
+    let volume = 0.2; // Base volume for own footsteps
+
+    if (!isOwnPlayer) {
+      // Other players' footsteps get quieter with distance
+      const maxHearingDistance = 30; // Max distance to hear footsteps
+
+      if (distance > maxHearingDistance) {
+        return; // Too far away, don't play sound
+      }
+
+      // Volume falls off with distance: 15% at close range, fading to 0%
+      const distanceFactor = 1 - distance / maxHearingDistance;
+      volume = 0.15 * distanceFactor; // Max 15% for other players
+    }
 
     // Play the single footstep sound with variation
     this.play("footstep", {
-      volume: 0.2, // Quieter for footsteps
+      volume: volume,
       playbackRate: 0.9 + Math.random() * 0.2, // Slight pitch variation for variety
     });
   }

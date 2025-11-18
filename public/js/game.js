@@ -762,9 +762,9 @@ class Game {
       }
     }
 
-    // Sync footstep sound with leg animation (only for current player)
-    if (isMoving && playerId === this.playerId) {
-      // Detect when legs hit the ground (when sin wave crosses zero going down)
+    // Sync footstep sound with leg animation (for all players with spatial audio)
+    if (isMoving) {
+      // Detect when legs hit the ground (when sin wave crosses zero)
       const currentSin = Math.sin(limbs.walkCycle);
       const previousSin = Math.sin(previousWalkCycle);
 
@@ -776,8 +776,30 @@ class Game {
       const crossedZeroDown = previousSin > 0 && currentSin <= 0; // Left leg hits ground
 
       if (crossedZeroUp || crossedZeroDown) {
-        // Play footstep sound synced with leg contact
-        this.soundManager.playFootstep(crossedZeroUp ? 0 : 1); // 0 = right, 1 = left
+        // Calculate distance from current player for spatial audio
+        const isOwnPlayer = playerId === this.playerId;
+        let distance = 0;
+
+        if (!isOwnPlayer) {
+          // Calculate 3D distance between this player and current player
+          const currentPlayer = this.players.get(this.playerId);
+          const otherPlayer = this.players.get(playerId);
+
+          if (currentPlayer && otherPlayer) {
+            const dx =
+              currentPlayer.mesh.position.x - otherPlayer.mesh.position.x;
+            const dz =
+              currentPlayer.mesh.position.z - otherPlayer.mesh.position.z;
+            distance = Math.sqrt(dx * dx + dz * dz);
+          }
+        }
+
+        // Play footstep sound synced with leg contact (with spatial audio)
+        this.soundManager.playFootstep(
+          crossedZeroUp ? 0 : 1, // 0 = right, 1 = left
+          distance,
+          isOwnPlayer
+        );
       }
     }
 
