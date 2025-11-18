@@ -219,7 +219,7 @@ class Game {
       });
 
       // Scale and position the model (Kenney models need scaling)
-      characterModel.scale.set(0.8, 0.8, 0.8);
+      characterModel.scale.set(1.2, 1.2, 1.2); // Increased from 0.8 to make characters taller
       group.add(characterModel);
 
       // Setup animation mixer for procedural animation
