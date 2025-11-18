@@ -22,6 +22,8 @@ class Game {
     this.gltfLoader = new GLTFLoader();
     this.characterModels = [];
     this.isModelsLoaded = false;
+    this.foodModels = new Map(); // Cache for loaded food models
+    this.foodItems = new Map(); // Active food items in the scene
 
     // Animation
     this.clock = new THREE.Clock();
@@ -47,6 +49,9 @@ class Game {
       this.isModelsLoaded = true;
       this.setupSocket();
       console.log("✅ Character models loaded");
+
+      // Spawn some demo food items on counters
+      this.spawnDemoFoodItems();
     });
     this.setupInput();
     this.animate();
@@ -439,6 +444,108 @@ class Game {
 
     this.scene.add(obstacle);
     this.obstacles.push(obstacle);
+  }
+
+  /**
+   * Load a food model from GLB
+   */
+  async loadFoodModel(foodName) {
+    // Check cache first
+    if (this.foodModels.has(foodName)) {
+      return this.foodModels.get(foodName).clone();
+    }
+
+    return new Promise((resolve, reject) => {
+      this.gltfLoader.load(
+        `/food/glb/${foodName}.glb`,
+        (gltf) => {
+          // Enable shadows
+          gltf.scene.traverse((child) => {
+            if (child.isMesh) {
+              child.castShadow = true;
+              child.receiveShadow = true;
+
+              // Fix transparency issues
+              if (child.material) {
+                child.material.transparent = false;
+                child.material.opacity = 1.0;
+                child.material.depthWrite = true;
+              }
+            }
+          });
+
+          // Cache the model
+          this.foodModels.set(foodName, gltf.scene);
+          resolve(gltf.scene.clone());
+        },
+        undefined,
+        (error) => {
+          console.warn(`Failed to load food model ${foodName}:`, error);
+          reject(error);
+        }
+      );
+    });
+  }
+
+  /**
+   * Spawn a food item in the scene
+   */
+  async spawnFoodItem(foodName, x, y, z) {
+    try {
+      const foodModel = await this.loadFoodModel(foodName);
+
+      // Scale the food model appropriately
+      foodModel.scale.set(0.3, 0.3, 0.3);
+      foodModel.position.set(x, y, z);
+
+      this.scene.add(foodModel);
+
+      // Store reference
+      const itemId = `food_${Date.now()}_${Math.random()}`;
+      this.foodItems.set(itemId, {
+        model: foodModel,
+        name: foodName,
+        position: { x, y, z },
+      });
+
+      console.log(`✅ Spawned ${foodName} at (${x}, ${y}, ${z})`);
+      return itemId;
+    } catch (error) {
+      console.error(`Failed to spawn ${foodName}:`, error);
+      return null;
+    }
+  }
+
+  /**
+   * Remove a food item from the scene
+   */
+  removeFoodItem(itemId) {
+    const item = this.foodItems.get(itemId);
+    if (item) {
+      this.scene.remove(item.model);
+      this.foodItems.delete(itemId);
+    }
+  }
+
+  /**
+   * Spawn demo food items on counters
+   */
+  spawnDemoFoodItems() {
+    // Spawn various food items on the counters
+    const demoFoods = [
+      { name: "tomato", x: 5, y: 1.5, z: 0 },
+      { name: "cheese", x: 5.5, y: 1.5, z: 1 },
+      { name: "bread", x: 4.5, y: 1.5, z: -1 },
+      { name: "burger", x: -5, y: 1.5, z: 5 },
+      { name: "pizza", x: -4, y: 1.5, z: 5 },
+      { name: "carrot", x: 0, y: 1.5, z: -8 },
+      { name: "apple", x: 1, y: 1.5, z: -8 },
+      { name: "banana", x: -1, y: 1.5, z: -8 },
+    ];
+
+    demoFoods.forEach((food) => {
+      this.spawnFoodItem(food.name, food.x, food.y, food.z);
+    });
   }
 
   /**
