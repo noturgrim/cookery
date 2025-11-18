@@ -3,6 +3,9 @@
   "version": "1.0.0",
   "description": "Browser-based multiplayer cooking game with Three.js and Node.js",
   "type": "module",
+  "engines": {
+    "node": ">=16.0.0"
+  },
   "scripts": {
     "dev": "node server/index.js",
     "start": "node server/index.js"
