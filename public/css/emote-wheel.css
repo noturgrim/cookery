@@ -19,12 +19,24 @@
 
 #emote-wheel {
   position: relative;
-  width: 300px;
-  height: 300px;
+  width: 400px;
+  height: 400px;
   border-radius: 50%;
-  background: rgba(0, 0, 0, 0.8);
-  border: 3px solid rgba(255, 215, 0, 0.8);
-  box-shadow: 0 0 30px rgba(255, 215, 0, 0.5);
+  background: rgba(0, 0, 0, 0.9);
+  border: 4px solid rgba(255, 215, 0, 0.9);
+  box-shadow: 0 0 40px rgba(255, 215, 0, 0.6), inset 0 0 30px rgba(0, 0, 0, 0.5);
+  animation: wheelAppear 0.3s ease-out;
+}
+
+@keyframes wheelAppear {
+  from {
+    transform: scale(0.8);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
 }
 
 .emote-wheel-center {
@@ -32,104 +44,144 @@
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
-  width: 80px;
-  height: 80px;
-  background: rgba(255, 215, 0, 0.2);
+  width: 100px;
+  height: 100px;
+  background: linear-gradient(
+    135deg,
+    rgba(255, 215, 0, 0.3),
+    rgba(255, 140, 0, 0.3)
+  );
+  border: 2px solid rgba(255, 215, 0, 0.5);
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 14px;
+  font-size: 12px;
   color: white;
   text-align: center;
   font-weight: bold;
   z-index: 10;
+  line-height: 1.3;
 }
 
 .emote-option {
   position: absolute;
-  width: 80px;
-  height: 80px;
+  width: 90px;
+  height: 90px;
   border-radius: 50%;
-  background: rgba(102, 126, 234, 0.3);
-  border: 2px solid rgba(255, 255, 255, 0.3);
+  background: rgba(102, 126, 234, 0.4);
+  border: 3px solid rgba(255, 255, 255, 0.4);
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  transition: all 0.2s;
-  font-size: 28px;
+  transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+  font-size: 32px;
   color: white;
+  backdrop-filter: blur(5px);
 }
 
 .emote-option-label {
-  font-size: 10px;
-  margin-top: 4px;
+  font-size: 11px;
+  margin-top: 3px;
   color: white;
   font-weight: bold;
-  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8);
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.9);
+  letter-spacing: 0.5px;
 }
 
 .emote-option:hover,
 .emote-option.highlighted {
-  background: rgba(255, 215, 0, 0.6);
+  background: linear-gradient(
+    135deg,
+    rgba(255, 215, 0, 0.8),
+    rgba(255, 140, 0, 0.8)
+  );
   border-color: rgba(255, 215, 0, 1);
-  transform: scale(1.15);
-  box-shadow: 0 0 20px rgba(255, 215, 0, 0.8);
+  border-width: 4px;
+  transform: scale(1.25);
+  box-shadow: 0 0 30px rgba(255, 215, 0, 1), 0 0 60px rgba(255, 215, 0, 0.5);
 }
 
-/* Position emotes around the circle */
-.emote-option:nth-child(1) {
-  /* Top */
-  top: 10px;
-  left: 50%;
-  transform: translateX(-50%);
+.emote-option:active {
+  transform: scale(1.1);
 }
+
+/* Position emotes around the circle in a perfect ring */
+/* Note: nth-child(2) is first .emote-option because .emote-wheel-center is nth-child(1) */
 
 .emote-option:nth-child(2) {
-  /* Top Right */
-  top: 30px;
-  right: 30px;
+  /* Hello - Top */
+  top: 5px;
+  left: 50%;
+  transform: translateX(-50%);
 }
 
 .emote-option:nth-child(3) {
-  /* Right */
-  top: 50%;
-  right: 10px;
-  transform: translateY(-50%);
+  /* Help - Top Right */
+  top: 40px;
+  right: 40px;
 }
 
 .emote-option:nth-child(4) {
-  /* Bottom Right */
-  bottom: 30px;
-  right: 30px;
+  /* Yes - Right */
+  top: 50%;
+  right: 5px;
+  transform: translateY(-50%);
 }
 
 .emote-option:nth-child(5) {
-  /* Bottom */
-  bottom: 10px;
+  /* No - Bottom Right */
+  bottom: 40px;
+  right: 40px;
+}
+
+.emote-option:nth-child(6) {
+  /* Thanks - Bottom */
+  bottom: 5px;
   left: 50%;
   transform: translateX(-50%);
 }
 
-.emote-option:nth-child(6) {
-  /* Bottom Left */
-  bottom: 30px;
-  left: 30px;
-}
-
 .emote-option:nth-child(7) {
-  /* Left */
-  top: 50%;
-  left: 10px;
-  transform: translateY(-50%);
+  /* Hurry - Bottom Left */
+  bottom: 40px;
+  left: 40px;
 }
 
 .emote-option:nth-child(8) {
-  /* Top Left */
-  top: 30px;
-  left: 30px;
+  /* Nice - Left */
+  top: 50%;
+  left: 5px;
+  transform: translateY(-50%);
+}
+
+.emote-option:nth-child(9) {
+  /* Oops - Top Left */
+  top: 40px;
+  left: 40px;
+}
+
+/* Maintain transform on hover for positioned elements */
+.emote-option:nth-child(2):hover,
+.emote-option:nth-child(2).highlighted {
+  transform: translateX(-50%) scale(1.25);
+}
+
+.emote-option:nth-child(4):hover,
+.emote-option:nth-child(4).highlighted {
+  transform: translateY(-50%) scale(1.25);
+}
+
+.emote-option:nth-child(6):hover,
+.emote-option:nth-child(6).highlighted {
+  transform: translateX(-50%) scale(1.25);
+}
+
+.emote-option:nth-child(8):hover,
+.emote-option:nth-child(8).highlighted {
+  transform: translateY(-50%) scale(1.25);
 }
 
 /* Voice indicator above player */
@@ -167,14 +219,22 @@
 /* Help text */
 #emote-help {
   position: absolute;
-  bottom: 20px;
+  bottom: 30px;
   left: 50%;
   transform: translateX(-50%);
-  background: rgba(0, 0, 0, 0.8);
+  background: rgba(0, 0, 0, 0.9);
   color: white;
-  padding: 10px 20px;
-  border-radius: 10px;
-  font-size: 14px;
+  padding: 12px 24px;
+  border-radius: 12px;
+  font-size: 15px;
   z-index: 100;
+  border: 2px solid rgba(255, 215, 0, 0.3);
+  backdrop-filter: blur(10px);
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5);
+  white-space: nowrap;
 }
 
+#emote-help strong {
+  color: #ffd700;
+  font-size: 16px;
+}
