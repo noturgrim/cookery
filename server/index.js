@@ -31,7 +31,7 @@ const gameState = {
 };
 
 // Server configuration
-const SERVER_TICK_RATE = 30; // 30 updates per second
+const SERVER_TICK_RATE = 20; // Reduced from 30 to 20 updates per second for bandwidth
 const PLAYER_SPEED = 0.15; // Units per tick
 const PLAYER_SIZE = { width: 1, height: 2, depth: 1 }; // Player AABB dimensions
 const GRID_SIZE = 0.8; // Grid cell size for pathfinding (larger = safer paths)

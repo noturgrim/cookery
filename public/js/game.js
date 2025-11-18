@@ -98,12 +98,16 @@ class Game {
     this.camera.position.set(15, 15, 15);
     this.camera.lookAt(0, 0, 0);
 
-    // Create renderer
-    this.renderer = new THREE.WebGLRenderer({ antialias: true });
+    // Create renderer with performance optimizations
+    this.renderer = new THREE.WebGLRenderer({
+      antialias: false, // Disable for performance
+      powerPreference: "high-performance",
+    });
     this.renderer.setSize(window.innerWidth, window.innerHeight);
-    this.renderer.setPixelRatio(window.devicePixelRatio);
+    // Limit pixel ratio for performance on high-DPI displays
+    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
     this.renderer.shadowMap.enabled = true;
-    this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    this.renderer.shadowMap.type = THREE.BasicShadowMap; // Faster shadow type
 
     document
       .getElementById("game-container")
@@ -120,13 +124,13 @@ class Game {
     directionalLight.position.set(10, 20, 10);
     directionalLight.castShadow = true;
 
-    // Configure shadow properties
+    // Configure shadow properties (optimized)
     directionalLight.shadow.camera.left = -30;
     directionalLight.shadow.camera.right = 30;
     directionalLight.shadow.camera.top = 30;
     directionalLight.shadow.camera.bottom = -30;
-    directionalLight.shadow.mapSize.width = 2048;
-    directionalLight.shadow.mapSize.height = 2048;
+    directionalLight.shadow.mapSize.width = 1024; // Reduced from 2048
+    directionalLight.shadow.mapSize.height = 1024;
 
     this.scene.add(directionalLight);
   }
@@ -147,8 +151,8 @@ class Game {
     this.floor.receiveShadow = true;
     this.scene.add(this.floor);
 
-    // Add grid helper for visual reference
-    const gridHelper = new THREE.GridHelper(40, 40, 0x444444, 0x888888);
+    // Add grid helper for visual reference (optimized divisions)
+    const gridHelper = new THREE.GridHelper(40, 20, 0x444444, 0x888888); // Reduced from 40 to 20 divisions
     this.scene.add(gridHelper);
   }
 
@@ -485,11 +489,12 @@ class Game {
               child.castShadow = true;
               child.receiveShadow = true;
 
-              // Fix transparency issues
+              // Fix transparency issues and optimize
               if (child.material) {
                 child.material.transparent = false;
                 child.material.opacity = 1.0;
                 child.material.depthWrite = true;
+                child.material.flatShading = true; // Better performance
               }
             }
           });
@@ -954,6 +959,9 @@ class Game {
     requestAnimationFrame(() => this.animate());
 
     const delta = this.clock.getDelta();
+
+    // Skip frame if delta is too large (tab was inactive)
+    if (delta > 0.1) return;
 
     // Interpolate player positions for smooth movement
     const lerpFactor = 0.3; // Smoothing factor (0-1)
