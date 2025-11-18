@@ -38,6 +38,12 @@ class Game {
       KeyD: "d",
     };
 
+    // Click to move
+    this.raycaster = new THREE.Raycaster();
+    this.mouse = new THREE.Vector2();
+    this.targetPosition = null; // Click destination
+    this.pathLine = null; // Visual path trace
+
     this.init();
   }
 
@@ -634,6 +640,13 @@ class Game {
         }
       });
     });
+
+    // Handle path updates from server
+    this.socket.on("pathUpdate", (data) => {
+      if (data.playerId === this.playerId && data.path) {
+        this.drawPathTrace(data.path);
+      }
+    });
   }
 
   /**
@@ -658,6 +671,121 @@ class Game {
         this.sendInput();
       }
     });
+
+    // Click to move
+    window.addEventListener("click", (e) => this.handleClick(e));
+    window.addEventListener("mousemove", (e) => this.handleMouseMove(e));
+  }
+
+  /**
+   * Handle mouse move for raycasting
+   */
+  handleMouseMove(event) {
+    // Calculate mouse position in normalized device coordinates (-1 to +1)
+    this.mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+    this.mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+  }
+
+  /**
+   * Handle click to move
+   */
+  handleClick(event) {
+    // Update raycaster
+    this.raycaster.setFromCamera(this.mouse, this.camera);
+
+    // Check intersection with floor
+    const intersects = this.raycaster.intersectObject(this.floor);
+
+    if (intersects.length > 0) {
+      const point = intersects[0].point;
+
+      // Set target position
+      this.targetPosition = { x: point.x, y: 0, z: point.z };
+
+      // Send move command to server
+      if (this.socket) {
+        this.socket.emit("moveTo", {
+          x: point.x,
+          z: point.z,
+        });
+      }
+
+      // Visual feedback - create a marker
+      this.createMoveMarker(point.x, point.z);
+
+      console.log(
+        `🎯 Moving to: (${point.x.toFixed(2)}, ${point.z.toFixed(2)})`
+      );
+    }
+  }
+
+  /**
+   * Create visual marker for click destination
+   */
+  createMoveMarker(x, z) {
+    // Remove old marker if exists
+    if (this.moveMarker) {
+      this.scene.remove(this.moveMarker);
+    }
+
+    // Create a ring marker
+    const geometry = new THREE.RingGeometry(0.3, 0.5, 16);
+    const material = new THREE.MeshBasicMaterial({
+      color: 0x00ff00,
+      side: THREE.DoubleSide,
+      transparent: true,
+      opacity: 0.7,
+    });
+    this.moveMarker = new THREE.Mesh(geometry, material);
+    this.moveMarker.rotation.x = -Math.PI / 2;
+    this.moveMarker.position.set(x, 0.1, z);
+
+    this.scene.add(this.moveMarker);
+
+    // Fade out and remove after 1 second
+    setTimeout(() => {
+      if (this.moveMarker) {
+        this.scene.remove(this.moveMarker);
+        this.moveMarker = null;
+      }
+    }, 1000);
+  }
+
+  /**
+   * Draw path trace line showing the route
+   */
+  drawPathTrace(path) {
+    // Remove old path line
+    if (this.pathLine) {
+      this.scene.remove(this.pathLine);
+    }
+
+    if (!path || path.length < 2) return;
+
+    // Create line geometry from path points
+    const points = path.map(
+      (point) => new THREE.Vector3(point.x, 0.15, point.z)
+    );
+    const geometry = new THREE.BufferGeometry().setFromPoints(points);
+
+    // Create dashed line material
+    const material = new THREE.LineBasicMaterial({
+      color: 0x00ffff,
+      linewidth: 3,
+      transparent: true,
+      opacity: 0.8,
+    });
+
+    this.pathLine = new THREE.Line(geometry, material);
+    this.scene.add(this.pathLine);
+
+    // Fade out path after 2 seconds
+    setTimeout(() => {
+      if (this.pathLine) {
+        this.scene.remove(this.pathLine);
+        this.pathLine = null;
+      }
+    }, 2000);
   }
 
   /**
