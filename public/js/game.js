@@ -524,6 +524,17 @@ class Game {
    * Create a player with GLB model or fallback to primitives
    */
   createPlayer(playerData) {
+    // Check if player already exists
+    if (this.players.has(playerData.id)) {
+      console.log("⚠️ Player already exists, removing old one:", playerData.id);
+      const existingPlayer = this.players.get(playerData.id);
+      if (existingPlayer.mesh) {
+        this.scene.remove(existingPlayer.mesh);
+      }
+      this.players.delete(playerData.id);
+      this.mixers.delete(playerData.id);
+    }
+
     const group = new THREE.Group();
 
     // Use GLB model if available, otherwise fallback to primitives
@@ -936,6 +947,15 @@ class Game {
       console.log("🎮 Connected to game server");
       this.playerId = data.playerId;
 
+      // Clear any existing players first (in case of reconnection)
+      this.players.forEach((player) => {
+        if (player.mesh) {
+          this.scene.remove(player.mesh);
+        }
+      });
+      this.players.clear();
+      this.mixers.clear();
+
       // Create all existing players
       data.players.forEach((player) => {
         this.createPlayer(player);
@@ -950,7 +970,16 @@ class Game {
     // Handle new player joining
     this.socket.on("playerJoined", (playerData) => {
       console.log("👋 Player joined:", playerData.id);
-      this.createPlayer(playerData);
+
+      // Don't create duplicate if player already exists
+      if (!this.players.has(playerData.id)) {
+        this.createPlayer(playerData);
+      } else {
+        console.log(
+          "⚠️ Player already exists, skipping duplicate:",
+          playerData.id
+        );
+      }
     });
 
     // Handle player leaving
