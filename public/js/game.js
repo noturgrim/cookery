@@ -53,16 +53,14 @@ class Game {
     // Player customization
     this.playerName = "";
     this.playerSkin = 0; // Index of character model
-    this.availableSkins = [
-      { id: 0, name: "Chef A", char: "character-a" },
-      { id: 1, name: "Chef B", char: "character-b" },
-      { id: 2, name: "Chef C", char: "character-c" },
-      { id: 3, name: "Chef D", char: "character-d" },
-      { id: 4, name: "Chef E", char: "character-e" },
-      { id: 5, name: "Chef F", char: "character-f" },
-      { id: 6, name: "Chef G", char: "character-g" },
-      { id: 7, name: "Chef H", char: "character-h" },
-    ];
+    this.availableSkins = Array.from({ length: 18 }, (_, i) => ({
+      id: i,
+      name: `Chef ${String.fromCharCode(65 + i)}`, // A, B, C, ..., R
+      char: `character-${String.fromCharCode(97 + i)}`, // character-a, character-b, ..., character-r
+    }));
+
+    // Game state flags
+    this.isGameRunning = false;
 
     this.initWelcomeScreen();
   }
@@ -80,9 +78,14 @@ class Game {
       this.playerName = savedName;
       this.playerSkin = parseInt(savedSkin);
       document.getElementById("welcome-modal").classList.add("hidden");
+
+      // Initialize game immediately
       this.init();
     } else {
-      // Show welcome modal
+      // Initialize game first to load models for preview
+      this.initForPreview();
+
+      // Show welcome modal after models load
       this.setupWelcomeModal();
     }
 
@@ -93,35 +96,76 @@ class Game {
   }
 
   /**
+   * Initialize just enough to show model previews (without socket)
+   */
+  initForPreview() {
+    if (this.scene) return;
+
+    this.setupScene();
+    this.setupLights();
+    this.createFloor();
+
+    // Start rendering loop so we can see the scene
+    this.animate();
+
+    // Load models for preview
+    this.loadCharacterModels();
+
+    // Handle window resize
+    window.addEventListener("resize", () => this.handleResize());
+
+    // Don't call setupSocket or setupInput yet
+  }
+
+  /**
    * Setup welcome modal
    */
   setupWelcomeModal() {
     const skinSelector = document.getElementById("skin-selector");
 
-    // Generate skin options
-    this.availableSkins.forEach((skin) => {
-      const option = document.createElement("div");
-      option.className = "skin-option";
-      option.dataset.skinId = skin.id;
-      option.dataset.name = skin.name;
-      option.textContent = "👨‍🍳";
-      option.style.filter = `hue-rotate(${skin.id * 45}deg)`;
+    // Show loading state
+    skinSelector.innerHTML =
+      '<div style="color: white; padding: 20px; text-align: center;">Loading characters...</div>';
 
-      if (skin.id === 0) {
-        option.classList.add("selected");
-        this.playerSkin = 0;
-      }
+    // Wait for models to load, then generate previews
+    const checkModelsLoaded = setInterval(() => {
+      if (this.characterModels.length > 0) {
+        clearInterval(checkModelsLoaded);
+        skinSelector.innerHTML = ""; // Clear loading message
 
-      option.addEventListener("click", () => {
-        document.querySelectorAll(".skin-option").forEach((o) => {
-          o.classList.remove("selected");
+        // Generate skin options with 3D model previews
+        this.availableSkins.forEach((skin) => {
+          const option = document.createElement("div");
+          option.className = "skin-option";
+          option.dataset.skinId = skin.id;
+          option.dataset.name = skin.name;
+
+          // Create a mini canvas for each character preview
+          const canvas = document.createElement("canvas");
+          canvas.width = 200;
+          canvas.height = 200;
+          option.appendChild(canvas);
+
+          // Render the character model to this canvas
+          this.renderCharacterPreview(canvas, skin.id);
+
+          if (skin.id === 0) {
+            option.classList.add("selected");
+            this.playerSkin = 0;
+          }
+
+          option.addEventListener("click", () => {
+            document.querySelectorAll(".skin-option").forEach((o) => {
+              o.classList.remove("selected");
+            });
+            option.classList.add("selected");
+            this.playerSkin = skin.id;
+          });
+
+          skinSelector.appendChild(option);
         });
-        option.classList.add("selected");
-        this.playerSkin = skin.id;
-      });
-
-      skinSelector.appendChild(option);
-    });
+      }
+    }, 100);
 
     // Handle start button
     document.getElementById("start-game-btn").addEventListener("click", () => {
@@ -140,9 +184,35 @@ class Game {
       localStorage.setItem("supercooked_playerName", this.playerName);
       localStorage.setItem("supercooked_playerSkin", this.playerSkin);
 
-      // Hide modal and start game
+      // Hide modal
       document.getElementById("welcome-modal").classList.add("hidden");
-      this.init();
+
+      console.log(
+        "🎮 Starting game with:",
+        this.playerName,
+        "Skin:",
+        this.playerSkin
+      );
+      console.log(
+        "Scene ready:",
+        !!this.scene,
+        "Renderer ready:",
+        !!this.renderer
+      );
+
+      // Now fully initialize the game if not already done
+      if (!this.socket) {
+        // First time - complete initialization
+        console.log("🔌 Initializing socket and input...");
+        this.completeInitialization();
+      } else {
+        // Settings changed - update server
+        console.log("♻️ Updating player customization...");
+        this.socket.emit("playerCustomization", {
+          name: this.playerName,
+          skinIndex: this.playerSkin,
+        });
+      }
     });
 
     // Allow Enter key to submit
@@ -151,6 +221,73 @@ class Game {
         document.getElementById("start-game-btn").click();
       }
     });
+  }
+
+  /**
+   * Render a character model preview to a canvas
+   */
+  renderCharacterPreview(canvas, modelIndex) {
+    if (modelIndex >= this.characterModels.length) {
+      console.warn(
+        `Model index ${modelIndex} out of range. Only ${this.characterModels.length} models loaded.`
+      );
+      return;
+    }
+
+    // Create a mini scene for preview
+    const previewScene = new THREE.Scene();
+    previewScene.background = new THREE.Color(0x2a2a3a);
+
+    // Mini camera - wider FOV and further back to fit whole character
+    const previewCamera = new THREE.PerspectiveCamera(50, 1, 0.1, 100);
+    previewCamera.position.set(0, 1.2, 3.5);
+    previewCamera.lookAt(0, 0.8, 0);
+
+    // Lighting for preview
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.8);
+    previewScene.add(ambientLight);
+    const directionalLight = new THREE.DirectionalLight(0xffffff, 0.6);
+    directionalLight.position.set(1, 2, 2);
+    previewScene.add(directionalLight);
+
+    // Clone the character model
+    const modelData = this.characterModels[modelIndex];
+    if (!modelData || !modelData.scene) {
+      console.warn(`Character model ${modelIndex} not loaded properly`);
+      return;
+    }
+
+    const characterModel = modelData.scene.clone();
+    characterModel.scale.set(1.2, 1.2, 1.2);
+    characterModel.rotation.y = Math.PI / 6; // Slight angle
+    characterModel.position.y = 0; // Center vertically
+    previewScene.add(characterModel);
+
+    // Create temporary offscreen canvas to avoid context limit
+    const offscreenCanvas = document.createElement("canvas");
+    offscreenCanvas.width = 200;
+    offscreenCanvas.height = 200;
+
+    // Create mini renderer on offscreen canvas
+    const previewRenderer = new THREE.WebGLRenderer({
+      canvas: offscreenCanvas,
+      antialias: false,
+      alpha: true,
+      preserveDrawingBuffer: true,
+    });
+    previewRenderer.setSize(200, 200);
+
+    // Render once
+    previewRenderer.render(previewScene, previewCamera);
+
+    // Copy to display canvas using 2D context
+    const ctx = canvas.getContext("2d");
+    ctx.drawImage(offscreenCanvas, 0, 0);
+
+    // CRITICAL: Dispose renderer immediately to free WebGL context
+    previewRenderer.dispose();
+    previewRenderer.forceContextLoss();
+    previewRenderer.domElement = null;
   }
 
   /**
@@ -163,13 +300,23 @@ class Game {
     // Pre-fill current values
     document.getElementById("player-name").value = this.playerName;
 
-    // Update selected skin
-    document.querySelectorAll(".skin-option").forEach((option) => {
-      option.classList.remove("selected");
-      if (parseInt(option.dataset.skinId) === this.playerSkin) {
-        option.classList.add("selected");
-      }
-    });
+    // Re-generate skin selector if needed
+    const skinSelector = document.getElementById("skin-selector");
+    if (
+      skinSelector.children.length === 0 ||
+      !skinSelector.querySelector(".skin-option canvas")
+    ) {
+      // Need to regenerate with models
+      this.setupWelcomeModal();
+    } else {
+      // Update selected skin
+      document.querySelectorAll(".skin-option").forEach((option) => {
+        option.classList.remove("selected");
+        if (parseInt(option.dataset.skinId) === this.playerSkin) {
+          option.classList.add("selected");
+        }
+      });
+    }
   }
 
   init() {
@@ -178,19 +325,50 @@ class Game {
     this.setupScene();
     this.setupLights();
     this.createFloor();
-    this.loadCharacterModels().then(() => {
-      this.isModelsLoaded = true;
-      this.setupSocket();
-      console.log("✅ Character models loaded");
 
-      // Spawn some demo food items on counters
-      this.spawnDemoFoodItems();
-    });
-    this.setupInput();
+    // Start animation loop
     this.animate();
 
     // Handle window resize
     window.addEventListener("resize", () => this.handleResize());
+
+    this.loadCharacterModels().then(() => {
+      this.isModelsLoaded = true;
+      this.completeInitialization();
+    });
+  }
+
+  /**
+   * Complete the initialization after models load and user selects character
+   */
+  completeInitialization() {
+    if (this.isGameRunning) {
+      console.log("⚠️ Game already running");
+      return;
+    }
+
+    console.log("🚀 Complete initialization starting...");
+
+    this.setupSocket();
+    this.setupInput();
+
+    // If animate loop isn't running yet, start it
+    if (!this.renderer) {
+      console.log("🎬 Starting renderer...");
+      this.animate();
+      window.addEventListener("resize", () => this.handleResize());
+    }
+
+    this.isGameRunning = true;
+
+    console.log("✅ Game fully started!");
+    console.log("   - Scene:", !!this.scene);
+    console.log("   - Renderer:", !!this.renderer);
+    console.log("   - Camera:", !!this.camera);
+    console.log("   - Socket:", !!this.socket);
+
+    // Spawn some demo food items on counters
+    this.spawnDemoFoodItems();
   }
 
   /**
@@ -286,7 +464,7 @@ class Game {
       String.fromCharCode(97 + i)
     ); // 97 = 'a' in ASCII
 
-    const loadPromises = characters.map((letter) => {
+    const loadPromises = characters.map((letter, index) => {
       return new Promise((resolve) => {
         this.gltfLoader.load(
           `/models/glb/character-${letter}.glb`,
@@ -298,12 +476,17 @@ class Game {
                 child.receiveShadow = true;
               }
             });
+            console.log(`✅ Loaded character-${letter}.glb (index ${index})`);
             // Store both scene and animations
-            resolve({ scene: gltf.scene, animations: gltf.animations });
+            resolve({
+              scene: gltf.scene,
+              animations: gltf.animations,
+              letter: letter,
+            });
           },
           undefined,
           (error) => {
-            console.warn(`Failed to load character-${letter}.glb:`, error);
+            console.error(`❌ Failed to load character-${letter}.glb:`, error);
             resolve(null); // Don't reject, just skip this model
           }
         );
@@ -312,6 +495,22 @@ class Game {
 
     const loadedModels = await Promise.all(loadPromises);
     this.characterModels = loadedModels.filter((model) => model !== null);
+
+    console.log(
+      `📦 Total loaded: ${this.characterModels.length} out of 18 character models`
+    );
+
+    // Log which models failed to load
+    const failedModels = characters.filter(
+      (letter, index) => !loadedModels[index]
+    );
+    if (failedModels.length > 0) {
+      console.warn(
+        `⚠️ Missing models: character-${failedModels.join(
+          ".glb, character-"
+        )}.glb`
+      );
+    }
 
     // Fallback: if no models loaded, we'll use primitives
     if (this.characterModels.length === 0) {
@@ -1087,6 +1286,9 @@ class Game {
    */
   animate() {
     requestAnimationFrame(() => this.animate());
+
+    // Don't render if scene/renderer not ready
+    if (!this.scene || !this.renderer || !this.camera) return;
 
     const delta = this.clock.getDelta();
 
