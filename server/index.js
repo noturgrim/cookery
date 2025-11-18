@@ -624,6 +624,19 @@ io.on("connection", (socket) => {
     }
   });
 
+  // Handle emote/voice from players
+  socket.on("playEmote", (data) => {
+    const { playerId, emote } = data;
+
+    // Broadcast to all players (including sender for consistency)
+    io.emit("playerEmote", {
+      playerId: playerId,
+      emote: emote,
+    });
+
+    console.log(`🎵 Player ${playerId} played emote: ${emote}`);
+  });
+
   // Handle disconnection
   socket.on("disconnect", () => {
     console.log(`Player disconnected: ${socket.id}`);

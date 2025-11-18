@@ -67,11 +67,47 @@ class Game {
     this.soundManager = new SoundManager();
     this.footstepCounter = 0; // Track which foot is stepping
 
+    // Show audio unlock notice if needed
+    this.setupAudioUnlockNotice();
+
     // Emote/Voice wheel
     this.emoteWheelActive = false;
     this.selectedEmote = null;
 
     this.initWelcomeScreen();
+  }
+
+  /**
+   * Setup audio unlock notice (browser security requirement)
+   */
+  setupAudioUnlockNotice() {
+    const notice = document.getElementById("audio-unlock-notice");
+
+    // Show notice after 2 seconds if audio isn't unlocked
+    setTimeout(() => {
+      if (!this.soundManager.audioUnlocked && notice) {
+        notice.style.display = "block";
+      }
+    }, 2000);
+
+    // Hide notice when audio is unlocked
+    const hideNotice = () => {
+      if (this.soundManager.audioUnlocked && notice) {
+        notice.style.transition = "opacity 0.3s";
+        notice.style.opacity = "0";
+        setTimeout(() => {
+          notice.style.display = "none";
+        }, 300);
+      }
+    };
+
+    // Check periodically
+    const checkInterval = setInterval(() => {
+      if (this.soundManager.audioUnlocked) {
+        hideNotice();
+        clearInterval(checkInterval);
+      }
+    }, 500);
   }
 
   /**

@@ -8,12 +8,51 @@ export class SoundManager {
     this.sounds = new Map();
     this.enabled = true;
     this.masterVolume = 0.3; // 30% volume by default
+    this.audioUnlocked = false; // Browser requires user interaction to play audio
 
     // Check if user has sound preference saved
     const savedSoundPref = localStorage.getItem("supercooked_soundEnabled");
     if (savedSoundPref !== null) {
       this.enabled = savedSoundPref === "true";
     }
+
+    // Unlock audio on first user interaction
+    this.unlockAudio();
+  }
+
+  /**
+   * Unlock audio context on first user interaction (browser requirement)
+   */
+  unlockAudio() {
+    const unlockHandler = () => {
+      if (this.audioUnlocked) return;
+
+      // Create and play a silent sound to unlock audio
+      const silentAudio = new Audio();
+      silentAudio.src =
+        "data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAgAAAAEA";
+      silentAudio.volume = 0;
+
+      silentAudio
+        .play()
+        .then(() => {
+          this.audioUnlocked = true;
+          console.log("🔊 Audio unlocked!");
+
+          // Remove listeners after unlock
+          document.removeEventListener("click", unlockHandler);
+          document.removeEventListener("keydown", unlockHandler);
+          document.removeEventListener("touchstart", unlockHandler);
+        })
+        .catch(() => {
+          // Audio unlock failed, will try again on next interaction
+        });
+    };
+
+    // Listen for any user interaction
+    document.addEventListener("click", unlockHandler);
+    document.addEventListener("keydown", unlockHandler);
+    document.addEventListener("touchstart", unlockHandler);
   }
 
   /**
@@ -45,6 +84,12 @@ export class SoundManager {
    */
   play(name, options = {}) {
     if (!this.enabled) return;
+
+    // Don't play if audio isn't unlocked yet
+    if (!this.audioUnlocked) {
+      console.warn("⚠️ Audio not unlocked yet. Click or press a key first.");
+      return;
+    }
 
     const sound = this.sounds.get(name);
     if (!sound) {
