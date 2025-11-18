@@ -195,14 +195,21 @@ class Game {
       const modelData = this.characterModels[modelIndex];
       const characterModel = modelData.scene.clone();
 
-      // Apply color tint to the model
+      // Keep original textures but fix transparency issues
       characterModel.traverse((child) => {
         if (child.isMesh) {
-          // Create new material with player color tint
+          // Clone material to avoid modifying the original
           child.material = child.material.clone();
-          child.material.color = new THREE.Color(playerData.color);
-          child.material.roughness = 0.7;
-          child.material.metalness = 0.2;
+
+          // Fix transparency issues (keep original colors/textures)
+          child.material.transparent = false;
+          child.material.opacity = 1.0;
+          child.material.alphaTest = 0;
+          child.material.depthWrite = true;
+          child.material.side = THREE.FrontSide;
+
+          // Force material update
+          child.material.needsUpdate = true;
         }
       });
 
