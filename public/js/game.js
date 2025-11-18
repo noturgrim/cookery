@@ -1,6 +1,7 @@
 import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js";
 import { GLTFLoader } from "https://unpkg.com/three@0.160.0/examples/jsm/loaders/GLTFLoader.js";
 import { io } from "https://cdn.socket.io/4.6.1/socket.io.esm.min.js";
+import { SoundManager } from "./soundManager.js";
 
 /**
  * SCENE SETUP - Orthographic Camera for Isometric "Overcooked" Look
@@ -61,6 +62,10 @@ class Game {
 
     // Game state flags
     this.isGameRunning = false;
+
+    // Sound manager
+    this.soundManager = new SoundManager();
+    this.footstepCounter = 0; // Track which foot is stepping
 
     this.initWelcomeScreen();
   }
@@ -367,8 +372,26 @@ class Game {
     console.log("   - Camera:", !!this.camera);
     console.log("   - Socket:", !!this.socket);
 
+    // Load sound effects
+    this.loadSoundEffects();
+
     // Spawn some demo food items on counters
     this.spawnDemoFoodItems();
+  }
+
+  /**
+   * Load all sound effects
+   */
+  async loadSoundEffects() {
+    console.log("🔊 Loading sound effects...");
+
+    // Load footstep sound
+    await this.soundManager.loadSound("footstep", "/sounds/step.mp3");
+
+    // Load UI sounds (optional)
+    await this.soundManager.loadSound("click", "/sounds/click.mp3");
+
+    console.log("🔊 Sound effects loaded!");
   }
 
   /**
@@ -719,6 +742,28 @@ class Game {
   updateWalkingAnimation(playerId, isMoving) {
     const mixerData = this.mixers.get(playerId);
     if (!mixerData) return;
+
+    // Play footstep sound for current player when walking
+    if (isMoving && playerId === this.playerId) {
+      // Check if we should play a footstep (roughly every 0.3 seconds during walk cycle)
+      const isCurrentPlayer = playerId === this.playerId;
+      if (isCurrentPlayer && !mixerData.lastFootstepTime) {
+        mixerData.lastFootstepTime = 0;
+        mixerData.footstepInterval = 0.3; // Time between footsteps (in seconds)
+      }
+
+      if (isCurrentPlayer) {
+        const currentTime = performance.now() / 1000; // Convert to seconds
+        if (
+          currentTime - mixerData.lastFootstepTime >=
+          mixerData.footstepInterval
+        ) {
+          this.soundManager.playFootstep(this.footstepCounter);
+          this.footstepCounter++;
+          mixerData.lastFootstepTime = currentTime;
+        }
+      }
+    }
 
     const { mixer } = mixerData;
     const limbs = mixer.userData;
