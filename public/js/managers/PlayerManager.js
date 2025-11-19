@@ -107,6 +107,12 @@ export class PlayerManager {
 
     // Start spawn animation
     this.playSpawnAnimation(playerData.id);
+
+    // Send player dimensions to server if this is the current player
+    if (isCurrentPlayer && this.networkManager) {
+      const boundingBox = this.sceneManager.calculateBoundingBox(group);
+      this.networkManager.updatePlayerDimensions(boundingBox);
+    }
   }
 
   /**

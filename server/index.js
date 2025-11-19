@@ -86,14 +86,16 @@ const checkAABBCollision = (box1, box2) => {
 };
 
 const getPlayerAABB = (player) => {
-  const halfWidth = PLAYER_SIZE.width / 2;
-  const halfDepth = PLAYER_SIZE.depth / 2;
+  // Use player's actual dimensions (from character model)
+  const halfWidth = (player.width || PLAYER_SIZE.width) / 2;
+  const halfDepth = (player.depth || PLAYER_SIZE.depth) / 2;
+  const height = player.height || PLAYER_SIZE.height;
 
   return {
     minX: player.x - halfWidth,
     maxX: player.x + halfWidth,
     minY: player.y,
-    maxY: player.y + PLAYER_SIZE.height,
+    maxY: player.y + height,
     minZ: player.z - halfDepth,
     maxZ: player.z + halfDepth,
   };
@@ -768,6 +770,10 @@ io.on("connection", (socket) => {
     path: null, // A* pathfinding waypoints
     stuckCounter: 0, // Counter to detect if player is stuck
     lastPosition: null, // Track position to detect stuck state
+    // Default dimensions (will be updated by client after mesh loads)
+    width: PLAYER_SIZE.width,
+    height: PLAYER_SIZE.height,
+    depth: PLAYER_SIZE.depth,
   };
 
   gameState.players.set(socket.id, newPlayer);
@@ -791,6 +797,21 @@ io.on("connection", (socket) => {
       io.emit("playerJoined", player);
 
       console.log(`👨‍🍳 ${player.name} (${socket.id}) joined the kitchen!`);
+    }
+  });
+
+  // Handle player dimensions update from client
+  socket.on("updatePlayerDimensions", (data) => {
+    const player = gameState.players.get(socket.id);
+    if (player && data) {
+      player.width = data.width || PLAYER_SIZE.width;
+      player.height = data.height || PLAYER_SIZE.height;
+      player.depth = data.depth || PLAYER_SIZE.depth;
+      console.log(
+        `📦 Updated player ${socket.id} dimensions: ${player.width.toFixed(
+          2
+        )}×${player.height.toFixed(2)}×${player.depth.toFixed(2)}`
+      );
     }
   });
 

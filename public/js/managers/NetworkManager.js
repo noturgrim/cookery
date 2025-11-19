@@ -32,6 +32,23 @@ export class NetworkManager {
   }
 
   /**
+   * Update player dimensions on the server
+   */
+  updatePlayerDimensions(boundingBox) {
+    if (!this.socket) return;
+
+    const width = boundingBox.max.x - boundingBox.min.x;
+    const height = boundingBox.max.y - boundingBox.min.y;
+    const depth = boundingBox.max.z - boundingBox.min.z;
+
+    this.socket.emit("updatePlayerDimensions", {
+      width,
+      height,
+      depth,
+    });
+  }
+
+  /**
    * Setup Socket.io connection
    */
   setupSocket() {
@@ -39,6 +56,7 @@ export class NetworkManager {
 
     // Send player customization on connection
     this.socket.on("connect", () => {
+      // Send initial data without dimensions (will update after mesh loads)
       this.socket.emit("playerCustomization", {
         name: this.playerName,
         skinIndex: this.playerSkin,
