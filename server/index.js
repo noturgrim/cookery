@@ -125,14 +125,18 @@ const validatePlayerMovement = (player, newX, newZ) => {
     return false;
   }
 
-  // Create player AABB at new position
+  // Create player AABB at new position using actual player dimensions
+  const halfWidth = (player.width || PLAYER_SIZE.width) / 2;
+  const halfDepth = (player.depth || PLAYER_SIZE.depth) / 2;
+  const height = player.height || PLAYER_SIZE.height;
+
   const playerAABB = {
-    minX: newX - PLAYER_SIZE.width / 2,
-    maxX: newX + PLAYER_SIZE.width / 2,
+    minX: newX - halfWidth,
+    maxX: newX + halfWidth,
     minY: player.y,
-    maxY: player.y + PLAYER_SIZE.height,
-    minZ: newZ - PLAYER_SIZE.depth / 2,
-    maxZ: newZ + PLAYER_SIZE.depth / 2,
+    maxY: player.y + height,
+    minZ: newZ - halfDepth,
+    maxZ: newZ + halfDepth,
   };
 
   // Check collision with all obstacles (furniture)
@@ -173,11 +177,57 @@ class AStarPathfinder {
   constructor(obstacles, gridSize = GRID_SIZE) {
     this.obstacles = obstacles;
     this.gridSize = gridSize;
+    // Store player size for pathfinding (use default, will be updated per-player if needed)
+    this.playerSize = { ...PLAYER_SIZE };
   }
 
-  // Heuristic: Manhattan distance
+  // Update player size for pathfinding calculations
+  setPlayerSize(width, height, depth) {
+    this.playerSize.width = width || PLAYER_SIZE.width;
+    this.playerSize.height = height || PLAYER_SIZE.height;
+    this.playerSize.depth = depth || PLAYER_SIZE.depth;
+  }
+
+  // Heuristic: Euclidean distance (pure, no penalty here since we add it to gScore)
   heuristic(a, b) {
-    return Math.abs(a.x - b.x) + Math.abs(a.z - b.z);
+    // Base Euclidean distance (more natural than Manhattan)
+    const dx = a.x - b.x;
+    const dz = a.z - b.z;
+    return Math.sqrt(dx * dx + dz * dz);
+  }
+
+  // Calculate penalty for being near obstacles
+  getObstacleProximityPenalty(pos) {
+    let penalty = 0;
+    const penaltyRadius = this.gridSize * 3; // Check 3 grid cells around (increased range)
+
+    // Check obstacles
+    for (const obstacle of this.obstacles) {
+      const dx = pos.x - obstacle.x;
+      const dz = pos.z - obstacle.z;
+      const distance = Math.sqrt(dx * dx + dz * dz);
+
+      if (distance < penaltyRadius) {
+        // Closer to obstacle = much higher penalty
+        // Use quadratic falloff for stronger avoidance close to obstacles
+        const normalizedDist = 1 - distance / penaltyRadius;
+        penalty += normalizedDist * normalizedDist * 2.0; // Quadratic penalty, 2.0 strength
+      }
+    }
+
+    // Check food items (lighter penalty)
+    for (const foodItem of gameState.foodItems) {
+      const dx = pos.x - foodItem.x;
+      const dz = pos.z - foodItem.z;
+      const distance = Math.sqrt(dx * dx + dz * dz);
+
+      if (distance < penaltyRadius) {
+        const normalizedDist = 1 - distance / penaltyRadius;
+        penalty += normalizedDist * normalizedDist * 0.5; // Lighter for food
+      }
+    }
+
+    return penalty;
   }
 
   // Check if a grid position is walkable
@@ -189,14 +239,14 @@ class AStarPathfinder {
     }
 
     // Create a test AABB for the pathfinding grid cell
-    // Use exact player size for accurate pathfinding
+    // Use actual player size for accurate pathfinding
     const testAABB = {
-      minX: x - PLAYER_SIZE.width / 2,
-      maxX: x + PLAYER_SIZE.width / 2,
+      minX: x - this.playerSize.width / 2,
+      maxX: x + this.playerSize.width / 2,
       minY: 0,
-      maxY: PLAYER_SIZE.height,
-      minZ: z - PLAYER_SIZE.depth / 2,
-      maxZ: z + PLAYER_SIZE.depth / 2,
+      maxY: this.playerSize.height,
+      minZ: z - this.playerSize.depth / 2,
+      maxZ: z + this.playerSize.depth / 2,
     };
 
     // Check collision with all obstacles
@@ -232,28 +282,40 @@ class AStarPathfinder {
     return true; // Walkable
   }
 
-  // Get neighbors of a node
-  getNeighbors(node) {
+  // Get neighbors of a node with intelligent pruning
+  getNeighbors(node, parent = null) {
     const neighbors = [];
     const directions = [
-      { x: 1, z: 0 }, // Right
-      { x: -1, z: 0 }, // Left
-      { x: 0, z: 1 }, // Down
-      { x: 0, z: -1 }, // Up
-      { x: 1, z: 1 }, // Diagonal NE
-      { x: -1, z: 1 }, // Diagonal SE
-      { x: 1, z: -1 }, // Diagonal NW
-      { x: -1, z: -1 }, // Diagonal SW
+      { x: 1, z: 0, cost: 1.0 }, // Right
+      { x: -1, z: 0, cost: 1.0 }, // Left
+      { x: 0, z: 1, cost: 1.0 }, // Down
+      { x: 0, z: -1, cost: 1.0 }, // Up
+      { x: 1, z: 1, cost: 1.414 }, // Diagonal NE
+      { x: -1, z: 1, cost: 1.414 }, // Diagonal SE
+      { x: 1, z: -1, cost: 1.414 }, // Diagonal NW
+      { x: -1, z: -1, cost: 1.414 }, // Diagonal SW
     ];
 
-    for (const dir of directions) {
+    // If we have a parent, prioritize continuing in the same direction
+    let priorityDirections = directions;
+    if (parent) {
+      const dx = Math.sign(node.x - parent.x);
+      const dz = Math.sign(node.z - parent.z);
+
+      // Sort directions to prefer continuing in same direction
+      priorityDirections = [...directions].sort((a, b) => {
+        const aSimilarity = Math.abs(a.x - dx) + Math.abs(a.z - dz);
+        const bSimilarity = Math.abs(b.x - dx) + Math.abs(b.z - dz);
+        return aSimilarity - bSimilarity;
+      });
+    }
+
+    for (const dir of priorityDirections) {
       const newX = node.x + dir.x * this.gridSize;
       const newZ = node.z + dir.z * this.gridSize;
 
       // For diagonal movement, check if both adjacent cells are walkable
       if (dir.x !== 0 && dir.z !== 0) {
-        const checkX = node.x + dir.x * this.gridSize;
-        const checkZ = node.z + dir.z * this.gridSize;
         const adjacentX = node.x + dir.x * this.gridSize;
         const adjacentZ = node.z;
         const adjacentZ2 = node.z + dir.z * this.gridSize;
@@ -265,12 +327,12 @@ class AStarPathfinder {
           this.isWalkable(adjacentX, adjacentZ) &&
           this.isWalkable(adjacentX2, adjacentZ2)
         ) {
-          neighbors.push({ x: newX, z: newZ, cost: 1.414 });
+          neighbors.push({ x: newX, z: newZ, cost: dir.cost });
         }
       } else {
         // Straight movement
         if (this.isWalkable(newX, newZ)) {
-          neighbors.push({ x: newX, z: newZ, cost: 1.0 });
+          neighbors.push({ x: newX, z: newZ, cost: dir.cost });
         }
       }
     }
@@ -341,8 +403,9 @@ class AStarPathfinder {
         return this.simplifyPath(path);
       }
 
-      // Check neighbors
-      const neighbors = this.getNeighbors(current);
+      // Check neighbors (pass parent for intelligent direction pruning)
+      const parent = cameFrom.has(currentKey) ? cameFrom.get(currentKey) : null;
+      const neighbors = this.getNeighbors(current, parent);
       for (const neighborData of neighbors) {
         const neighbor = { x: neighborData.x, z: neighborData.z };
         const neighborKey = key(neighbor);
@@ -352,8 +415,12 @@ class AStarPathfinder {
           continue;
         }
 
+        // Add obstacle proximity cost to the actual path cost (not just heuristic)
+        const proximityCost = this.getObstacleProximityPenalty(neighbor);
         const tentativeGScore =
-          gScore.get(currentKey) + neighborData.cost * this.gridSize;
+          gScore.get(currentKey) +
+          neighborData.cost * this.gridSize +
+          proximityCost;
 
         if (
           !gScore.has(neighborKey) ||
@@ -446,20 +513,62 @@ class AStarPathfinder {
     if (path.length <= 2) return path;
 
     const simplified = [path[0]];
+    let i = 0;
 
+    while (i < path.length - 1) {
+      let farthest = i + 1;
+
+      // Find the farthest point we can reach with line of sight
+      for (let j = i + 2; j < path.length; j++) {
+        if (this.hasLineOfSight(path[i], path[j])) {
+          farthest = j;
+        } else {
+          break; // Stop checking once we lose line of sight
+        }
+      }
+
+      // Add the farthest reachable point
+      if (farthest < path.length - 1) {
+        simplified.push(path[farthest]);
+      }
+      i = farthest;
+    }
+
+    // Always add the final destination
+    if (simplified[simplified.length - 1] !== path[path.length - 1]) {
+      simplified.push(path[path.length - 1]);
+    }
+
+    // Apply path smoothing for more natural movement
+    return this.smoothPath(simplified);
+  }
+
+  // Smooth path using moving average for more natural curves
+  smoothPath(path) {
+    if (path.length <= 2) return path;
+
+    const smoothed = [path[0]]; // Keep start point
+
+    // Apply simple smoothing to intermediate points
     for (let i = 1; i < path.length - 1; i++) {
       const prev = path[i - 1];
       const current = path[i];
       const next = path[i + 1];
 
-      // Check if we can skip this waypoint (line of sight check)
-      if (!this.hasLineOfSight(prev, next)) {
-        simplified.push(current);
+      // Weighted average: favor current position but smooth towards neighbors
+      const smoothX = current.x * 0.5 + (prev.x + next.x) * 0.25;
+      const smoothZ = current.z * 0.5 + (prev.z + next.z) * 0.25;
+
+      // Only use smoothed point if it's still walkable
+      if (this.isWalkable(smoothX, smoothZ)) {
+        smoothed.push({ x: smoothX, z: smoothZ });
+      } else {
+        smoothed.push(current); // Keep original if smoothed isn't walkable
       }
     }
 
-    simplified.push(path[path.length - 1]);
-    return simplified;
+    smoothed.push(path[path.length - 1]); // Keep end point
+    return smoothed;
   }
 
   // Find the best position around an obstacle to interact with it
@@ -605,6 +714,9 @@ const processPlayerInput = (player) => {
   let deltaX = 0;
   let deltaZ = 0;
 
+  // Update pathfinder with this player's dimensions for any replanning
+  pathfinder.setPlayerSize(player.width, player.height, player.depth);
+
   // Check if player has a path to follow
   if (player.path && player.path.length > 0) {
     const nextWaypoint = player.path[0];
@@ -620,6 +732,37 @@ const processPlayerInput = (player) => {
         player.stuckCounter = 0;
       }
     } else {
+      // Check if the actual waypoint is blocked (not just look-ahead)
+      if (!pathfinder.isWalkable(nextWaypoint.x, nextWaypoint.z)) {
+        // Waypoint itself is now blocked (dynamic obstacle), skip to next or replan
+        console.log(`🚧 Player ${player.id} waypoint blocked, skipping...`);
+        player.path.shift(); // Remove blocked waypoint
+
+        // If no more waypoints, replan with cooldown
+        if (player.path.length === 0) {
+          player.replanCooldown = player.replanCooldown || 0;
+          if (player.replanCooldown === 0) {
+            console.log(`🔄 Replanning from scratch...`);
+            const path = pathfinder.findPath(
+              { x: player.x, z: player.z },
+              player.moveTarget
+            );
+            if (path.length > 1) {
+              player.path = path;
+              player.replanCooldown = 10; // Wait 10 ticks before replanning again
+            } else {
+              player.moveTarget = null; // Can't reach target
+            }
+          }
+        }
+        return { x: 0, z: 0 }; // Don't move this tick
+      }
+
+      // Decrease replan cooldown
+      if (player.replanCooldown > 0) {
+        player.replanCooldown--;
+      }
+
       // Move towards waypoint
       deltaX = (dx / distance) * PLAYER_SPEED;
       deltaZ = (dz / distance) * PLAYER_SPEED;
@@ -637,9 +780,9 @@ const processPlayerInput = (player) => {
         if (movedDistance < 0.01) {
           player.stuckCounter = (player.stuckCounter || 0) + 1;
 
-          // If stuck for too long, recalculate path
-          if (player.stuckCounter > 20) {
-            console.log(`Player ${player.id} stuck, recalculating path`);
+          // If stuck for too long, recalculate path with offset
+          if (player.stuckCounter > 15) {
+            console.log(`⚠️ Player ${player.id} stuck, force replanning...`);
             player.path = null;
             player.stuckCounter = 0;
 
@@ -702,23 +845,130 @@ const processPlayerInput = (player) => {
 
       // Calculate rotation based on movement direction
       player.rotation = Math.atan2(deltaX, deltaZ);
+
+      // Reset collision counter on successful movement
+      player.collisionCounter = 0;
     } else {
       // If collision detected during movement
-      if (player.path && player.path.length > 0) {
-        // Skip current waypoint if we can't reach it
-        player.path.shift();
-        if (player.path.length === 0) {
+      if (player.moveTarget) {
+        // Initialize or check collision counter
+        player.collisionCounter = (player.collisionCounter || 0) + 1;
+
+        // If stuck in same spot for too long, give up
+        if (player.collisionCounter > 30) {
+          console.log(
+            `❌ Player ${player.id} stuck after ${player.collisionCounter} collision attempts, giving up`
+          );
           player.moveTarget = null;
+          player.path = null;
+          player.collisionCounter = 0;
+          player.replanCooldown = 0;
+          return { x: 0, z: 0 };
         }
-      } else if (player.moveTarget) {
-        // Try to recalculate path
-        const start = { x: player.x, z: player.z };
-        const path = pathfinder.findPath(start, player.moveTarget);
-        if (path.length > 1) {
-          player.path = path;
-        } else {
-          player.moveTarget = null;
+
+        // Replan with cooldown
+        player.replanCooldown = player.replanCooldown || 0;
+        if (player.replanCooldown === 0) {
+          console.log(
+            `🚫 Player ${player.id} collision #${
+              player.collisionCounter
+            } at (${player.x.toFixed(2)}, ${player.z.toFixed(
+              2
+            )}), replanning...`
+          );
+
+          let start = { x: player.x, z: player.z };
+
+          // If multiple collisions, try to nudge player to a better position
+          if (player.collisionCounter > 5) {
+            console.log(`🔄 Attempting to move away from collision...`);
+
+            // Try multiple directions to find walkable space
+            const nudgeDistance = 0.3;
+            const directions = [
+              { x: nudgeDistance, z: 0 }, // Right
+              { x: -nudgeDistance, z: 0 }, // Left
+              { x: 0, z: nudgeDistance }, // Forward
+              { x: 0, z: -nudgeDistance }, // Back
+              { x: nudgeDistance, z: nudgeDistance }, // Diagonal
+              { x: -nudgeDistance, z: -nudgeDistance },
+              { x: nudgeDistance, z: -nudgeDistance },
+              { x: -nudgeDistance, z: nudgeDistance },
+            ];
+
+            for (const dir of directions) {
+              const testX = player.x + dir.x;
+              const testZ = player.z + dir.z;
+
+              if (validatePlayerMovement(player, testX, testZ)) {
+                // Found a walkable position, move there
+                player.x = testX;
+                player.z = testZ;
+                start = { x: testX, z: testZ };
+                console.log(
+                  `✨ Moved to (${testX.toFixed(2)}, ${testZ.toFixed(2)})`
+                );
+                player.collisionCounter = 0; // Reset after successful nudge
+                break;
+              }
+            }
+          }
+
+          const path = pathfinder.findPath(start, player.moveTarget);
+
+          if (path.length > 1) {
+            player.path = path;
+            player.replanCooldown = 10; // Longer cooldown to prevent spam
+            console.log(`✅ Replanned: ${path.length} waypoints`);
+          } else {
+            console.log(`❌ No path found from current position`);
+
+            // Try finding nearest walkable position as last resort
+            if (player.collisionCounter > 15) {
+              const nearestWalkable = pathfinder.findNearestWalkable({
+                x: player.x,
+                z: player.z,
+              });
+              if (
+                nearestWalkable &&
+                (nearestWalkable.x !== player.x ||
+                  nearestWalkable.z !== player.z)
+              ) {
+                console.log(
+                  `🚁 Teleporting to nearest walkable: (${nearestWalkable.x.toFixed(
+                    2
+                  )}, ${nearestWalkable.z.toFixed(2)})`
+                );
+                player.x = nearestWalkable.x;
+                player.z = nearestWalkable.z;
+                player.collisionCounter = 0;
+                // Try pathfinding again from new position
+                const newPath = pathfinder.findPath(
+                  nearestWalkable,
+                  player.moveTarget
+                );
+                if (newPath.length > 1) {
+                  player.path = newPath;
+                  player.replanCooldown = 10;
+                  console.log(
+                    `✅ Found path from teleport position: ${newPath.length} waypoints`
+                  );
+                } else {
+                  player.moveTarget = null;
+                  player.path = null;
+                }
+              } else {
+                player.moveTarget = null;
+                player.path = null;
+                player.collisionCounter = 0;
+              }
+            }
+          }
         }
+        // During cooldown, don't spam logs, just wait
+      } else {
+        player.path = null;
+        player.collisionCounter = 0;
       }
     }
   }
@@ -770,6 +1020,8 @@ io.on("connection", (socket) => {
     path: null, // A* pathfinding waypoints
     stuckCounter: 0, // Counter to detect if player is stuck
     lastPosition: null, // Track position to detect stuck state
+    replanCooldown: 0, // Cooldown to prevent infinite replanning
+    collisionCounter: 0, // Counter for consecutive collision detections
     // Default dimensions (will be updated by client after mesh loads)
     width: PLAYER_SIZE.width,
     height: PLAYER_SIZE.height,
@@ -980,6 +1232,9 @@ io.on("connection", (socket) => {
   socket.on("moveTo", (target) => {
     const player = gameState.players.get(socket.id);
     if (player && target.x !== undefined && target.z !== undefined) {
+      // Update pathfinder with player's actual dimensions
+      pathfinder.setPlayerSize(player.width, player.height, player.depth);
+
       // Calculate path using A*
       const start = { x: player.x, z: player.z };
       let goal = { x: target.x, z: target.z };
@@ -988,6 +1243,19 @@ io.on("connection", (socket) => {
       goal = pathfinder.findInteractionPoint(goal);
 
       const path = pathfinder.findPath(start, goal);
+
+      // Validate path doesn't go through obstacles
+      let pathValid = true;
+      for (let i = 0; i < path.length; i++) {
+        if (!pathfinder.isWalkable(path[i].x, path[i].z)) {
+          console.log(
+            `⚠️ WARNING: Waypoint ${i} at (${path[i].x.toFixed(2)}, ${path[
+              i
+            ].z.toFixed(2)}) is NOT walkable!`
+          );
+          pathValid = false;
+        }
+      }
 
       player.path = path;
       player.moveTarget = goal;
@@ -999,11 +1267,13 @@ io.on("connection", (socket) => {
       });
 
       console.log(
-        `🗺️ Player ${socket.id} pathfinding to (${target.x.toFixed(
+        `🗺️ Player ${socket.id} pathfinding: (${start.x.toFixed(
           2
-        )}, ${target.z.toFixed(2)}) → (${goal.x.toFixed(2)}, ${goal.z.toFixed(
+        )}, ${start.z.toFixed(2)}) → (${goal.x.toFixed(2)}, ${goal.z.toFixed(
           2
-        )}) - ${path.length} waypoints`
+        )}) - ${path.length} waypoints, ${
+          gameState.obstacles.length
+        } obstacles${pathValid ? " ✓" : " ✗ INVALID PATH"}`
       );
     }
   });
