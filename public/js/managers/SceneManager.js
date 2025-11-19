@@ -21,6 +21,57 @@ export class SceneManager {
 
     // Obstacles
     this.obstacles = [];
+
+    // Loading manager for textures
+    this.loadingManager = new THREE.LoadingManager();
+    this.textureLoader = new THREE.TextureLoader(this.loadingManager);
+
+    // Track loading progress
+    this.isLoading = true;
+    this.setupLoadingManager();
+  }
+
+  /**
+   * Setup loading manager to track asset loading
+   */
+  setupLoadingManager() {
+    this.loadingManager.onStart = (url, itemsLoaded, itemsTotal) => {
+      console.log(`🔄 Loading: ${url}`);
+    };
+
+    this.loadingManager.onProgress = (url, itemsLoaded, itemsTotal) => {
+      const progress = Math.round((itemsLoaded / itemsTotal) * 100);
+      console.log(`📦 Loading progress: ${progress}%`);
+
+      // Update loading screen if it exists
+      const loadingElement = document.getElementById("loading");
+      if (loadingElement) {
+        const loadingText = loadingElement.querySelector("div");
+        if (loadingText) {
+          loadingText.textContent = `🍳 Loading... ${progress}%`;
+        }
+      }
+    };
+
+    this.loadingManager.onLoad = () => {
+      console.log("✅ All assets loaded!");
+      this.isLoading = false;
+
+      // Hide loading screen after a short delay
+      setTimeout(() => {
+        const loadingElement = document.getElementById("loading");
+        if (loadingElement) {
+          loadingElement.style.opacity = "0";
+          setTimeout(() => {
+            loadingElement.style.display = "none";
+          }, 300);
+        }
+      }, 500);
+    };
+
+    this.loadingManager.onError = (url) => {
+      console.error(`❌ Error loading: ${url}`);
+    };
   }
 
   /**
@@ -88,14 +139,23 @@ export class SceneManager {
   }
 
   /**
-   * Create the game floor
+   * Create the game floor with texture
    */
   createFloor() {
     const floorGeometry = new THREE.PlaneGeometry(40, 40);
+
+    // Load texture from file using the loading manager
+    const texture = this.textureLoader.load("/floor/floor2.jpg");
+
+    // Configure texture for tiling
+    texture.wrapS = THREE.RepeatWrapping;
+    texture.wrapT = THREE.RepeatWrapping;
+    texture.repeat.set(8, 8); // Adjust this number to make tiles bigger (smaller number) or smaller (larger number)
+
     const floorMaterial = new THREE.MeshStandardMaterial({
-      color: 0x90ee90,
+      map: texture,
       roughness: 0.8,
-      metalness: 0.2,
+      metalness: 0.1,
     });
 
     this.floor = new THREE.Mesh(floorGeometry, floorMaterial);
@@ -103,8 +163,10 @@ export class SceneManager {
     this.floor.receiveShadow = true;
     this.scene.add(this.floor);
 
-    // Add grid helper
-    const gridHelper = new THREE.GridHelper(40, 20, 0x444444, 0x888888);
+    // Add subtle grid helper (optional - remove if you don't want the grid)
+    const gridHelper = new THREE.GridHelper(40, 20, 0x999999, 0xcccccc);
+    gridHelper.material.opacity = 0.2;
+    gridHelper.material.transparent = true;
     this.scene.add(gridHelper);
   }
 
