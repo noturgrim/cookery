@@ -547,6 +547,9 @@ class Game {
       this.playerManager.updatePlayers(delta, this.soundManager);
     }
 
+    // Update debug wireframes (if debug mode is on)
+    this.sceneManager.updateDebugWireframes();
+
     // Render the scene
     this.sceneManager.render();
   }

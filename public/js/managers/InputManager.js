@@ -73,6 +73,10 @@ export class InputManager {
       this.toggleSpawnMenu();
     }
 
+    if (e.code === "KeyD") {
+      this.toggleDebugMode();
+    }
+
     if (
       (e.code === "Delete" || e.code === "Backspace") &&
       this.editMode &&
@@ -754,6 +758,9 @@ export class InputManager {
         this.highlightObject(furniture);
       }
 
+      // Add debug wireframe if debug mode is on
+      this.sceneManager.addDebugWireframeForObject(furniture);
+
       // Send to server for database persistence
       this.networkManager.spawnObstacle(furniture.userData);
 
@@ -779,6 +786,9 @@ export class InputManager {
       if (this.editMode) {
         this.highlightObject(foodModel);
       }
+
+      // Add debug wireframe if debug mode is on
+      this.sceneManager.addDebugWireframeForObject(foodModel);
 
       // Send to server for database persistence
       this.networkManager.spawnFood({
@@ -823,6 +833,9 @@ export class InputManager {
     const objectId = object.userData.id;
     const objectType = object.userData.type;
 
+    // Remove debug wireframe if exists
+    this.sceneManager.removeDebugWireframeForObject(object);
+
     // Remove from scene
     this.sceneManager.scene.remove(object);
 
@@ -851,5 +864,17 @@ export class InputManager {
       this.deleteObject(this.selectedObstacle);
       this.selectedObstacle = null;
     }
+  }
+
+  /**
+   * Toggle debug mode - show/hide wireframes
+   */
+  toggleDebugMode() {
+    this.sceneManager.toggleDebugMode();
+    console.log(
+      `🔍 Debug Mode: ${
+        this.sceneManager.debugMode ? "ON" : "OFF"
+      } - Press D to toggle`
+    );
   }
 }

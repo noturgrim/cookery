@@ -29,6 +29,10 @@ export class SceneManager {
     // Track loading progress
     this.isLoading = true;
     this.setupLoadingManager();
+
+    // Debug mode
+    this.debugMode = false;
+    this.debugHelpers = [];
   }
 
   /**
@@ -422,5 +426,113 @@ export class SceneManager {
    */
   remove(object) {
     this.scene.remove(object);
+  }
+
+  /**
+   * Create a debug wireframe box for an object
+   */
+  createDebugWireframe(object) {
+    const width = object.userData.width || 1;
+    const height = object.userData.height || 1;
+    const depth = object.userData.depth || 1;
+
+    // Create wireframe geometry
+    const geometry = new THREE.BoxGeometry(width, height, depth);
+    const edges = new THREE.EdgesGeometry(geometry);
+    const lineMaterial = new THREE.LineBasicMaterial({
+      color: 0x00ff00,
+      linewidth: 2,
+      transparent: true,
+      opacity: 0.8,
+    });
+    const wireframe = new THREE.LineSegments(edges, lineMaterial);
+
+    // Position wireframe at object position
+    wireframe.position.copy(object.position);
+    wireframe.rotation.copy(object.rotation);
+
+    // Store reference to parent object
+    wireframe.userData.parentObject = object;
+
+    return wireframe;
+  }
+
+  /**
+   * Toggle debug mode - show/hide wireframes around all items
+   */
+  toggleDebugMode() {
+    this.debugMode = !this.debugMode;
+
+    if (this.debugMode) {
+      // Create wireframes for all obstacles
+      this.obstacles.forEach((obstacle) => {
+        const wireframe = this.createDebugWireframe(obstacle);
+        this.scene.add(wireframe);
+        this.debugHelpers.push(wireframe);
+      });
+
+      // Create wireframes for all food items
+      this.foodItems.forEach((foodData) => {
+        const wireframe = this.createDebugWireframe(foodData.model);
+        this.scene.add(wireframe);
+        this.debugHelpers.push(wireframe);
+      });
+
+      console.log(
+        `✅ Debug Mode ON - Showing ${this.debugHelpers.length} wireframes`
+      );
+    } else {
+      // Remove all wireframes
+      this.debugHelpers.forEach((helper) => {
+        this.scene.remove(helper);
+      });
+      this.debugHelpers = [];
+      console.log("❌ Debug Mode OFF");
+    }
+
+    this.render();
+  }
+
+  /**
+   * Update debug wireframes to match object positions
+   */
+  updateDebugWireframes() {
+    if (!this.debugMode) return;
+
+    this.debugHelpers.forEach((wireframe) => {
+      const parentObject = wireframe.userData.parentObject;
+      if (parentObject) {
+        wireframe.position.copy(parentObject.position);
+        wireframe.rotation.copy(parentObject.rotation);
+      }
+    });
+  }
+
+  /**
+   * Add debug wireframe for a single object (when spawned)
+   */
+  addDebugWireframeForObject(object) {
+    if (!this.debugMode) return;
+
+    const wireframe = this.createDebugWireframe(object);
+    this.scene.add(wireframe);
+    this.debugHelpers.push(wireframe);
+  }
+
+  /**
+   * Remove debug wireframe for a specific object
+   */
+  removeDebugWireframeForObject(object) {
+    if (!this.debugMode) return;
+
+    const index = this.debugHelpers.findIndex(
+      (helper) => helper.userData.parentObject === object
+    );
+
+    if (index > -1) {
+      const wireframe = this.debugHelpers[index];
+      this.scene.remove(wireframe);
+      this.debugHelpers.splice(index, 1);
+    }
   }
 }
