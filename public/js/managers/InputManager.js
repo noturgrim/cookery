@@ -527,6 +527,15 @@ export class InputManager {
       console.log("\n📍 Current Layout (copy to server/index.js):");
       console.log("obstacles: [");
       this.sceneManager.obstacles.forEach((obstacle) => {
+        // Skip obstacles without position data
+        if (!obstacle.position || !obstacle.userData) {
+          console.warn(
+            "⚠️ Skipping obstacle without position or userData:",
+            obstacle
+          );
+          return;
+        }
+
         console.log(`  {`);
         console.log(`    id: "${obstacle.userData.id}",`);
         console.log(`    x: ${obstacle.position.x.toFixed(2)},`);
@@ -739,11 +748,15 @@ export class InputManager {
         id: `furniture_${modelName}_${Date.now()}`,
         type: "furniture",
         name: modelName,
+        x: furniture.position.x,
+        y: furniture.position.y,
+        z: furniture.position.z,
         width: 4,
         height: 2,
         depth: 4,
         model: modelName,
         scale: 4,
+        rotation: 0,
       };
 
       this.sceneManager.scene.add(furniture);

@@ -328,10 +328,14 @@ export class SceneManager {
         id: itemId,
         type: "food",
         name: foodName,
+        x: x,
+        y: y,
+        z: z,
         scale: scale,
         width: 1,
         height: 1,
         depth: 1,
+        rotation: 0,
       };
 
       this.scene.add(foodModel);
