@@ -219,10 +219,13 @@ export class InputManager {
     this.raycaster.setFromCamera(this.mouse, this.sceneManager.camera);
 
     // First check if clicking on an object (obstacle or food)
-    const allObjects = [
-      ...this.sceneManager.obstacles,
-      ...this.sceneManager.foodItems,
-    ];
+    const allObjects = [...this.sceneManager.obstacles];
+
+    // Add food item models to clickable objects
+    this.sceneManager.foodItems.forEach((foodData) => {
+      allObjects.push(foodData.model);
+    });
+
     const objectIntersects = this.raycaster.intersectObjects(
       allObjects,
       true // Check children

@@ -316,16 +316,17 @@ export class SceneManager {
   /**
    * Spawn a food item in the scene
    */
-  async spawnFoodItem(foodName, x, y, z, scale = 0.3) {
+  async spawnFoodItem(foodName, x, y, z, scale = 0.3, itemId = null) {
     try {
       const foodModel = await this.loadFoodModel(foodName);
       foodModel.scale.set(scale, scale, scale);
       foodModel.position.set(x, y, z);
 
       // Add metadata to make it editable
-      const itemId = `food_${foodName}_${Date.now()}`;
+      // Use provided ID for persistence, or generate new one
+      const finalItemId = itemId || `food_${foodName}_${Date.now()}`;
       foodModel.userData = {
-        id: itemId,
+        id: finalItemId,
         type: "food",
         name: foodName,
         x: x,
@@ -340,7 +341,7 @@ export class SceneManager {
 
       this.scene.add(foodModel);
 
-      this.foodItems.set(itemId, {
+      this.foodItems.set(finalItemId, {
         model: foodModel,
         name: foodName,
         position: { x, y, z },
@@ -348,7 +349,7 @@ export class SceneManager {
       });
 
       console.log(
-        `✅ Spawned ${foodName} at (${x}, ${y}, ${z}) scale:${scale}`
+        `✅ Spawned ${foodName} at (${x}, ${y}, ${z}) scale:${scale} id:${finalItemId}`
       );
       return foodModel;
     } catch (error) {

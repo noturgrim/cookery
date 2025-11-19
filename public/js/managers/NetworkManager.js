@@ -63,6 +63,23 @@ export class NetworkManager {
       data.obstacles.forEach((obstacle) => {
         this.sceneManager.createObstacle(obstacle);
       });
+
+      // Create all food items
+      if (data.foodItems && data.foodItems.length > 0) {
+        data.foodItems.forEach((foodItem) => {
+          this.sceneManager.spawnFoodItem(
+            foodItem.name,
+            foodItem.x,
+            foodItem.y,
+            foodItem.z,
+            foodItem.scale,
+            foodItem.id // Pass existing ID for persistence
+          );
+        });
+        console.log(
+          `🍔 Loaded ${data.foodItems.length} food items from server`
+        );
+      }
     });
 
     // Handle new player joining
@@ -153,7 +170,8 @@ export class NetworkManager {
         foodData.x,
         foodData.y,
         foodData.z,
-        foodData.scale
+        foodData.scale,
+        foodData.id // Pass existing ID for persistence
       );
       // Apply highlight if edit mode is active
       if (this.inputManager && this.inputManager.editMode && foodModel) {
