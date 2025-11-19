@@ -268,25 +268,126 @@ class Game {
    * Show settings modal
    */
   showSettings() {
-    const modal = document.getElementById("welcome-modal");
-    modal.classList.remove("hidden");
+    const modal = document.getElementById("settings-modal");
+    modal.classList.add("active");
+    modal.classList.remove("pointer-events-none");
+    modal.style.display = "flex";
 
-    document.getElementById("player-name").value = this.playerName;
+    // Populate current values
+    document.getElementById("settings-player-name").value = this.playerName;
 
-    const skinSelector = document.getElementById("skin-selector");
-    if (
-      skinSelector.children.length === 0 ||
-      !skinSelector.querySelector(".skin-option canvas")
-    ) {
-      this.setupWelcomeModal();
-    } else {
-      document.querySelectorAll(".skin-option").forEach((option) => {
-        option.classList.remove("selected");
-        if (parseInt(option.dataset.skinId) === this.playerSkin) {
-          option.classList.add("selected");
+    // Setup skin selector in settings
+    this.setupSettingsSkinSelector();
+
+    const closeModal = () => {
+      modal.classList.remove("active");
+      modal.classList.add("pointer-events-none");
+      modal.style.display = "none";
+    };
+
+    // Close button
+    document.getElementById("settings-close-btn").onclick = closeModal;
+
+    // Save button
+    document.getElementById("settings-save-btn").onclick = () => {
+      const newName = document
+        .getElementById("settings-player-name")
+        .value.trim();
+      if (newName) {
+        this.playerName = newName;
+        localStorage.setItem("supercooked_playerName", newName);
+
+        // Update server if game is running
+        if (this.networkManager) {
+          this.networkManager.updatePlayerCustomization(
+            this.playerName,
+            this.playerSkin
+          );
         }
-      });
+
+        console.log(
+          `✅ Settings saved: ${this.playerName}, Skin: ${this.playerSkin}`
+        );
+
+        // Close modal
+        closeModal();
+      } else {
+        alert("Please enter a name!");
+      }
+    };
+
+    // Close on background click
+    modal.onclick = (e) => {
+      if (e.target === modal) {
+        closeModal();
+      }
+    };
+  }
+
+  /**
+   * Setup skin selector for settings modal
+   */
+  setupSettingsSkinSelector() {
+    const skinSelector = document.getElementById("settings-skin-selector");
+    skinSelector.innerHTML = "";
+
+    if (this.characterModels.length === 0) {
+      skinSelector.innerHTML =
+        '<div style="color: white; padding: 20px; text-align: center; grid-column: span 4;">Loading characters...</div>';
+
+      // Wait for models to load
+      const checkModelsLoaded = setInterval(() => {
+        if (this.characterModels.length > 0) {
+          clearInterval(checkModelsLoaded);
+          this.setupSettingsSkinSelector(); // Retry
+        }
+      }, 100);
+      return;
     }
+
+    this.availableSkins.forEach((skin) => {
+      const option = document.createElement("div");
+      option.className =
+        "aspect-square border-2 border-gray-600 rounded-lg cursor-pointer transition-all hover:scale-110 hover:border-purple-500 bg-gray-700/50 flex items-center justify-center overflow-hidden p-1";
+      option.dataset.skinId = skin.id;
+
+      const canvas = document.createElement("canvas");
+      canvas.width = 100;
+      canvas.height = 100;
+      canvas.className = "w-full h-full object-contain rounded";
+      option.appendChild(canvas);
+
+      this.renderCharacterPreview(canvas, skin.id);
+
+      if (skin.id === this.playerSkin) {
+        option.classList.add(
+          "!border-purple-500",
+          "!border-4",
+          "bg-purple-500/20"
+        );
+      }
+
+      option.addEventListener("click", () => {
+        document
+          .querySelectorAll("#settings-skin-selector > div")
+          .forEach((o) => {
+            o.classList.remove(
+              "!border-purple-500",
+              "!border-4",
+              "bg-purple-500/20"
+            );
+          });
+        option.classList.add(
+          "!border-purple-500",
+          "!border-4",
+          "bg-purple-500/20"
+        );
+        this.playerSkin = skin.id;
+        localStorage.setItem("supercooked_playerSkin", skin.id);
+      });
+
+      skinSelector.appendChild(option);
+    });
   }
 
   /**

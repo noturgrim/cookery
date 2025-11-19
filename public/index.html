@@ -278,6 +278,69 @@
       ⚙️
     </button>
 
+    <!-- Settings Modal (Compact) -->
+    <div
+      id="settings-modal"
+      class="fixed inset-0 bg-black/80 backdrop-blur-sm z-[3000] hidden items-center justify-center p-4 pointer-events-none"
+    >
+      <div
+        class="bg-gradient-to-br from-gray-900 to-gray-800 rounded-xl shadow-2xl border-2 border-purple-500/50 w-full max-w-md flex flex-col pointer-events-auto"
+      >
+        <!-- Header -->
+        <div
+          class="flex items-center justify-between px-4 py-3 border-b border-purple-500/30"
+        >
+          <div class="flex items-center gap-2">
+            <span class="text-2xl">⚙️</span>
+            <h2 class="text-xl font-bold text-purple-400">Settings</h2>
+          </div>
+          <button
+            id="settings-close-btn"
+            class="w-8 h-8 rounded-full bg-red-500 hover:bg-red-600 text-white text-xl font-bold transition-all hover:scale-110 flex items-center justify-center"
+          >
+            ×
+          </button>
+        </div>
+
+        <!-- Content -->
+        <div class="p-4 space-y-4">
+          <!-- Name Input -->
+          <div>
+            <label class="block text-white text-sm font-bold mb-2">
+              👤 Your Name
+            </label>
+            <input
+              type="text"
+              id="settings-player-name"
+              placeholder="Enter your chef name..."
+              maxlength="20"
+              autocomplete="off"
+              class="w-full py-2 px-3 rounded-lg bg-gray-800/50 border-2 border-gray-600 text-white placeholder-gray-400 focus:border-purple-500 focus:outline-none transition-all"
+            />
+          </div>
+
+          <!-- Character Selector -->
+          <div>
+            <label class="block text-white text-sm font-bold mb-2">
+              👨‍🍳 Choose Character
+            </label>
+            <div
+              id="settings-skin-selector"
+              class="grid grid-cols-4 gap-2 max-h-64 overflow-y-auto p-2 bg-gray-800/30 rounded-lg"
+            ></div>
+          </div>
+
+          <!-- Save Button -->
+          <button
+            id="settings-save-btn"
+            class="w-full py-3 px-4 rounded-lg bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white font-bold text-base transition-all hover:scale-105 active:scale-95 shadow-lg"
+          >
+            💾 Save Changes
+          </button>
+        </div>
+      </div>
+    </div>
+
     <div id="ui-overlay">
       <div id="controls-info">
         <h3>Controls</h3>
@@ -327,10 +390,10 @@
     <!-- Spawn Menu (Compact) -->
     <div
       id="spawn-menu"
-      class="fixed inset-0 bg-black/80 backdrop-blur-sm z-[2000] hidden items-center justify-center p-3"
+      class="fixed inset-0 bg-black/80 backdrop-blur-sm z-[2000] hidden items-center justify-center p-3 pointer-events-none"
     >
       <div
-        class="bg-gradient-to-br from-gray-900 to-gray-800 rounded-xl shadow-2xl border-2 border-yellow-500/50 w-full max-w-4xl max-h-[85vh] flex flex-col"
+        class="bg-gradient-to-br from-gray-900 to-gray-800 rounded-xl shadow-2xl border-2 border-yellow-500/50 w-full max-w-4xl max-h-[85vh] flex flex-col pointer-events-auto"
       >
         <!-- Header -->
         <div
@@ -341,7 +404,7 @@
             <h2 class="text-xl font-bold text-yellow-400">Spawn Objects</h2>
           </div>
           <button
-            onclick="document.getElementById('spawn-menu').classList.remove('active')"
+            onclick="const menu = document.getElementById('spawn-menu'); menu.classList.remove('active'); menu.classList.add('pointer-events-none');"
             class="w-8 h-8 rounded-full bg-red-500 hover:bg-red-600 text-white text-xl font-bold transition-all hover:scale-110 flex items-center justify-center"
           >
             ×

@@ -432,7 +432,14 @@ export class InputManager {
    */
   toggleSpawnMenu() {
     const menu = document.getElementById("spawn-menu");
-    menu.classList.toggle("active");
+    const isActive = menu.classList.toggle("active");
+
+    // Enable/disable pointer events on the menu overlay
+    if (isActive) {
+      menu.classList.remove("pointer-events-none");
+    } else {
+      menu.classList.add("pointer-events-none");
+    }
 
     // Load available models if not already loaded
     if (this.furnitureModels.length === 0) {
