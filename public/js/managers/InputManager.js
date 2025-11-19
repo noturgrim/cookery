@@ -299,14 +299,18 @@ export class InputManager {
   highlightObject(object) {
     object.traverse((child) => {
       if (child.isMesh && child.material) {
-        if (!child.userData.originalEmissive) {
+        // Store original emissive value
+        if (child.userData.originalEmissive === undefined) {
           child.userData.originalEmissive = child.material.emissive
             ? child.material.emissive.getHex()
             : 0x000000;
         }
+        // Apply orange highlight
         if (child.material.emissive) {
           child.material.emissive.setHex(0xff6b00); // Orange highlight
         }
+        // Mark as highlighted
+        child.userData.isHighlighted = true;
       }
     });
   }
@@ -317,11 +321,34 @@ export class InputManager {
   removeHighlight(object) {
     object.traverse((child) => {
       if (child.isMesh && child.material) {
+        // Check if this child was highlighted
+        if (child.userData.isHighlighted) {
+          // Restore original emissive value
+          if (child.material.emissive) {
+            if (child.userData.originalEmissive !== undefined) {
+              child.material.emissive.setHex(child.userData.originalEmissive);
+            } else {
+              // Fallback: set to black if no original was stored
+              child.material.emissive.setHex(0x000000);
+            }
+          }
+
+          // Clear highlight flag and stored value
+          child.userData.isHighlighted = false;
+          delete child.userData.originalEmissive;
+        }
+
+        // Safety check: if emissive is still orange, force it to black
         if (
           child.material.emissive &&
-          child.userData.originalEmissive !== undefined
+          child.material.emissive.getHex() === 0xff6b00
         ) {
-          child.material.emissive.setHex(child.userData.originalEmissive);
+          child.material.emissive.setHex(0x000000);
+          console.log(
+            `🔧 Force-removed orange highlight from ${
+              object.userData.id || "unknown"
+            }`
+          );
         }
       }
     });
@@ -335,6 +362,13 @@ export class InputManager {
 
     // Update all editable objects visual feedback
     const allEditableObjects = this.sceneManager.getAllEditableObjects();
+
+    console.log(
+      this.editMode
+        ? `🔧 Edit Mode ON - Highlighting ${allEditableObjects.length} objects`
+        : `✅ Edit Mode OFF - Removing highlights from ${allEditableObjects.length} objects`
+    );
+
     allEditableObjects.forEach((object) => {
       if (this.editMode) {
         this.highlightObject(object);
@@ -343,11 +377,8 @@ export class InputManager {
       }
     });
 
-    console.log(
-      this.editMode
-        ? "🔧 Edit Mode ON - Click and drag tables"
-        : "✅ Edit Mode OFF"
-    );
+    // Force render to show changes
+    this.sceneManager.render();
 
     // Log all current positions when entering edit mode
     if (this.editMode) {
