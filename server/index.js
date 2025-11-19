@@ -29,6 +29,37 @@ const io = new Server(httpServer, {
 // Serve static files from public directory
 app.use(express.static(join(__dirname, "../public")));
 
+// API endpoint to list available models
+import { readdir } from "fs/promises";
+
+app.get("/api/models/furniture", async (req, res) => {
+  try {
+    const furnitureDir = join(__dirname, "../public/furniture/glb");
+    const files = await readdir(furnitureDir);
+    const models = files
+      .filter((file) => file.endsWith(".glb"))
+      .map((file) => file.replace(".glb", ""));
+    res.json(models);
+  } catch (error) {
+    console.error("Error reading furniture directory:", error);
+    res.status(500).json({ error: "Failed to load furniture models" });
+  }
+});
+
+app.get("/api/models/food", async (req, res) => {
+  try {
+    const foodDir = join(__dirname, "../public/food/glb");
+    const files = await readdir(foodDir);
+    const models = files
+      .filter((file) => file.endsWith(".glb"))
+      .map((file) => file.replace(".glb", ""));
+    res.json(models);
+  } catch (error) {
+    console.error("Error reading food directory:", error);
+    res.status(500).json({ error: "Failed to load food models" });
+  }
+});
+
 // Game state - Authoritative server
 const gameState = {
   players: new Map(),

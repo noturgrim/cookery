@@ -15,6 +15,9 @@
       }
     </script>
 
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
     <link rel="stylesheet" href="/css/styles.css" />
     <link rel="stylesheet" href="/css/emote-wheel.css" />
     <link rel="stylesheet" href="/css/spawn-menu.css" />
@@ -286,39 +289,135 @@
       <div class="spinner"></div>
     </div>
 
-    <!-- Spawn Menu -->
-    <div id="spawn-menu">
-      <button
-        class="spawn-menu-close"
-        onclick="document.getElementById('spawn-menu').classList.remove('active')"
+    <!-- Spawn Menu (Tailwind Styled) -->
+    <div
+      id="spawn-menu"
+      class="fixed inset-0 bg-black/80 backdrop-blur-sm z-[2000] hidden items-center justify-center p-4"
+    >
+      <div
+        class="bg-gradient-to-br from-gray-900 to-gray-800 rounded-2xl shadow-2xl border-2 border-yellow-500/50 w-full max-w-6xl max-h-[90vh] flex flex-col"
       >
-        ×
-      </button>
-      <h2>🎨 Spawn Objects</h2>
+        <!-- Header -->
+        <div
+          class="flex items-center justify-between p-6 border-b border-yellow-500/30"
+        >
+          <div class="flex items-center gap-3">
+            <span class="text-4xl">🎨</span>
+            <h2 class="text-3xl font-bold text-yellow-400">Spawn Objects</h2>
+          </div>
+          <button
+            onclick="document.getElementById('spawn-menu').classList.remove('active')"
+            class="w-10 h-10 rounded-full bg-red-500 hover:bg-red-600 text-white text-2xl font-bold transition-all hover:scale-110 flex items-center justify-center"
+          >
+            ×
+          </button>
+        </div>
 
-      <button class="delete-mode-btn" id="delete-mode-btn">
-        🗑️ Delete Mode (OFF)
-      </button>
+        <!-- Content -->
+        <div class="flex-1 overflow-y-auto p-6 space-y-6">
+          <!-- Delete Mode Button -->
+          <button
+            id="delete-mode-btn"
+            class="w-full py-3 px-6 rounded-xl bg-red-500/20 hover:bg-red-500/30 border-2 border-red-500 text-white font-bold text-lg transition-all hover:scale-105 active:scale-95"
+          >
+            🗑️ Delete Mode (OFF)
+          </button>
 
-      <div class="spawn-category">
-        <h3 onclick="this.nextElementSibling.classList.toggle('expanded')">
-          🪑 Furniture
-        </h3>
-        <div class="spawn-items" id="furniture-items"></div>
-      </div>
+          <!-- Search Bar -->
+          <div class="relative">
+            <input
+              type="text"
+              id="model-search"
+              placeholder="🔍 Search models..."
+              class="w-full py-3 px-4 pl-12 rounded-xl bg-gray-800/50 border-2 border-gray-600 text-white placeholder-gray-400 focus:border-yellow-500 focus:outline-none transition-all"
+            />
+            <span class="absolute left-4 top-1/2 -translate-y-1/2 text-xl"
+              >🔍</span
+            >
+          </div>
 
-      <div class="spawn-category">
-        <h3 onclick="this.nextElementSibling.classList.toggle('expanded')">
-          🍔 Food
-        </h3>
-        <div class="spawn-items" id="food-items"></div>
-      </div>
+          <!-- Furniture Category -->
+          <div class="spawn-category">
+            <button
+              onclick="this.nextElementSibling.classList.toggle('hidden')"
+              class="w-full flex items-center justify-between p-4 rounded-xl bg-gradient-to-r from-yellow-600/20 to-orange-600/20 border-2 border-yellow-500/30 hover:border-yellow-500/50 transition-all group"
+            >
+              <div class="flex items-center gap-3">
+                <span class="text-3xl">🪑</span>
+                <h3 class="text-2xl font-bold text-yellow-300">Furniture</h3>
+                <span
+                  id="furniture-count"
+                  class="text-sm text-gray-400 bg-gray-800/50 px-3 py-1 rounded-full"
+                ></span>
+              </div>
+              <svg
+                class="w-6 h-6 text-yellow-400 transition-transform group-hover:translate-y-1"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  d="M19 9l-7 7-7-7"
+                ></path>
+              </svg>
+            </button>
+            <div
+              id="furniture-items"
+              class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 mt-4 hidden"
+            ></div>
+          </div>
 
-      <div class="spawn-menu-help">
-        Press <strong>B</strong> to open/close • Click items to spawn at
-        center<br />
-        Press <strong>E</strong> to toggle Edit Mode • Drag to move objects<br />
-        Delete Mode: Click objects to delete them
+          <!-- Food Category -->
+          <div class="spawn-category">
+            <button
+              onclick="this.nextElementSibling.classList.toggle('hidden')"
+              class="w-full flex items-center justify-between p-4 rounded-xl bg-gradient-to-r from-green-600/20 to-lime-600/20 border-2 border-green-500/30 hover:border-green-500/50 transition-all group"
+            >
+              <div class="flex items-center gap-3">
+                <span class="text-3xl">🍔</span>
+                <h3 class="text-2xl font-bold text-green-300">Food</h3>
+                <span
+                  id="food-count"
+                  class="text-sm text-gray-400 bg-gray-800/50 px-3 py-1 rounded-full"
+                ></span>
+              </div>
+              <svg
+                class="w-6 h-6 text-green-400 transition-transform group-hover:translate-y-1"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  d="M19 9l-7 7-7-7"
+                ></path>
+              </svg>
+            </button>
+            <div
+              id="food-items"
+              class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 mt-4 hidden"
+            ></div>
+          </div>
+        </div>
+
+        <!-- Footer -->
+        <div class="p-6 border-t border-yellow-500/30 bg-gray-900/50">
+          <div class="text-center text-gray-400 text-sm space-y-2">
+            <p>
+              <strong class="text-yellow-400">B</strong> - Open/Close Menu •
+              <strong class="text-yellow-400">E</strong> - Edit Mode •
+              <strong class="text-yellow-400">Delete</strong> - Remove Object
+            </p>
+            <p class="text-xs">
+              Click items to spawn at center • Drag to move in Edit Mode
+            </p>
+          </div>
+        </div>
       </div>
     </div>
 

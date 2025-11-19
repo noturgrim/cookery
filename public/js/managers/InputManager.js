@@ -367,50 +367,38 @@ export class InputManager {
   }
 
   /**
-   * Load available models from directories
+   * Load available models from directories (dynamically from server)
    */
   async loadAvailableModels() {
-    // Hardcoded list of furniture models (from your glb directory)
-    this.furnitureModels = [
-      "table",
-      "tableRound",
-      "tableCoffee",
-      "tableCoffeeSquare",
-      "kitchenCabinet",
-      "kitchenBar",
-      "kitchenSink",
-      "kitchenStove",
-      "chair",
-      "chairCushion",
-      "stoolBar",
-      "desk",
-      "bookcase",
-      "shelf",
-    ];
+    try {
+      // Fetch furniture models from server
+      const furnitureResponse = await fetch("/api/models/furniture");
+      if (furnitureResponse.ok) {
+        this.furnitureModels = await furnitureResponse.json();
+        console.log(
+          `📦 Loaded ${this.furnitureModels.length} furniture models`
+        );
+      } else {
+        console.error("Failed to load furniture models");
+        this.furnitureModels = [];
+      }
 
-    // Hardcoded list of food models
-    this.foodModels = [
-      "apple",
-      "banana",
-      "orange",
-      "tomato",
-      "lettuce",
-      "onion",
-      "cheese",
-      "bread",
-      "burger",
-      "pizza",
-      "hotdog",
-      "carrot",
-      "potato",
-      "pumpkin",
-      "cucumber",
-      "meat",
-      "fish",
-      "chicken",
-    ];
+      // Fetch food models from server
+      const foodResponse = await fetch("/api/models/food");
+      if (foodResponse.ok) {
+        this.foodModels = await foodResponse.json();
+        console.log(`🍔 Loaded ${this.foodModels.length} food models`);
+      } else {
+        console.error("Failed to load food models");
+        this.foodModels = [];
+      }
 
-    this.populateSpawnMenu();
+      this.populateSpawnMenu();
+    } catch (error) {
+      console.error("Error loading models:", error);
+      this.furnitureModels = [];
+      this.foodModels = [];
+    }
   }
 
   /**
@@ -424,20 +412,32 @@ export class InputManager {
     furnitureContainer.innerHTML = "";
     foodContainer.innerHTML = "";
 
-    // Add furniture items
+    // Update counts
+    document.getElementById(
+      "furniture-count"
+    ).textContent = `${this.furnitureModels.length} items`;
+    document.getElementById(
+      "food-count"
+    ).textContent = `${this.foodModels.length} items`;
+
+    // Add furniture items with Tailwind styling
     this.furnitureModels.forEach((model) => {
-      const item = document.createElement("div");
-      item.className = "spawn-item";
+      const item = document.createElement("button");
+      item.className =
+        "spawn-item p-3 rounded-lg bg-gradient-to-br from-gray-700 to-gray-800 hover:from-yellow-600 hover:to-orange-600 border-2 border-gray-600 hover:border-yellow-500 text-white text-sm font-medium transition-all hover:scale-105 active:scale-95 break-words";
       item.textContent = model;
+      item.dataset.name = model.toLowerCase();
       item.onclick = () => this.spawnFurniture(model);
       furnitureContainer.appendChild(item);
     });
 
-    // Add food items
+    // Add food items with Tailwind styling
     this.foodModels.forEach((model) => {
-      const item = document.createElement("div");
-      item.className = "spawn-item";
+      const item = document.createElement("button");
+      item.className =
+        "spawn-item p-3 rounded-lg bg-gradient-to-br from-gray-700 to-gray-800 hover:from-green-600 hover:to-lime-600 border-2 border-gray-600 hover:border-green-500 text-white text-sm font-medium transition-all hover:scale-105 active:scale-95 break-words";
       item.textContent = model;
+      item.dataset.name = model.toLowerCase();
       item.onclick = () => this.spawnFood(model);
       foodContainer.appendChild(item);
     });
@@ -445,6 +445,31 @@ export class InputManager {
     // Setup delete mode button
     const deleteBtn = document.getElementById("delete-mode-btn");
     deleteBtn.onclick = () => this.toggleDeleteMode();
+
+    // Setup search functionality
+    this.setupSearch();
+  }
+
+  /**
+   * Setup search functionality
+   */
+  setupSearch() {
+    const searchInput = document.getElementById("model-search");
+    if (!searchInput) return;
+
+    searchInput.addEventListener("input", (e) => {
+      const searchTerm = e.target.value.toLowerCase().trim();
+      const allItems = document.querySelectorAll(".spawn-item");
+
+      allItems.forEach((item) => {
+        const itemName = item.dataset.name;
+        if (itemName.includes(searchTerm)) {
+          item.style.display = "";
+        } else {
+          item.style.display = "none";
+        }
+      });
+    });
   }
 
   /**
@@ -524,11 +549,13 @@ export class InputManager {
 
     if (this.deleteMode) {
       btn.textContent = "🗑️ Delete Mode (ON)";
-      btn.classList.add("active");
+      btn.className =
+        "w-full py-3 px-6 rounded-xl bg-green-500/30 hover:bg-green-500/40 border-2 border-green-500 text-white font-bold text-lg transition-all hover:scale-105 active:scale-95";
       console.log("🗑️ Delete Mode ON - Click objects to delete them");
     } else {
       btn.textContent = "🗑️ Delete Mode (OFF)";
-      btn.classList.remove("active");
+      btn.className =
+        "w-full py-3 px-6 rounded-xl bg-red-500/20 hover:bg-red-500/30 border-2 border-red-500 text-white font-bold text-lg transition-all hover:scale-105 active:scale-95";
       console.log("✅ Delete Mode OFF");
     }
   }
