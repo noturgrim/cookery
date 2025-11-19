@@ -494,22 +494,22 @@ export class InputManager {
       "food-count"
     ).textContent = `${this.foodModels.length} items`;
 
-    // Add furniture items with Tailwind styling
+    // Add furniture items with compact Tailwind styling
     this.furnitureModels.forEach((model) => {
       const item = document.createElement("button");
       item.className =
-        "spawn-item p-3 rounded-lg bg-gradient-to-br from-gray-700 to-gray-800 hover:from-yellow-600 hover:to-orange-600 border-2 border-gray-600 hover:border-yellow-500 text-white text-sm font-medium transition-all hover:scale-105 active:scale-95 break-words";
+        "spawn-item p-2 rounded-md bg-gradient-to-br from-gray-700 to-gray-800 hover:from-yellow-600 hover:to-orange-600 border border-gray-600 hover:border-yellow-500 text-white text-xs font-medium transition-all hover:scale-105 active:scale-95 break-words";
       item.textContent = model;
       item.dataset.name = model.toLowerCase();
       item.onclick = () => this.spawnFurniture(model);
       furnitureContainer.appendChild(item);
     });
 
-    // Add food items with Tailwind styling
+    // Add food items with compact Tailwind styling
     this.foodModels.forEach((model) => {
       const item = document.createElement("button");
       item.className =
-        "spawn-item p-3 rounded-lg bg-gradient-to-br from-gray-700 to-gray-800 hover:from-green-600 hover:to-lime-600 border-2 border-gray-600 hover:border-green-500 text-white text-sm font-medium transition-all hover:scale-105 active:scale-95 break-words";
+        "spawn-item p-2 rounded-md bg-gradient-to-br from-gray-700 to-gray-800 hover:from-green-600 hover:to-lime-600 border border-gray-600 hover:border-green-500 text-white text-xs font-medium transition-all hover:scale-105 active:scale-95 break-words";
       item.textContent = model;
       item.dataset.name = model.toLowerCase();
       item.onclick = () => this.spawnFood(model);
@@ -624,12 +624,12 @@ export class InputManager {
     if (this.deleteMode) {
       btn.textContent = "🗑️ Delete Mode (ON)";
       btn.className =
-        "w-full py-3 px-6 rounded-xl bg-green-500/30 hover:bg-green-500/40 border-2 border-green-500 text-white font-bold text-lg transition-all hover:scale-105 active:scale-95";
+        "w-full py-2 px-4 rounded-lg bg-green-500/30 hover:bg-green-500/40 border-2 border-green-500 text-white font-bold text-sm transition-all hover:scale-105 active:scale-95";
       console.log("🗑️ Delete Mode ON - Click objects to delete them");
     } else {
       btn.textContent = "🗑️ Delete Mode (OFF)";
       btn.className =
-        "w-full py-3 px-6 rounded-xl bg-red-500/20 hover:bg-red-500/30 border-2 border-red-500 text-white font-bold text-lg transition-all hover:scale-105 active:scale-95";
+        "w-full py-2 px-4 rounded-lg bg-red-500/20 hover:bg-red-500/30 border-2 border-red-500 text-white font-bold text-sm transition-all hover:scale-105 active:scale-95";
       console.log("✅ Delete Mode OFF");
     }
   }
