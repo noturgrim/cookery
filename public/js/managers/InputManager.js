@@ -27,6 +27,11 @@ export class InputManager {
     // Emote wheel state
     this.emoteWheelActive = false;
     this.selectedEmote = null;
+
+    // Camera panning state
+    this.isPanning = false;
+    this.lastPanPosition = { x: 0, y: 0 };
+    this.cameraOffset = { x: 0, z: 0 };
   }
 
   /**
@@ -48,6 +53,9 @@ export class InputManager {
 
     // Keyboard
     window.addEventListener("keydown", (e) => this.handleKeyDown(e));
+
+    // Prevent context menu on right-click
+    window.addEventListener("contextmenu", (e) => e.preventDefault());
 
     // Emote wheel
     this.setupEmoteWheel();
@@ -185,6 +193,39 @@ export class InputManager {
     this.mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
     this.mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
 
+    // Handle camera panning (right-click drag)
+    if (this.isPanning) {
+      const deltaX = event.clientX - this.lastPanPosition.x;
+      const deltaY = event.clientY - this.lastPanPosition.y;
+
+      // Calculate pan amount based on camera distance and angle
+      const panSpeed = 0.02;
+      const camera = this.sceneManager.camera;
+
+      // For isometric camera, pan in the direction of drag
+      // Since camera is at 45 degrees, we need to transform screen space to world space
+      const worldDeltaX = (deltaX + deltaY) * panSpeed;
+      const worldDeltaZ = (deltaY - deltaX) * panSpeed;
+
+      this.cameraOffset.x -= worldDeltaX;
+      this.cameraOffset.z -= worldDeltaZ;
+
+      // Apply offset to camera position and look-at point
+      const basePosition = { x: 15, y: 15, z: 15 };
+      camera.position.set(
+        basePosition.x + this.cameraOffset.x,
+        basePosition.y,
+        basePosition.z + this.cameraOffset.z
+      );
+      camera.lookAt(this.cameraOffset.x, 0, this.cameraOffset.z);
+
+      this.lastPanPosition = { x: event.clientX, y: event.clientY };
+
+      // Show cursor feedback
+      document.body.style.cursor = "grabbing";
+      return;
+    }
+
     // Handle obstacle dragging
     if (this.isDraggingObstacle && this.selectedObstacle) {
       this.raycaster.setFromCamera(this.mouse, this.sceneManager.camera);
@@ -209,6 +250,14 @@ export class InputManager {
    * Handle mouse down events
    */
   handleMouseDown(event) {
+    // Right-click to start panning
+    if (event.button === 2) {
+      this.isPanning = true;
+      this.lastPanPosition = { x: event.clientX, y: event.clientY };
+      document.body.style.cursor = "grab";
+      return;
+    }
+
     if (!this.editMode) return;
 
     this.raycaster.setFromCamera(this.mouse, this.sceneManager.camera);
@@ -245,6 +294,13 @@ export class InputManager {
    * Handle mouse up events
    */
   handleMouseUp(event) {
+    // Stop panning on right-click release
+    if (event.button === 2 || this.isPanning) {
+      this.isPanning = false;
+      document.body.style.cursor = "default";
+      return;
+    }
+
     if (this.isDraggingObstacle && this.selectedObstacle) {
       const isFood = this.selectedObstacle.userData.type === "food";
 
