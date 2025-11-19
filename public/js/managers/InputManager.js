@@ -136,7 +136,8 @@ export class InputManager {
         this.selectedObstacle.userData.id,
         this.selectedObstacle.position.x,
         this.selectedObstacle.position.y,
-        this.selectedObstacle.position.z
+        this.selectedObstacle.position.z,
+        this.selectedObstacle.rotation.y
       );
     }
 
@@ -234,9 +235,6 @@ export class InputManager {
       const point = intersects[0].point;
       this.dragOffset.copy(point).sub(this.selectedObstacle.position);
 
-      // Highlight selected obstacle
-      this.highlightObject(this.selectedObstacle);
-
       console.log(
         `📦 Selected: ${this.selectedObstacle.userData.id || "object"}`
       );
@@ -263,7 +261,8 @@ export class InputManager {
           this.selectedObstacle.userData.id,
           this.selectedObstacle.position.x,
           this.selectedObstacle.position.y,
-          this.selectedObstacle.position.z
+          this.selectedObstacle.position.z,
+          this.selectedObstacle.rotation.y
         );
       }
 
@@ -291,10 +290,7 @@ export class InputManager {
     }
 
     this.isDraggingObstacle = false;
-    if (this.selectedObstacle) {
-      this.removeHighlight(this.selectedObstacle);
-      this.selectedObstacle = null;
-    }
+    this.selectedObstacle = null;
   }
 
   /**

@@ -615,7 +615,7 @@ io.on("connection", (socket) => {
 
   // Handle obstacle updates from clients
   socket.on("updateObstacle", async (data) => {
-    const { id, x, y, z } = data;
+    const { id, x, y, z, rotation } = data;
 
     // Find and update the obstacle
     const obstacle = gameState.obstacles.find((obs) => obs.id === id);
@@ -623,12 +623,15 @@ io.on("connection", (socket) => {
       obstacle.x = x;
       obstacle.y = y;
       obstacle.z = z;
+      if (rotation !== undefined) {
+        obstacle.rotation = rotation;
+      }
 
       // Save to database
       await saveObstacle(obstacle);
 
       // Broadcast update to all clients
-      io.emit("obstacleUpdated", { id, x, y, z });
+      io.emit("obstacleUpdated", { id, x, y, z, rotation });
 
       // Recreate pathfinder with updated obstacles
       pathfinder.obstacles = gameState.obstacles;
@@ -665,8 +668,8 @@ io.on("connection", (socket) => {
     // Recreate pathfinder with new obstacles
     pathfinder.obstacles = gameState.obstacles;
 
-    // Broadcast to all clients
-    io.emit("obstacleSpawned", newObstacle);
+    // Broadcast to all OTHER clients (spawner already has it)
+    socket.broadcast.emit("obstacleSpawned", newObstacle);
 
     console.log(`✨ Spawned obstacle: ${newObstacle.id}`);
   });
@@ -686,8 +689,8 @@ io.on("connection", (socket) => {
       // Recreate pathfinder
       pathfinder.obstacles = gameState.obstacles;
 
-      // Broadcast to all clients
-      io.emit("obstacleDeleted", { id });
+      // Broadcast to all OTHER clients (deleter already removed it)
+      socket.broadcast.emit("obstacleDeleted", { id });
 
       console.log(`🗑️ Deleted obstacle: ${id}`);
     }
@@ -710,8 +713,8 @@ io.on("connection", (socket) => {
     // Save to database
     await saveFoodItem(newFood);
 
-    // Broadcast to all clients
-    io.emit("foodSpawned", newFood);
+    // Broadcast to all OTHER clients (spawner already has it)
+    socket.broadcast.emit("foodSpawned", newFood);
 
     console.log(`✨ Spawned food: ${newFood.id}`);
   });
@@ -749,8 +752,8 @@ io.on("connection", (socket) => {
       // Delete from database
       await deleteFoodItem(id);
 
-      // Broadcast to all clients
-      io.emit("foodDeleted", { id });
+      // Broadcast to all OTHER clients (deleter already removed it)
+      socket.broadcast.emit("foodDeleted", { id });
 
       console.log(`🗑️ Deleted food: ${id}`);
     }

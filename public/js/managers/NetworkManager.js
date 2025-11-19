@@ -25,6 +25,13 @@ export class NetworkManager {
   }
 
   /**
+   * Set input manager reference (called after InputManager is created)
+   */
+  setInputManager(inputManager) {
+    this.inputManager = inputManager;
+  }
+
+  /**
    * Setup Socket.io connection
    */
   setupSocket() {
@@ -100,13 +107,80 @@ export class NetworkManager {
 
     // Handle obstacle updates
     this.socket.on("obstacleUpdated", (data) => {
-      const { id, x, y, z } = data;
+      const { id, x, y, z, rotation } = data;
       const obstacle = this.sceneManager.obstacles.find(
         (obs) => obs.userData.id === id
       );
       if (obstacle) {
         obstacle.position.set(x, y, z);
+        if (rotation !== undefined) {
+          obstacle.rotation.y = rotation;
+        }
         console.log(`📦 Obstacle ${id} updated by another player`);
+      }
+    });
+
+    // Handle new obstacle spawned by other players
+    this.socket.on("obstacleSpawned", async (obstacleData) => {
+      const obstacle = await this.sceneManager.createObstacle(obstacleData);
+      // Apply highlight if edit mode is active
+      if (this.inputManager && this.inputManager.editMode && obstacle) {
+        this.inputManager.highlightObject(obstacle);
+      }
+      console.log(`✨ Obstacle ${obstacleData.id} spawned by another player`);
+    });
+
+    // Handle obstacle deleted by other players
+    this.socket.on("obstacleDeleted", (data) => {
+      const { id } = data;
+      const obstacle = this.sceneManager.obstacles.find(
+        (obs) => obs.userData.id === id
+      );
+      if (obstacle) {
+        this.sceneManager.scene.remove(obstacle);
+        const index = this.sceneManager.obstacles.indexOf(obstacle);
+        if (index > -1) {
+          this.sceneManager.obstacles.splice(index, 1);
+        }
+        console.log(`🗑️ Obstacle ${id} deleted by another player`);
+      }
+    });
+
+    // Handle food spawned by other players
+    this.socket.on("foodSpawned", async (foodData) => {
+      const foodModel = await this.sceneManager.spawnFoodItem(
+        foodData.name,
+        foodData.x,
+        foodData.y,
+        foodData.z,
+        foodData.scale
+      );
+      // Apply highlight if edit mode is active
+      if (this.inputManager && this.inputManager.editMode && foodModel) {
+        this.inputManager.highlightObject(foodModel);
+      }
+      console.log(`✨ Food ${foodData.id} spawned by another player`);
+    });
+
+    // Handle food updates
+    this.socket.on("foodUpdated", (data) => {
+      const { id, x, y, z } = data;
+      const foodItem = this.sceneManager.foodItems.get(id);
+      if (foodItem && foodItem.model) {
+        foodItem.model.position.set(x, y, z);
+        foodItem.position = { x, y, z };
+        console.log(`🍔 Food ${id} updated by another player`);
+      }
+    });
+
+    // Handle food deleted by other players
+    this.socket.on("foodDeleted", (data) => {
+      const { id } = data;
+      const foodItem = this.sceneManager.foodItems.get(id);
+      if (foodItem) {
+        this.sceneManager.scene.remove(foodItem.model);
+        this.sceneManager.foodItems.delete(id);
+        console.log(`🗑️ Food ${id} deleted by another player`);
       }
     });
 
@@ -149,11 +223,11 @@ export class NetworkManager {
   }
 
   /**
-   * Update obstacle position on server
+   * Update obstacle position and rotation on server
    */
-  updateObstacle(id, x, y, z) {
+  updateObstacle(id, x, y, z, rotation = 0) {
     if (this.socket) {
-      this.socket.emit("updateObstacle", { id, x, y, z });
+      this.socket.emit("updateObstacle", { id, x, y, z, rotation });
     }
   }
 

@@ -179,6 +179,7 @@ export class SceneManager {
 
     obstacle.userData = {
       id: obstacleData.id,
+      type: obstacleData.type || "furniture",
       width: obstacleData.width,
       height: obstacleData.height,
       depth: obstacleData.depth,

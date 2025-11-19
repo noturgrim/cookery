@@ -347,6 +347,9 @@ class Game {
     );
     this.inputManager.setupInput();
 
+    // Set input manager reference in network manager for edit mode sync
+    this.networkManager.setInputManager(this.inputManager);
+
     // If animate loop isn't running yet, start it
     if (!this.sceneManager.renderer) {
       console.log("🎬 Starting renderer...");
