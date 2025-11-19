@@ -29,6 +29,10 @@ export class SceneManager {
     // Track loading progress
     this.isLoading = true;
     this.setupLoadingManager();
+
+    // Collision box visualization
+    this.collisionBoxes = [];
+    this.showCollisionBoxes = false;
   }
 
   /**
@@ -239,12 +243,18 @@ export class SceneManager {
       obstacle.rotation.y = obstacleData.rotation;
     }
 
+    // Calculate actual bounding box if it's a 3D model
+    let bbox = null;
+    if (obstacleData.model) {
+      bbox = this.calculateBoundingBox(obstacle);
+    }
+
     obstacle.userData = {
       id: obstacleData.id,
       type: obstacleData.type || "furniture",
-      width: obstacleData.width,
-      height: obstacleData.height,
-      depth: obstacleData.depth,
+      width: bbox ? bbox.width : obstacleData.width,
+      height: bbox ? bbox.height : obstacleData.height,
+      depth: bbox ? bbox.depth : obstacleData.depth,
     };
 
     this.scene.add(obstacle);
@@ -322,6 +332,9 @@ export class SceneManager {
       foodModel.scale.set(scale, scale, scale);
       foodModel.position.set(x, y, z);
 
+      // Calculate actual bounding box after scaling
+      const bbox = this.calculateBoundingBox(foodModel);
+
       // Add metadata to make it editable
       // Use provided ID for persistence, or generate new one
       const finalItemId = itemId || `food_${foodName}_${Date.now()}`;
@@ -333,9 +346,9 @@ export class SceneManager {
         y: y,
         z: z,
         scale: scale,
-        width: 1,
-        height: 1,
-        depth: 1,
+        width: bbox.width,
+        height: bbox.height,
+        depth: bbox.depth,
         rotation: 0,
       };
 
@@ -349,7 +362,11 @@ export class SceneManager {
       });
 
       console.log(
-        `✅ Spawned ${foodName} at (${x}, ${y}, ${z}) scale:${scale} id:${finalItemId}`
+        `✅ Spawned ${foodName} at (${x}, ${y}, ${z}) scale:${scale} size:(${bbox.width.toFixed(
+          2
+        )}x${bbox.height.toFixed(2)}x${bbox.depth.toFixed(
+          2
+        )}) id:${finalItemId}`
       );
       return foodModel;
     } catch (error) {
@@ -427,5 +444,174 @@ export class SceneManager {
    */
   remove(object) {
     this.scene.remove(object);
+  }
+
+  /**
+   * Calculate actual bounding box for an object (including scale)
+   */
+  calculateBoundingBox(object) {
+    const box = new THREE.Box3().setFromObject(object);
+    const size = new THREE.Vector3();
+    box.getSize(size);
+    const center = new THREE.Vector3();
+    box.getCenter(center);
+
+    return {
+      width: size.x,
+      height: size.y,
+      depth: size.z,
+      center: center,
+    };
+  }
+
+  /**
+   * Create a collision box helper (green wireframe box) from object
+   */
+  createCollisionBoxFromObject(object) {
+    const bbox = this.calculateBoundingBox(object);
+
+    const geometry = new THREE.BoxGeometry(bbox.width, bbox.height, bbox.depth);
+    const edges = new THREE.EdgesGeometry(geometry);
+    const material = new THREE.LineBasicMaterial({
+      color: 0x00ff00,
+      linewidth: 2,
+      transparent: true,
+      opacity: 0.8,
+    });
+    const wireframe = new THREE.LineSegments(edges, material);
+
+    // Position at the center of the bounding box
+    wireframe.position.copy(bbox.center);
+    wireframe.userData.isCollisionBox = true;
+    wireframe.userData.boundingBox = bbox;
+
+    return wireframe;
+  }
+
+  /**
+   * Create a collision box helper (green wireframe box) - legacy method
+   */
+  createCollisionBox(width, height, depth, x, y, z) {
+    const geometry = new THREE.BoxGeometry(width, height, depth);
+    const edges = new THREE.EdgesGeometry(geometry);
+    const material = new THREE.LineBasicMaterial({
+      color: 0x00ff00,
+      linewidth: 2,
+      transparent: true,
+      opacity: 0.8,
+    });
+    const wireframe = new THREE.LineSegments(edges, material);
+    wireframe.position.set(x, y, z);
+    wireframe.userData.isCollisionBox = true;
+    return wireframe;
+  }
+
+  /**
+   * Toggle collision box visualization for all objects
+   */
+  toggleCollisionBoxes() {
+    this.showCollisionBoxes = !this.showCollisionBoxes;
+
+    if (this.showCollisionBoxes) {
+      // Create collision boxes for all obstacles
+      this.obstacles.forEach((obstacle) => {
+        const collisionBox = this.createCollisionBoxFromObject(obstacle);
+
+        // Store reference to parent object
+        collisionBox.userData.parentObject = obstacle;
+        obstacle.userData.collisionBox = collisionBox;
+
+        this.scene.add(collisionBox);
+        this.collisionBoxes.push(collisionBox);
+      });
+
+      // Create collision boxes for all food items
+      this.foodItems.forEach((foodData, itemId) => {
+        const model = foodData.model;
+        const collisionBox = this.createCollisionBoxFromObject(model);
+
+        // Store reference to parent object
+        collisionBox.userData.parentObject = model;
+        model.userData.collisionBox = collisionBox;
+
+        this.scene.add(collisionBox);
+        this.collisionBoxes.push(collisionBox);
+      });
+
+      console.log(
+        `✅ Collision boxes ON (${this.collisionBoxes.length} boxes)`
+      );
+    } else {
+      // Remove all collision boxes
+      this.collisionBoxes.forEach((box) => {
+        this.scene.remove(box);
+      });
+      this.collisionBoxes = [];
+
+      // Clear collision box references
+      this.obstacles.forEach((obstacle) => {
+        delete obstacle.userData.collisionBox;
+      });
+      this.foodItems.forEach((foodData) => {
+        delete foodData.model.userData.collisionBox;
+      });
+
+      console.log("❌ Collision boxes OFF");
+    }
+
+    this.render();
+  }
+
+  /**
+   * Update collision box positions (called when objects are moved)
+   */
+  updateCollisionBoxes() {
+    if (!this.showCollisionBoxes) return;
+
+    this.collisionBoxes.forEach((box) => {
+      const parent = box.userData.parentObject;
+      if (parent) {
+        // Recalculate bounding box to account for rotation/scale changes
+        const bbox = this.calculateBoundingBox(parent);
+        box.position.copy(bbox.center);
+        box.userData.boundingBox = bbox;
+      }
+    });
+  }
+
+  /**
+   * Add collision box for a single object
+   */
+  addCollisionBoxForObject(object) {
+    if (!this.showCollisionBoxes) return;
+
+    // Remove existing collision box if present
+    if (object.userData.collisionBox) {
+      this.removeCollisionBoxForObject(object);
+    }
+
+    const collisionBox = this.createCollisionBoxFromObject(object);
+
+    collisionBox.userData.parentObject = object;
+    object.userData.collisionBox = collisionBox;
+
+    this.scene.add(collisionBox);
+    this.collisionBoxes.push(collisionBox);
+
+    return collisionBox;
+  }
+
+  /**
+   * Remove collision box for a single object
+   */
+  removeCollisionBoxForObject(object) {
+    if (object.userData.collisionBox) {
+      this.scene.remove(object.userData.collisionBox);
+      const index = this.collisionBoxes.indexOf(object.userData.collisionBox);
+      if (index > -1) {
+        this.collisionBoxes.splice(index, 1);
+      }
+      delete object.userData.collisionBox;
+    }
   }
 }

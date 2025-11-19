@@ -73,6 +73,10 @@ export class InputManager {
       this.toggleSpawnMenu();
     }
 
+    if (e.code === "KeyC") {
+      this.sceneManager.toggleCollisionBoxes();
+    }
+
     if (
       (e.code === "Delete" || e.code === "Backspace") &&
       this.editMode &&
@@ -282,6 +286,9 @@ export class InputManager {
     this.mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
     this.mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
 
+    // Update collision boxes if they're visible
+    this.sceneManager.updateCollisionBoxes();
+
     // Handle camera panning (right-click drag)
     if (this.isPanning) {
       const deltaX = event.clientX - this.lastPanPosition.x;
@@ -418,6 +425,9 @@ export class InputManager {
           2
         )}, ${this.selectedObstacle.position.z.toFixed(2)})`
       );
+
+      // Update collision box position if it exists
+      this.sceneManager.updateCollisionBoxes();
 
       // Log the code snippet for easy copy-paste (furniture only)
       if (!isFood) {
@@ -747,6 +757,9 @@ export class InputManager {
       furniture.position.set(0, 0, 0);
       furniture.scale.set(4, 4, 4); // Default scale 4 for furniture
 
+      // Calculate actual bounding box after scaling
+      const bbox = this.sceneManager.calculateBoundingBox(furniture);
+
       furniture.userData = {
         id: `furniture_${modelName}_${Date.now()}`,
         type: "furniture",
@@ -754,9 +767,9 @@ export class InputManager {
         x: furniture.position.x,
         y: furniture.position.y,
         z: furniture.position.z,
-        width: 4,
-        height: 2,
-        depth: 4,
+        width: bbox.width,
+        height: bbox.height,
+        depth: bbox.depth,
         model: modelName,
         scale: 4,
         rotation: 0,
@@ -770,10 +783,17 @@ export class InputManager {
         this.highlightObject(furniture);
       }
 
+      // Add collision box if enabled
+      this.sceneManager.addCollisionBoxForObject(furniture);
+
       // Send to server for database persistence
       this.networkManager.spawnObstacle(furniture.userData);
 
-      console.log(`✨ Spawned furniture: ${modelName} at scale 4`);
+      console.log(
+        `✨ Spawned furniture: ${modelName} at scale 4 size:(${bbox.width.toFixed(
+          2
+        )}x${bbox.height.toFixed(2)}x${bbox.depth.toFixed(2)})`
+      );
     } catch (error) {
       console.error(`Failed to spawn furniture ${modelName}:`, error);
     }
@@ -795,6 +815,9 @@ export class InputManager {
       if (this.editMode) {
         this.highlightObject(foodModel);
       }
+
+      // Add collision box if enabled
+      this.sceneManager.addCollisionBoxForObject(foodModel);
 
       // Send to server for database persistence
       this.networkManager.spawnFood({
@@ -838,6 +861,9 @@ export class InputManager {
 
     const objectId = object.userData.id;
     const objectType = object.userData.type;
+
+    // Remove collision box if exists
+    this.sceneManager.removeCollisionBoxForObject(object);
 
     // Remove from scene
     this.sceneManager.scene.remove(object);

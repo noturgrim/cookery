@@ -60,14 +60,17 @@ export class NetworkManager {
       });
 
       // Create all obstacles
-      data.obstacles.forEach((obstacle) => {
-        this.sceneManager.createObstacle(obstacle);
+      data.obstacles.forEach(async (obstacle) => {
+        const obj = await this.sceneManager.createObstacle(obstacle);
+        if (obj) {
+          this.sceneManager.addCollisionBoxForObject(obj);
+        }
       });
 
       // Create all food items
       if (data.foodItems && data.foodItems.length > 0) {
-        data.foodItems.forEach((foodItem) => {
-          this.sceneManager.spawnFoodItem(
+        data.foodItems.forEach(async (foodItem) => {
+          const foodModel = await this.sceneManager.spawnFoodItem(
             foodItem.name,
             foodItem.x,
             foodItem.y,
@@ -75,6 +78,9 @@ export class NetworkManager {
             foodItem.scale,
             foodItem.id // Pass existing ID for persistence
           );
+          if (foodModel) {
+            this.sceneManager.addCollisionBoxForObject(foodModel);
+          }
         });
         console.log(
           `🍔 Loaded ${data.foodItems.length} food items from server`
@@ -144,6 +150,10 @@ export class NetworkManager {
       if (this.inputManager && this.inputManager.editMode && obstacle) {
         this.inputManager.highlightObject(obstacle);
       }
+      // Add collision box if enabled
+      if (obstacle) {
+        this.sceneManager.addCollisionBoxForObject(obstacle);
+      }
       console.log(`✨ Obstacle ${obstacleData.id} spawned by another player`);
     });
 
@@ -176,6 +186,10 @@ export class NetworkManager {
       // Apply highlight if edit mode is active
       if (this.inputManager && this.inputManager.editMode && foodModel) {
         this.inputManager.highlightObject(foodModel);
+      }
+      // Add collision box if enabled
+      if (foodModel) {
+        this.sceneManager.addCollisionBoxForObject(foodModel);
       }
       console.log(`✨ Food ${foodData.id} spawned by another player`);
     });
