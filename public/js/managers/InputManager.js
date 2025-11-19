@@ -218,7 +218,42 @@ export class InputManager {
     // Update raycaster
     this.raycaster.setFromCamera(this.mouse, this.sceneManager.camera);
 
-    // Check intersection with floor
+    // First check if clicking on an object (obstacle or food)
+    const allObjects = [
+      ...this.sceneManager.obstacles,
+      ...this.sceneManager.foodItems,
+    ];
+    const objectIntersects = this.raycaster.intersectObjects(
+      allObjects,
+      true // Check children
+    );
+
+    if (objectIntersects.length > 0) {
+      // Find the parent object (obstacle or food)
+      let clickedObject = objectIntersects[0].object;
+      while (clickedObject.parent && !clickedObject.userData.id) {
+        clickedObject = clickedObject.parent;
+      }
+
+      if (clickedObject.userData.id) {
+        const objPos = clickedObject.position;
+
+        // Send move command to object's position (server will find best interaction spot)
+        this.networkManager.moveTo(objPos.x, objPos.z);
+
+        // Visual feedback at object position
+        this.uiManager.createMoveMarker(objPos.x, objPos.z);
+
+        console.log(
+          `🎯 Moving to interact with: ${
+            clickedObject.userData.id
+          } at (${objPos.x.toFixed(2)}, ${objPos.z.toFixed(2)})`
+        );
+        return;
+      }
+    }
+
+    // If no object clicked, check intersection with floor
     const intersects = this.raycaster.intersectObject(this.sceneManager.floor);
 
     if (intersects.length > 0) {

@@ -100,9 +100,11 @@ const getPlayerAABB = (player) => {
 };
 
 const getObstacleAABB = (obstacle) => {
-  const halfWidth = obstacle.width / 2;
-  const halfHeight = obstacle.height / 2;
-  const halfDepth = obstacle.depth / 2;
+  // Reduce collision box by 20% to allow players to get closer without getting stuck
+  const collisionReduction = 0.8; // 80% of original size
+  const halfWidth = (obstacle.width / 2) * collisionReduction;
+  const halfHeight = (obstacle.height / 2) * collisionReduction;
+  const halfDepth = (obstacle.depth / 2) * collisionReduction;
 
   return {
     minX: obstacle.x - halfWidth,
@@ -115,25 +117,15 @@ const getObstacleAABB = (obstacle) => {
 };
 
 const validatePlayerMovement = (player, newX, newZ) => {
-  // Create temporary player at new position
-  const tempPlayer = { ...player, x: newX, z: newZ };
-  const playerAABB = getPlayerAABB(tempPlayer);
+  // COLLISION DISABLED - Players can walk through everything
 
-  // Check collision with all obstacles
-  for (const obstacle of gameState.obstacles) {
-    const obstacleAABB = getObstacleAABB(obstacle);
-    if (checkAABBCollision(playerAABB, obstacleAABB)) {
-      return false; // Collision detected
-    }
-  }
-
-  // Keep players within bounds
+  // Only keep world bounds check (optional - can be removed too)
   const WORLD_BOUNDS = 20;
   if (Math.abs(newX) > WORLD_BOUNDS || Math.abs(newZ) > WORLD_BOUNDS) {
     return false;
   }
 
-  return true; // Valid movement
+  return true; // Always allow movement
 };
 
 // A* Pathfinding Algorithm
@@ -150,29 +142,13 @@ class AStarPathfinder {
 
   // Check if a grid position is walkable
   isWalkable(x, z) {
-    // Check world bounds
+    // COLLISION DISABLED - All positions are walkable except world bounds
     const WORLD_BOUNDS = 20;
     if (Math.abs(x) > WORLD_BOUNDS || Math.abs(z) > WORLD_BOUNDS) {
       return false;
     }
 
-    // Check collision with obstacles (with bigger buffer zone)
-    const SAFETY_MARGIN = 1.5; // Extra space around obstacles (increased for safety)
-    for (const obstacle of this.obstacles) {
-      const halfWidth = obstacle.width / 2;
-      const halfDepth = obstacle.depth / 2;
-
-      if (
-        x > obstacle.x - halfWidth - PLAYER_SIZE.width / 2 - SAFETY_MARGIN &&
-        x < obstacle.x + halfWidth + PLAYER_SIZE.width / 2 + SAFETY_MARGIN &&
-        z > obstacle.z - halfDepth - PLAYER_SIZE.depth / 2 - SAFETY_MARGIN &&
-        z < obstacle.z + halfDepth + PLAYER_SIZE.depth / 2 + SAFETY_MARGIN
-      ) {
-        return false;
-      }
-    }
-
-    return true;
+    return true; // Always walkable
   }
 
   // Get neighbors of a node
@@ -297,30 +273,68 @@ class AStarPathfinder {
       }
     }
 
-    // No path found, try to find closest reachable point
-    console.log(`⚠️ No path found after ${iterations} iterations`);
-    return [start, goal];
+    // No path found, return closest point we could reach
+    console.log(`⚠️ No complete path found after ${iterations} iterations`);
+
+    // Find the closest reachable position to the goal
+    let closestNode = start;
+    let closestDistance = this.heuristic(start, goal);
+
+    closedSet.forEach((nodeKey) => {
+      const [x, z] = nodeKey.split(",").map(Number);
+      const node = { x, z };
+      const dist = this.heuristic(node, goal);
+      if (dist < closestDistance) {
+        closestDistance = dist;
+        closestNode = node;
+      }
+    });
+
+    // Reconstruct path to closest reachable point
+    if (closestNode !== start) {
+      const path = [closestNode];
+      let temp = closestNode;
+      while (cameFrom.has(key(temp))) {
+        path.unshift(temp);
+        temp = cameFrom.get(key(temp));
+      }
+      return this.simplifyPath(path);
+    }
+
+    return [start]; // Just stay in place if no path at all
   }
 
   // Find nearest walkable position
   findNearestWalkable(pos) {
-    const searchRadius = 3; // Search within 3 units
+    const searchRadius = 5; // Increased search radius
     const step = this.gridSize;
     let bestPos = pos;
     let bestDistance = Infinity;
 
-    for (let dx = -searchRadius; dx <= searchRadius; dx += step) {
-      for (let dz = -searchRadius; dz <= searchRadius; dz += step) {
-        const testX = pos.x + dx;
-        const testZ = pos.z + dz;
+    // Try current position first
+    if (this.isWalkable(pos.x, pos.z)) {
+      return pos;
+    }
+
+    // Search in expanding circles for nearest walkable spot
+    for (let radius = step; radius <= searchRadius; radius += step) {
+      for (let angle = 0; angle < Math.PI * 2; angle += Math.PI / 8) {
+        const testX = pos.x + Math.cos(angle) * radius;
+        const testZ = pos.z + Math.sin(angle) * radius;
 
         if (this.isWalkable(testX, testZ)) {
-          const distance = Math.sqrt(dx * dx + dz * dz);
+          const distance = Math.sqrt(
+            (testX - pos.x) ** 2 + (testZ - pos.z) ** 2
+          );
           if (distance < bestDistance) {
             bestDistance = distance;
             bestPos = { x: testX, z: testZ };
           }
         }
+      }
+      // If we found a walkable position in this radius, use it
+      if (bestDistance < Infinity) {
+        break;
       }
     }
 
@@ -348,6 +362,63 @@ class AStarPathfinder {
     return simplified;
   }
 
+  // Find the best position around an obstacle to interact with it
+  findInteractionPoint(goal) {
+    // If goal is already walkable, use it
+    if (this.isWalkable(goal.x, goal.z)) {
+      return goal;
+    }
+
+    // Check if goal is inside an obstacle
+    let targetObstacle = null;
+    for (const obstacle of this.obstacles) {
+      const halfWidth = obstacle.width / 2;
+      const halfDepth = obstacle.depth / 2;
+
+      if (
+        goal.x >= obstacle.x - halfWidth &&
+        goal.x <= obstacle.x + halfWidth &&
+        goal.z >= obstacle.z - halfDepth &&
+        goal.z <= obstacle.z + halfDepth
+      ) {
+        targetObstacle = obstacle;
+        break;
+      }
+    }
+
+    if (targetObstacle) {
+      // Find closest accessible point around this obstacle
+      const interactionDistance = 0.3; // Very close to obstacle for interaction
+      const angles = 16; // Check 16 positions around the obstacle
+      let bestPoint = goal;
+      let bestDistance = Infinity;
+
+      for (let i = 0; i < angles; i++) {
+        const angle = (i * Math.PI * 2) / angles;
+        const testX =
+          targetObstacle.x +
+          Math.cos(angle) * (targetObstacle.width / 2 + interactionDistance);
+        const testZ =
+          targetObstacle.z +
+          Math.sin(angle) * (targetObstacle.depth / 2 + interactionDistance);
+
+        if (this.isWalkable(testX, testZ)) {
+          // Calculate distance from original goal
+          const dist = Math.sqrt((testX - goal.x) ** 2 + (testZ - goal.z) ** 2);
+          if (dist < bestDistance) {
+            bestDistance = dist;
+            bestPoint = { x: testX, z: testZ };
+          }
+        }
+      }
+
+      return bestPoint;
+    }
+
+    // Fallback to nearest walkable
+    return this.findNearestWalkable(goal);
+  }
+
   // Check if there's a clear line between two points
   hasLineOfSight(a, b) {
     const dx = b.x - a.x;
@@ -373,40 +444,8 @@ const pathfinder = new AStarPathfinder(gameState.obstacles);
 
 // Calculate repulsion force from obstacles
 const getObstacleRepulsion = (player) => {
-  let repulsionX = 0;
-  let repulsionZ = 0;
-  const REPULSION_RANGE = 2.0; // Distance at which repulsion starts
-  const REPULSION_STRENGTH = 0.08; // Force multiplier
-
-  for (const obstacle of gameState.obstacles) {
-    const dx = player.x - obstacle.x;
-    const dz = player.z - obstacle.z;
-    const distance = Math.sqrt(dx * dx + dz * dz);
-
-    // Calculate edge distance (closest point on obstacle)
-    const halfWidth = obstacle.width / 2;
-    const halfDepth = obstacle.depth / 2;
-
-    // Distance from obstacle surface
-    const surfaceDistance = Math.max(
-      Math.abs(dx) - halfWidth,
-      Math.abs(dz) - halfDepth,
-      0
-    );
-
-    if (surfaceDistance < REPULSION_RANGE) {
-      // Apply repulsion force (stronger when closer)
-      const forceMagnitude =
-        REPULSION_STRENGTH * (1 - surfaceDistance / REPULSION_RANGE);
-
-      if (distance > 0) {
-        repulsionX += (dx / distance) * forceMagnitude;
-        repulsionZ += (dz / distance) * forceMagnitude;
-      }
-    }
-  }
-
-  return { x: repulsionX, z: repulsionZ };
+  // REPULSION DISABLED - No push back from obstacles
+  return { x: 0, z: 0 };
 };
 
 // Process player input and update position
@@ -765,7 +804,11 @@ io.on("connection", (socket) => {
     if (player && target.x !== undefined && target.z !== undefined) {
       // Calculate path using A*
       const start = { x: player.x, z: player.z };
-      const goal = { x: target.x, z: target.z };
+      let goal = { x: target.x, z: target.z };
+
+      // If clicking on an obstacle, find the best interaction point
+      goal = pathfinder.findInteractionPoint(goal);
+
       const path = pathfinder.findPath(start, goal);
 
       player.path = path;
@@ -780,7 +823,9 @@ io.on("connection", (socket) => {
       console.log(
         `🗺️ Player ${socket.id} pathfinding to (${target.x.toFixed(
           2
-        )}, ${target.z.toFixed(2)}) - ${path.length} waypoints`
+        )}, ${target.z.toFixed(2)}) → (${goal.x.toFixed(2)}, ${goal.z.toFixed(
+          2
+        )}) - ${path.length} waypoints`
       );
     }
   });

@@ -97,13 +97,15 @@ export class UIManager {
     const curve = new THREE.CatmullRomCurve3(points);
     const tubeGeometry = new THREE.TubeGeometry(curve, 32, 0.15, 8, false);
 
-    // Create glowing material
-    const material = new THREE.MeshBasicMaterial({
+    // Create glowing material (use MeshStandardMaterial for emissive support)
+    const material = new THREE.MeshStandardMaterial({
       color: 0xffdd00, // Bright yellow/gold
       transparent: true,
       opacity: 0.85,
       emissive: 0xffdd00,
       emissiveIntensity: 0.5,
+      metalness: 0,
+      roughness: 0.5,
     });
 
     this.pathLine = new THREE.Mesh(tubeGeometry, material);
