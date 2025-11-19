@@ -41,6 +41,11 @@ export class InputManager {
     window.addEventListener("mousedown", (e) => this.handleMouseDown(e));
     window.addEventListener("mouseup", (e) => this.handleMouseUp(e));
 
+    // Mouse wheel for zoom
+    window.addEventListener("wheel", (e) => this.handleWheel(e), {
+      passive: false,
+    });
+
     // Keyboard
     window.addEventListener("keydown", (e) => this.handleKeyDown(e));
 
@@ -68,6 +73,79 @@ export class InputManager {
       e.preventDefault();
       this.deleteSelectedObject();
     }
+
+    // Rotation controls for selected object (Q and R keys)
+    if (this.editMode && this.selectedObstacle) {
+      if (e.code === "KeyQ") {
+        e.preventDefault();
+        this.rotateSelectedObject(-Math.PI / 8); // Rotate 22.5 degrees left
+      }
+      if (e.code === "KeyR") {
+        e.preventDefault();
+        this.rotateSelectedObject(Math.PI / 8); // Rotate 22.5 degrees right
+      }
+    }
+  }
+
+  /**
+   * Handle mouse wheel for camera zoom
+   */
+  handleWheel(e) {
+    // Prevent page scrolling
+    if (e.target.closest("#spawn-menu")) {
+      return; // Allow scrolling in spawn menu
+    }
+
+    e.preventDefault();
+    e.stopPropagation();
+
+    const camera = this.sceneManager.camera;
+    const zoomSpeed = 0.1; // Zoom factor per scroll
+    const minZoom = 0.5; // Maximum zoom out (smaller = more zoomed out)
+    const maxZoom = 3.0; // Maximum zoom in (larger = more zoomed in)
+
+    // For OrthographicCamera, adjust the zoom property
+    // Negative deltaY = scroll up = zoom in (increase zoom)
+    // Positive deltaY = scroll down = zoom out (decrease zoom)
+    if (e.deltaY < 0) {
+      // Zoom in
+      camera.zoom = Math.min(maxZoom, camera.zoom + zoomSpeed);
+    } else {
+      // Zoom out
+      camera.zoom = Math.max(minZoom, camera.zoom - zoomSpeed);
+    }
+
+    // Update the projection matrix to apply the zoom
+    camera.updateProjectionMatrix();
+
+    // Force an immediate render
+    this.sceneManager.render();
+  }
+
+  /**
+   * Rotate selected object
+   */
+  rotateSelectedObject(angle) {
+    if (!this.selectedObstacle) return;
+
+    this.selectedObstacle.rotation.y += angle;
+
+    // Send update to server (furniture only, food doesn't need rotation saved)
+    if (this.selectedObstacle.userData.type !== "food") {
+      this.networkManager.updateObstacle(
+        this.selectedObstacle.userData.id,
+        this.selectedObstacle.position.x,
+        this.selectedObstacle.position.y,
+        this.selectedObstacle.position.z
+      );
+    }
+
+    console.log(
+      `🔄 Rotated ${this.selectedObstacle.userData.id} to ${(
+        (this.selectedObstacle.rotation.y * 180) /
+        Math.PI
+      ).toFixed(0)}°`
+    );
   }
 
   /**

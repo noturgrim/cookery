@@ -33,6 +33,8 @@
         font-family: "Arial", sans-serif;
         overflow: hidden;
         background: #1a1a1a;
+        overscroll-behavior: none;
+        touch-action: none;
       }
 
       #game-container {
@@ -272,11 +274,35 @@
         <h3>Controls</h3>
         <ul>
           <li><span class="key">🖱️</span> Left Click to Move</li>
+          <li><span class="key">🎡</span> Mouse Wheel to Zoom</li>
+          <li><span class="key">E</span> Edit Mode</li>
+          <li><span class="key">B</span> Spawn Menu</li>
           <li style="font-size: 12px; margin-top: 8px; opacity: 0.8">
-            Click anywhere on the floor to navigate
+            Edit Mode: Q/R to rotate selected object
           </li>
         </ul>
       </div>
+    </div>
+
+    <!-- Zoom Controls -->
+    <div
+      id="zoom-controls"
+      class="fixed right-6 bottom-24 flex flex-col gap-2 z-50"
+    >
+      <button
+        onclick="document.dispatchEvent(new WheelEvent('wheel', { deltaY: -100 }))"
+        class="w-12 h-12 rounded-full bg-gray-800/80 hover:bg-gray-700 border-2 border-gray-600 hover:border-yellow-500 text-white text-2xl font-bold transition-all hover:scale-110 backdrop-blur-sm flex items-center justify-center"
+        title="Zoom In"
+      >
+        +
+      </button>
+      <button
+        onclick="document.dispatchEvent(new WheelEvent('wheel', { deltaY: 100 }))"
+        class="w-12 h-12 rounded-full bg-gray-800/80 hover:bg-gray-700 border-2 border-gray-600 hover:border-yellow-500 text-white text-2xl font-bold transition-all hover:scale-110 backdrop-blur-sm flex items-center justify-center"
+        title="Zoom Out"
+      >
+        −
+      </button>
     </div>
 
     <div id="connection-status">
