@@ -117,15 +117,53 @@ const getObstacleAABB = (obstacle) => {
 };
 
 const validatePlayerMovement = (player, newX, newZ) => {
-  // COLLISION DISABLED - Players can walk through everything
-
-  // Only keep world bounds check (optional - can be removed too)
+  // Check world bounds
   const WORLD_BOUNDS = 20;
   if (Math.abs(newX) > WORLD_BOUNDS || Math.abs(newZ) > WORLD_BOUNDS) {
     return false;
   }
 
-  return true; // Always allow movement
+  // Create player AABB at new position
+  const playerAABB = {
+    minX: newX - PLAYER_SIZE.width / 2,
+    maxX: newX + PLAYER_SIZE.width / 2,
+    minY: player.y,
+    maxY: player.y + PLAYER_SIZE.height,
+    minZ: newZ - PLAYER_SIZE.depth / 2,
+    maxZ: newZ + PLAYER_SIZE.depth / 2,
+  };
+
+  // Check collision with all obstacles (furniture)
+  for (const obstacle of gameState.obstacles) {
+    const obstacleAABB = getObstacleAABB(obstacle);
+    if (checkAABBCollision(playerAABB, obstacleAABB)) {
+      return false; // Collision detected
+    }
+  }
+
+  // Check collision with all food items
+  for (const foodItem of gameState.foodItems) {
+    // Create AABB for food item (smaller collision, food is pickupable)
+    const collisionReduction = 0.5; // 50% of original size for food
+    const halfWidth = ((foodItem.width || 1) / 2) * collisionReduction;
+    const halfHeight = ((foodItem.height || 1) / 2) * collisionReduction;
+    const halfDepth = ((foodItem.depth || 1) / 2) * collisionReduction;
+
+    const foodAABB = {
+      minX: foodItem.x - halfWidth,
+      maxX: foodItem.x + halfWidth,
+      minY: foodItem.y - halfHeight,
+      maxY: foodItem.y + halfHeight,
+      minZ: foodItem.z - halfDepth,
+      maxZ: foodItem.z + halfDepth,
+    };
+
+    if (checkAABBCollision(playerAABB, foodAABB)) {
+      return false; // Collision detected
+    }
+  }
+
+  return true; // No collision, movement valid
 };
 
 // A* Pathfinding Algorithm
@@ -142,13 +180,31 @@ class AStarPathfinder {
 
   // Check if a grid position is walkable
   isWalkable(x, z) {
-    // COLLISION DISABLED - All positions are walkable except world bounds
+    // Check world bounds
     const WORLD_BOUNDS = 20;
     if (Math.abs(x) > WORLD_BOUNDS || Math.abs(z) > WORLD_BOUNDS) {
       return false;
     }
 
-    return true; // Always walkable
+    // Create a small test AABB for the pathfinding grid cell
+    const testAABB = {
+      minX: x - PLAYER_SIZE.width / 2,
+      maxX: x + PLAYER_SIZE.width / 2,
+      minY: 0,
+      maxY: PLAYER_SIZE.height,
+      minZ: z - PLAYER_SIZE.depth / 2,
+      maxZ: z + PLAYER_SIZE.depth / 2,
+    };
+
+    // Check collision with all obstacles
+    for (const obstacle of this.obstacles) {
+      const obstacleAABB = getObstacleAABB(obstacle);
+      if (checkAABBCollision(testAABB, obstacleAABB)) {
+        return false; // Not walkable
+      }
+    }
+
+    return true; // Walkable
   }
 
   // Get neighbors of a node
@@ -444,8 +500,34 @@ const pathfinder = new AStarPathfinder(gameState.obstacles);
 
 // Calculate repulsion force from obstacles
 const getObstacleRepulsion = (player) => {
-  // REPULSION DISABLED - No push back from obstacles
-  return { x: 0, z: 0 };
+  let repulsionX = 0;
+  let repulsionZ = 0;
+  const repulsionRadius = 2.0; // Distance at which repulsion starts
+  const repulsionStrength = 0.05; // How strong the push is
+
+  const playerAABB = getPlayerAABB(player);
+
+  // Check each obstacle
+  for (const obstacle of gameState.obstacles) {
+    const dx = player.x - obstacle.x;
+    const dz = player.z - obstacle.z;
+    const distance = Math.sqrt(dx * dx + dz * dz);
+
+    // Only apply repulsion if close enough
+    if (distance < repulsionRadius && distance > 0.1) {
+      const obstacleAABB = getObstacleAABB(obstacle);
+
+      // Check if we're very close or colliding
+      if (checkAABBCollision(playerAABB, obstacleAABB)) {
+        // Strong push away from obstacle center
+        const force = repulsionStrength * (1 - distance / repulsionRadius);
+        repulsionX += (dx / distance) * force;
+        repulsionZ += (dz / distance) * force;
+      }
+    }
+  }
+
+  return { x: repulsionX, z: repulsionZ };
 };
 
 // Process player input and update position
@@ -744,6 +826,9 @@ io.on("connection", (socket) => {
       y: data.y,
       z: data.z,
       scale: data.scale || 1.0,
+      width: data.width || 1.0,
+      height: data.height || 1.0,
+      depth: data.depth || 1.0,
     };
 
     // Add to game state
@@ -755,7 +840,11 @@ io.on("connection", (socket) => {
     // Broadcast to all OTHER clients (spawner already has it)
     socket.broadcast.emit("foodSpawned", newFood);
 
-    console.log(`✨ Spawned food: ${newFood.id}`);
+    console.log(
+      `✨ Spawned food: ${newFood.id} (${newFood.width.toFixed(
+        2
+      )}x${newFood.height.toFixed(2)}x${newFood.depth.toFixed(2)})`
+    );
   });
 
   // Handle updating food items

@@ -64,9 +64,20 @@ export async function initializeDatabase() {
         y FLOAT NOT NULL,
         z FLOAT NOT NULL,
         scale FLOAT DEFAULT 1.0,
+        width FLOAT DEFAULT 1.0,
+        height FLOAT DEFAULT 1.0,
+        depth FLOAT DEFAULT 1.0,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
+    `);
+
+    // Add columns to existing food_items table if they don't exist
+    await pool.query(`
+      ALTER TABLE food_items 
+      ADD COLUMN IF NOT EXISTS width FLOAT DEFAULT 1.0,
+      ADD COLUMN IF NOT EXISTS height FLOAT DEFAULT 1.0,
+      ADD COLUMN IF NOT EXISTS depth FLOAT DEFAULT 1.0
     `);
 
     console.log("✅ Database tables initialized");
@@ -178,6 +189,9 @@ export async function loadFoodItems() {
       y: parseFloat(row.y),
       z: parseFloat(row.z),
       scale: parseFloat(row.scale),
+      width: parseFloat(row.width || 1.0),
+      height: parseFloat(row.height || 1.0),
+      depth: parseFloat(row.depth || 1.0),
     }));
   } catch (error) {
     console.error("❌ Error loading food items:", error);
@@ -192,14 +206,17 @@ export async function saveFoodItem(foodItem) {
   try {
     await pool.query(
       `
-      INSERT INTO food_items (id, name, x, y, z, scale, updated_at)
-      VALUES ($1, $2, $3, $4, $5, $6, CURRENT_TIMESTAMP)
+      INSERT INTO food_items (id, name, x, y, z, scale, width, height, depth, updated_at)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, CURRENT_TIMESTAMP)
       ON CONFLICT (id) 
       DO UPDATE SET 
         x = $3, 
         y = $4, 
         z = $5, 
         scale = $6,
+        width = $7,
+        height = $8,
+        depth = $9,
         updated_at = CURRENT_TIMESTAMP
     `,
       [
@@ -209,6 +226,9 @@ export async function saveFoodItem(foodItem) {
         foodItem.y,
         foodItem.z,
         foodItem.scale || 1.0,
+        foodItem.width || 1.0,
+        foodItem.height || 1.0,
+        foodItem.depth || 1.0,
       ]
     );
 

@@ -827,6 +827,9 @@ export class InputManager {
         y: 1.5,
         z: 0,
         scale: 1.5,
+        width: foodModel.userData.width,
+        height: foodModel.userData.height,
+        depth: foodModel.userData.depth,
       });
 
       console.log(`✨ Spawned food: ${foodName} at scale 1.5`);
