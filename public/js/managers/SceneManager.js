@@ -48,7 +48,7 @@ export class SceneManager {
       if (loadingElement) {
         const loadingText = loadingElement.querySelector("div");
         if (loadingText) {
-          loadingText.textContent = `🍳 Loading... ${progress}%`;
+          loadingText.textContent = `Loading... ${progress}%`;
         }
       }
     };

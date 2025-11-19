@@ -3,7 +3,11 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Supercooked - Multiplayer Cooking Game</title>
+    <title>Supercooked</title>
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
 
     <!-- Import map to resolve 'three' module for GLTFLoader -->
     <script type="importmap">
@@ -167,33 +171,60 @@
     </style>
   </head>
   <body>
-    <!-- Welcome Modal -->
-    <div id="welcome-modal">
-      <div class="modal-content">
-        <h2>🍳 Welcome to Supercooked!</h2>
-        <p>Choose your name and character</p>
-
-        <div class="input-group">
-          <label for="player-name">Your Name</label>
-          <input
-            type="text"
-            id="player-name"
-            placeholder="Enter your chef name..."
-            maxlength="20"
-            autocomplete="off"
-          />
+    <!-- Welcome Modal (Compact) -->
+    <div
+      id="welcome-modal"
+      class="fixed inset-0 bg-black/90 backdrop-blur-md z-[4000] flex items-center justify-center p-4"
+    >
+      <div
+        class="bg-gradient-to-br from-purple-900 to-indigo-900 rounded-2xl shadow-2xl border-2 border-yellow-500/50 w-full max-w-lg flex flex-col overflow-hidden"
+      >
+        <!-- Header -->
+        <div class="bg-gradient-to-r from-yellow-500 to-orange-500 px-6 py-4">
+          <h2 class="text-3xl font-bold text-white text-center drop-shadow-lg">
+            Welcome to Supercooked!
+          </h2>
+          <p class="text-white/90 text-center text-sm mt-1">
+            Choose your chef identity
+          </p>
         </div>
 
-        <div class="input-group">
-          <label>Choose Your Character</label>
-          <div class="skin-selector" id="skin-selector">
-            <!-- Character options will be generated here -->
+        <!-- Content -->
+        <div class="p-6 space-y-4">
+          <!-- Name Input -->
+          <div>
+            <label class="block text-white text-sm font-bold mb-2">
+              Your Name
+            </label>
+            <input
+              type="text"
+              id="player-name"
+              placeholder="Enter your chef name..."
+              maxlength="20"
+              autocomplete="off"
+              class="w-full py-3 px-4 rounded-lg bg-white/10 border-2 border-white/20 text-white text-base placeholder-white/50 focus:border-yellow-500 focus:outline-none focus:bg-white/15 transition-all"
+            />
           </div>
-        </div>
 
-        <button class="btn-primary" id="start-game-btn">
-          Start Cooking! 👨‍🍳
-        </button>
+          <!-- Character Selector -->
+          <div>
+            <label class="block text-white text-sm font-bold mb-2">
+              Choose Your Character
+            </label>
+            <div
+              id="skin-selector"
+              class="grid grid-cols-4 gap-2 max-h-72 overflow-y-auto p-3 bg-black/20 rounded-lg border border-white/10"
+            ></div>
+          </div>
+
+          <!-- Start Button -->
+          <button
+            id="start-game-btn"
+            class="w-full py-3 px-6 rounded-lg bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-600 hover:to-orange-600 text-white font-bold text-lg transition-all hover:scale-105 active:scale-95 shadow-lg"
+          >
+            Start Cooking!
+          </button>
+        </div>
       </div>
     </div>
 
@@ -322,7 +353,7 @@
           <!-- Character Selector -->
           <div>
             <label class="block text-white text-sm font-bold mb-2">
-              👨‍🍳 Choose Character
+              Choose Character
             </label>
             <div
               id="settings-skin-selector"
@@ -335,7 +366,7 @@
             id="settings-save-btn"
             class="w-full py-3 px-4 rounded-lg bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white font-bold text-base transition-all hover:scale-105 active:scale-95 shadow-lg"
           >
-            💾 Save Changes
+            Save Changes
           </button>
         </div>
       </div>
@@ -362,7 +393,7 @@
     </div>
 
     <div id="loading">
-      <div>🍳 Loading Supercooked...</div>
+      <div>Loading Supercooked...</div>
       <div class="spinner"></div>
     </div>
 

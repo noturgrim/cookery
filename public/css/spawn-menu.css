@@ -2,3 +2,7 @@
 #spawn-menu.active {
   display: flex !important;
 }
+
+* {
+  font-family: "Inter", sans-serif;
+}

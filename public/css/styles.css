@@ -1,20 +1,10 @@
 /* Welcome Modal */
-#welcome-modal {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background: rgba(0, 0, 0, 0.95);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 2000;
-  backdrop-filter: blur(10px);
+* {
+  font-family: "Inter", sans-serif;
 }
 
 #welcome-modal.hidden {
-  display: none;
+  display: none !important;
 }
 
 .modal-content {
@@ -79,101 +69,69 @@
   box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.3);
 }
 
-.skin-selector {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
-  gap: 10px;
-  margin-bottom: 20px;
-  max-height: 350px;
-  overflow-y: auto;
-  padding: 10px;
-  background: rgba(255, 255, 255, 0.05);
-  border-radius: 10px;
-}
-
 .skin-option {
   aspect-ratio: 1;
-  border: 3px solid transparent;
-  border-radius: 12px;
+  border: 2px solid rgba(255, 255, 255, 0.2);
+  border-radius: 10px;
   cursor: pointer;
   transition: all 0.3s;
-  background: rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.05);
   display: flex;
   align-items: center;
   justify-content: center;
   position: relative;
   overflow: hidden;
-  padding: 5px;
+  padding: 4px;
 }
 
 .skin-option canvas {
   width: 100%;
   height: 100%;
   object-fit: contain;
-  border-radius: 8px;
+  border-radius: 6px;
 }
 
 .skin-option:hover {
   transform: scale(1.1);
-  background: rgba(255, 255, 255, 0.2);
+  border-color: rgba(255, 215, 0, 0.8);
+  background: rgba(255, 255, 255, 0.15);
+  box-shadow: 0 0 15px rgba(255, 215, 0, 0.3);
 }
 
 .skin-option.selected {
   border-color: #ffd700;
+  border-width: 3px;
   background: rgba(255, 215, 0, 0.2);
-  box-shadow: 0 0 20px rgba(255, 215, 0, 0.5);
+  box-shadow: 0 0 20px rgba(255, 215, 0, 0.6);
 }
 
 .skin-option::after {
   content: attr(data-name);
   position: absolute;
-  bottom: 3px;
-  font-size: 9px;
+  bottom: 2px;
+  font-size: 8px;
   color: white;
   font-weight: bold;
-  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8);
 }
 
 /* Scrollbar styling for skin selector */
-.skin-selector::-webkit-scrollbar {
-  width: 8px;
+#skin-selector::-webkit-scrollbar {
+  width: 6px;
 }
 
-.skin-selector::-webkit-scrollbar-track {
-  background: rgba(255, 255, 255, 0.1);
+#skin-selector::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.3);
   border-radius: 10px;
 }
 
-.skin-selector::-webkit-scrollbar-thumb {
+#skin-selector::-webkit-scrollbar-thumb {
   background: rgba(255, 215, 0, 0.5);
   border-radius: 10px;
 }
 
-.skin-selector::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 215, 0, 0.7);
-}
-
-.btn-primary {
-  width: 100%;
-  padding: 15px;
-  border: none;
-  border-radius: 12px;
-  background: linear-gradient(135deg, #ffd700 0%, #ff8c00 100%);
-  color: #333;
-  font-size: 18px;
-  font-weight: bold;
-  cursor: pointer;
-  transition: all 0.3s;
-  box-shadow: 0 5px 15px rgba(255, 215, 0, 0.4);
-}
-
-.btn-primary:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 8px 20px rgba(255, 215, 0, 0.6);
-}
-
-.btn-primary:active {
-  transform: translateY(0);
+#skin-selector::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 215, 0, 0.8);
 }
 
 /* Settings Button */

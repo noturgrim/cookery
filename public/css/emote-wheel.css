@@ -184,6 +184,10 @@
   transform: translateY(-50%) scale(1.25);
 }
 
+* {
+  font-family: "Inter", sans-serif;
+}
+
 /* Voice indicator above player */
 .voice-indicator {
   position: absolute;
