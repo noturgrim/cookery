@@ -70,8 +70,8 @@ const gameState = {
 // Server configuration
 const SERVER_TICK_RATE = 20; // Reduced from 30 to 20 updates per second for bandwidth
 const PLAYER_SPEED = 0.15; // Units per tick
-const PLAYER_SIZE = { width: 1, height: 2, depth: 1 }; // Player AABB dimensions
-const GRID_SIZE = 0.8; // Grid cell size for pathfinding (larger = safer paths)
+const PLAYER_SIZE = { width: 0.6, height: 2, depth: 0.6 }; // Player AABB dimensions (smaller for better navigation)
+const GRID_SIZE = 0.4; // Grid cell size for pathfinding (smaller = more precise paths)
 
 // AABB Collision Detection
 const checkAABBCollision = (box1, box2) => {
@@ -100,11 +100,11 @@ const getPlayerAABB = (player) => {
 };
 
 const getObstacleAABB = (obstacle) => {
-  // Reduce collision box by 20% to allow players to get closer without getting stuck
-  const collisionReduction = 0.8; // 80% of original size
-  const halfWidth = (obstacle.width / 2) * collisionReduction;
-  const halfHeight = (obstacle.height / 2) * collisionReduction;
-  const halfDepth = (obstacle.depth / 2) * collisionReduction;
+  // Use actual dimensions for collision (no reduction for pathfinding accuracy)
+  // But we made player smaller so they can navigate better
+  const halfWidth = obstacle.width / 2;
+  const halfHeight = obstacle.height / 2;
+  const halfDepth = obstacle.depth / 2;
 
   return {
     minX: obstacle.x - halfWidth,
@@ -143,8 +143,8 @@ const validatePlayerMovement = (player, newX, newZ) => {
 
   // Check collision with all food items
   for (const foodItem of gameState.foodItems) {
-    // Create AABB for food item (smaller collision, food is pickupable)
-    const collisionReduction = 0.5; // 50% of original size for food
+    // Create AABB for food item (smaller collision, food is more passable)
+    const collisionReduction = 0.3; // 30% of original size for food (very small hitbox)
     const halfWidth = ((foodItem.width || 1) / 2) * collisionReduction;
     const halfHeight = ((foodItem.height || 1) / 2) * collisionReduction;
     const halfDepth = ((foodItem.depth || 1) / 2) * collisionReduction;
@@ -215,19 +215,38 @@ class AStarPathfinder {
       { x: -1, z: 0 }, // Left
       { x: 0, z: 1 }, // Down
       { x: 0, z: -1 }, // Up
-      { x: 1, z: 1 }, // Diagonal
-      { x: -1, z: 1 },
-      { x: 1, z: -1 },
-      { x: -1, z: -1 },
+      { x: 1, z: 1 }, // Diagonal NE
+      { x: -1, z: 1 }, // Diagonal SE
+      { x: 1, z: -1 }, // Diagonal NW
+      { x: -1, z: -1 }, // Diagonal SW
     ];
 
     for (const dir of directions) {
       const newX = node.x + dir.x * this.gridSize;
       const newZ = node.z + dir.z * this.gridSize;
 
-      if (this.isWalkable(newX, newZ)) {
-        const cost = dir.x !== 0 && dir.z !== 0 ? 1.414 : 1; // Diagonal cost
-        neighbors.push({ x: newX, z: newZ, cost });
+      // For diagonal movement, check if both adjacent cells are walkable
+      if (dir.x !== 0 && dir.z !== 0) {
+        const checkX = node.x + dir.x * this.gridSize;
+        const checkZ = node.z + dir.z * this.gridSize;
+        const adjacentX = node.x + dir.x * this.gridSize;
+        const adjacentZ = node.z;
+        const adjacentZ2 = node.z + dir.z * this.gridSize;
+        const adjacentX2 = node.x;
+
+        // Only allow diagonal if both adjacent cells are walkable (prevent corner cutting)
+        if (
+          this.isWalkable(newX, newZ) &&
+          this.isWalkable(adjacentX, adjacentZ) &&
+          this.isWalkable(adjacentX2, adjacentZ2)
+        ) {
+          neighbors.push({ x: newX, z: newZ, cost: 1.414 });
+        }
+      } else {
+        // Straight movement
+        if (this.isWalkable(newX, newZ)) {
+          neighbors.push({ x: newX, z: newZ, cost: 1.0 });
+        }
       }
     }
 
@@ -267,7 +286,7 @@ class AStarPathfinder {
     fScore.set(key(start), this.heuristic(start, goal));
 
     let iterations = 0;
-    const MAX_ITERATIONS = 2000; // Increased iterations
+    const MAX_ITERATIONS = 5000; // Increased iterations for smaller grid
 
     while (openSet.length > 0 && iterations < MAX_ITERATIONS) {
       iterations++;
@@ -280,10 +299,10 @@ class AStarPathfinder {
       // Add to closed set
       closedSet.add(currentKey);
 
-      // Check if we reached the goal
+      // Check if we reached the goal (tighter tolerance for precision)
       if (
-        Math.abs(current.x - goal.x) < this.gridSize * 1.5 &&
-        Math.abs(current.z - goal.z) < this.gridSize * 1.5
+        Math.abs(current.x - goal.x) < this.gridSize * 2.0 &&
+        Math.abs(current.z - goal.z) < this.gridSize * 2.0
       ) {
         // Reconstruct path
         const path = [goal];
@@ -502,8 +521,8 @@ const pathfinder = new AStarPathfinder(gameState.obstacles);
 const getObstacleRepulsion = (player) => {
   let repulsionX = 0;
   let repulsionZ = 0;
-  const repulsionRadius = 2.0; // Distance at which repulsion starts
-  const repulsionStrength = 0.05; // How strong the push is
+  const repulsionRadius = 1.5; // Distance at which repulsion starts
+  const repulsionStrength = 0.08; // How strong the push is
 
   const playerAABB = getPlayerAABB(player);
 
@@ -542,8 +561,8 @@ const processPlayerInput = (player) => {
     const dz = nextWaypoint.z - player.z;
     const distance = Math.sqrt(dx * dx + dz * dz);
 
-    // If reached waypoint, move to next (increased tolerance)
-    if (distance < 0.8) {
+    // If reached waypoint, move to next (tighter tolerance for precision)
+    if (distance < 0.5) {
       player.path.shift();
       if (player.path.length === 0) {
         player.moveTarget = null;

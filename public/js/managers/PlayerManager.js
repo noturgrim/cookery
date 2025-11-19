@@ -75,6 +75,15 @@ export class PlayerManager {
     });
 
     this.sceneManager.add(group);
+
+    // Create collision box if enabled (after mesh is added to scene)
+    let collisionBox = null;
+    if (this.sceneManager.showCollisionBoxes) {
+      collisionBox = this.sceneManager.createPlayerCollisionBox(group);
+      this.sceneManager.scene.add(collisionBox);
+      this.sceneManager.collisionBoxes.push(collisionBox);
+    }
+
     this.players.set(playerData.id, {
       mesh: group,
       targetPosition: new THREE.Vector3(
@@ -87,6 +96,7 @@ export class PlayerManager {
       isMoving: false,
       spawnProgress: 0, // 0 to 1 for spawn animation
       isSpawning: true,
+      collisionBox: collisionBox, // Store reference to collision box
     });
 
     // Add name tag
@@ -153,6 +163,14 @@ export class PlayerManager {
         const baseY = player.targetPosition.y;
         player.mesh.position.y = baseY + bounce;
       }
+
+      // Update collision box position during spawn animation
+      if (player.collisionBox) {
+        this.sceneManager.updatePlayerCollisionBox(
+          player.collisionBox,
+          player.mesh
+        );
+      }
     }
   }
 
@@ -162,6 +180,17 @@ export class PlayerManager {
   removePlayer(playerId, withAnimation = false) {
     const player = this.players.get(playerId);
     if (!player) return;
+
+    // Remove collision box if it exists
+    if (player.collisionBox) {
+      this.sceneManager.scene.remove(player.collisionBox);
+      const index = this.sceneManager.collisionBoxes.indexOf(
+        player.collisionBox
+      );
+      if (index > -1) {
+        this.sceneManager.collisionBoxes.splice(index, 1);
+      }
+    }
 
     if (withAnimation && player.mesh) {
       // Play despawn animation before removing
@@ -250,6 +279,14 @@ export class PlayerManager {
 
       // Smooth position interpolation
       player.mesh.position.lerp(player.targetPosition, lerpFactor);
+
+      // Update collision box position if it exists
+      if (player.collisionBox) {
+        this.sceneManager.updatePlayerCollisionBox(
+          player.collisionBox,
+          player.mesh
+        );
+      }
 
       // Smooth rotation interpolation
       const currentRotation = player.mesh.rotation.y;

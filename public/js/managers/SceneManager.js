@@ -507,9 +507,49 @@ export class SceneManager {
   }
 
   /**
+   * Create collision box for player based on actual model geometry
+   */
+  createPlayerCollisionBox(playerMesh) {
+    // Calculate actual bounding box from the player mesh
+    const bbox = this.calculateBoundingBox(playerMesh);
+
+    const geometry = new THREE.BoxGeometry(bbox.width, bbox.height, bbox.depth);
+    const edges = new THREE.EdgesGeometry(geometry);
+    const material = new THREE.LineBasicMaterial({
+      color: 0x00ffff, // Cyan for players (different from green obstacles)
+      linewidth: 2,
+      transparent: true,
+      opacity: 0.9,
+    });
+    const wireframe = new THREE.LineSegments(edges, material);
+
+    // Position at the center of the bounding box
+    wireframe.position.copy(bbox.center);
+    wireframe.userData.isCollisionBox = true;
+    wireframe.userData.isPlayerBox = true;
+    wireframe.userData.boundingBox = bbox;
+
+    return wireframe;
+  }
+
+  /**
+   * Update player collision box to match current mesh position
+   */
+  updatePlayerCollisionBox(collisionBox, playerMesh) {
+    if (!collisionBox || !playerMesh) return;
+
+    // Recalculate bounding box for current position/pose
+    const bbox = this.calculateBoundingBox(playerMesh);
+
+    // Update position to match new bounding box center
+    collisionBox.position.copy(bbox.center);
+    collisionBox.userData.boundingBox = bbox;
+  }
+
+  /**
    * Toggle collision box visualization for all objects
    */
-  toggleCollisionBoxes() {
+  toggleCollisionBoxes(playerManager) {
     this.showCollisionBoxes = !this.showCollisionBoxes;
 
     if (this.showCollisionBoxes) {
@@ -538,8 +578,23 @@ export class SceneManager {
         this.collisionBoxes.push(collisionBox);
       });
 
+      // Create collision boxes for all players
+      if (playerManager) {
+        playerManager.getAllPlayers().forEach((player, playerId) => {
+          if (!player.collisionBox && player.mesh) {
+            const collisionBox = this.createPlayerCollisionBox(player.mesh);
+            player.collisionBox = collisionBox;
+            this.scene.add(collisionBox);
+            this.collisionBoxes.push(collisionBox);
+          }
+        });
+      }
+
+      const playerCount = playerManager
+        ? playerManager.getAllPlayers().size
+        : 0;
       console.log(
-        `✅ Collision boxes ON (${this.collisionBoxes.length} boxes)`
+        `✅ Collision boxes ON (${this.collisionBoxes.length} boxes: objects + ${playerCount} players)`
       );
     } else {
       // Remove all collision boxes
@@ -555,6 +610,13 @@ export class SceneManager {
       this.foodItems.forEach((foodData) => {
         delete foodData.model.userData.collisionBox;
       });
+
+      // Clear player collision boxes
+      if (playerManager) {
+        playerManager.getAllPlayers().forEach((player) => {
+          player.collisionBox = null;
+        });
+      }
 
       console.log("❌ Collision boxes OFF");
     }

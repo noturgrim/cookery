@@ -74,7 +74,7 @@ export class InputManager {
     }
 
     if (e.code === "KeyC") {
-      this.sceneManager.toggleCollisionBoxes();
+      this.sceneManager.toggleCollisionBoxes(this.networkManager.playerManager);
     }
 
     if (
