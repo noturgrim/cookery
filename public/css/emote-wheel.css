@@ -187,31 +187,30 @@
 /* Voice indicator above player */
 .voice-indicator {
   position: absolute;
-  top: -40px;
-  left: 50%;
-  transform: translateX(-50%);
-  background: rgba(255, 215, 0, 0.9);
-  color: #333;
-  padding: 5px 12px;
+  padding: 6px 14px;
   border-radius: 20px;
-  font-size: 20px;
+  background: rgba(0, 0, 0, 0.75);
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  font-size: 16px;
   font-weight: bold;
-  animation: voiceBounce 0.5s ease-out;
+  font-family: Arial, sans-serif;
   pointer-events: none;
-  z-index: 100;
+  z-index: 1000;
   white-space: nowrap;
+  animation: voiceBounceIn 0.3s ease-out;
+  backdrop-filter: blur(4px);
 }
 
-@keyframes voiceBounce {
+@keyframes voiceBounceIn {
   0% {
-    transform: translateX(-50%) scale(0);
+    transform: scale(0.5);
     opacity: 0;
   }
-  50% {
-    transform: translateX(-50%) scale(1.2);
+  60% {
+    transform: scale(1.1);
   }
   100% {
-    transform: translateX(-50%) scale(1);
+    transform: scale(1);
     opacity: 1;
   }
 }

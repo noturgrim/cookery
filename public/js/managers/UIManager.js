@@ -120,50 +120,117 @@ export class UIManager {
   showVoiceIndicator(playerMesh, emoteName, camera) {
     if (!playerMesh) return;
 
-    // Get emoji for the emote
-    const emoteEmojis = {
-      hello: "👋",
-      help: "🆘",
-      yes: "✅",
-      no: "❌",
-      thanks: "🙏",
-      hurry: "⏰",
-      nice: "😄",
-      oops: "😅",
+    // Get text labels for emotes
+    const emoteLabels = {
+      hello: "Hello!",
+      help: "Help!",
+      yes: "Yes!",
+      no: "No!",
+      thanks: "Thanks!",
+      hurry: "Hurry Up!",
+      nice: "Nice!",
+      oops: "Oops!",
     };
+
+    // Get color for each emote type
+    const emoteColors = {
+      hello: "#4CAF50", // Green
+      help: "#FF5722", // Red-orange
+      yes: "#2196F3", // Blue
+      no: "#F44336", // Red
+      thanks: "#9C27B0", // Purple
+      hurry: "#FF9800", // Orange
+      nice: "#00BCD4", // Cyan
+      oops: "#FFC107", // Amber
+    };
+
+    const label = emoteLabels[emoteName] || emoteName.toUpperCase();
+    const color = emoteColors[emoteName] || "#FFFFFF";
 
     // Create indicator element
     const indicator = document.createElement("div");
     indicator.className = "voice-indicator";
-    indicator.textContent = emoteEmojis[emoteName] || "💬";
+    indicator.textContent = label;
     indicator.style.position = "absolute";
     indicator.style.zIndex = "1000";
+    indicator.style.color = color;
+    indicator.style.fontWeight = "bold";
+    indicator.style.fontSize = "18px";
+    indicator.style.textShadow =
+      "2px 2px 4px rgba(0,0,0,0.8), -1px -1px 2px rgba(0,0,0,0.5)";
+    indicator.style.pointerEvents = "none";
+    indicator.style.fontFamily = "Arial, sans-serif";
+    indicator.style.whiteSpace = "nowrap";
+    indicator.style.transition = "opacity 0.3s";
 
     document.body.appendChild(indicator);
+
+    // Track existing indicators for this player for cleanup
+    if (!this.playerVoiceIndicators) {
+      this.playerVoiceIndicators = new Map();
+    }
+
+    if (!this.playerVoiceIndicators.has(playerMesh)) {
+      this.playerVoiceIndicators.set(playerMesh, []);
+    }
+
+    const indicators = this.playerVoiceIndicators.get(playerMesh);
+    indicators.push(indicator);
+
+    // Animation state
+    let progress = 0;
+    const duration = 2.5; // 2.5 seconds total
+    const floatSpeed = 50; // pixels per second upward (increased for more visibility)
 
     // Position above player (update every frame)
     const updatePosition = () => {
       if (!playerMesh || !indicator.parentElement) return;
 
+      progress += 0.016; // ~60fps
+      const t = progress / duration;
+
+      // Calculate base position
       const vector = playerMesh.position.clone();
       vector.y += 3;
       vector.project(camera);
 
-      const x = (vector.x * 0.5 + 0.5) * window.innerWidth;
-      const y = (-(vector.y * 0.5) + 0.5) * window.innerHeight;
+      const baseX = (vector.x * 0.5 + 0.5) * window.innerWidth;
+      const baseY = (-(vector.y * 0.5) + 0.5) * window.innerHeight;
 
-      indicator.style.left = x + "px";
-      indicator.style.top = y + "px";
+      // Float upward from the same starting position (no offset)
+      const floatAmount = progress * floatSpeed;
+
+      indicator.style.left = baseX - indicator.offsetWidth / 2 + "px";
+      indicator.style.top = baseY - floatAmount + "px";
+
+      // Fade out in the last 0.5 seconds
+      if (t > 0.8) {
+        const fadeT = (t - 0.8) / 0.2;
+        indicator.style.opacity = 1 - fadeT;
+      }
     };
 
-    // Update position for 2 seconds
+    // Update position every frame
     const intervalId = setInterval(updatePosition, 16);
 
-    // Remove after 2 seconds
+    // Remove after duration
     setTimeout(() => {
       clearInterval(intervalId);
       indicator.remove();
-    }, 2000);
+
+      // Remove from tracking
+      const indicators = this.playerVoiceIndicators.get(playerMesh);
+      if (indicators) {
+        const index = indicators.indexOf(indicator);
+        if (index > -1) {
+          indicators.splice(index, 1);
+        }
+        // Clean up if no indicators left
+        if (indicators.length === 0) {
+          this.playerVoiceIndicators.delete(playerMesh);
+        }
+      }
+    }, duration * 1000);
   }
 
   /**
