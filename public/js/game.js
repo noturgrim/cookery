@@ -418,26 +418,11 @@ class Game {
 
   /**
    * Spawn demo food items on the table
+   * (Currently disabled - use Press B to spawn objects)
    */
   spawnDemoFoodItems() {
-    // Platform dimensions: 40x40 (from -20 to +20)
-    // Table at x:-15, z:0
-    const demoFoods = [
-      // Food items on the left table
-      { name: "tomato", x: -15, y: 1.5, z: -1, scale: 1.5 },
-      { name: "cheese", x: -15, y: 1.5, z: 0, scale: 1.5 },
-      { name: "bread", x: -15, y: 1.5, z: 1, scale: 1.5 },
-    ];
-
-    demoFoods.forEach((food) => {
-      this.sceneManager.spawnFoodItem(
-        food.name,
-        food.x,
-        food.y,
-        food.z,
-        food.scale
-      );
-    });
+    // No default food items
+    // Players can spawn items using the spawn menu (Press B key)
   }
 
   /**

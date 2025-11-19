@@ -259,12 +259,13 @@ export class InputManager {
   toggleEditMode() {
     this.editMode = !this.editMode;
 
-    // Update obstacle visual feedback
-    this.sceneManager.obstacles.forEach((obstacle) => {
+    // Update all editable objects visual feedback
+    const allEditableObjects = this.sceneManager.getAllEditableObjects();
+    allEditableObjects.forEach((object) => {
       if (this.editMode) {
-        this.highlightObject(obstacle);
+        this.highlightObject(object);
       } else {
-        this.removeHighlight(obstacle);
+        this.removeHighlight(object);
       }
     });
 
@@ -469,6 +470,11 @@ export class InputManager {
       this.sceneManager.scene.add(furniture);
       this.sceneManager.obstacles.push(furniture);
 
+      // Highlight only if edit mode is on
+      if (this.editMode) {
+        this.highlightObject(furniture);
+      }
+
       // Send to server for database persistence
       this.networkManager.spawnObstacle(furniture.userData);
 
@@ -490,6 +496,11 @@ export class InputManager {
       1.5 // Default scale 1.5 for food
     );
     if (foodModel) {
+      // Highlight only if edit mode is on
+      if (this.editMode) {
+        this.highlightObject(foodModel);
+      }
+
       // Send to server for database persistence
       this.networkManager.spawnFood({
         id: foodModel.userData.id,
