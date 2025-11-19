@@ -786,8 +786,21 @@ export class InputManager {
       // Add collision box if enabled
       this.sceneManager.addCollisionBoxForObject(furniture);
 
-      // Send to server for database persistence
-      this.networkManager.spawnObstacle(furniture.userData);
+      // Send to server for database persistence (only send serializable data)
+      this.networkManager.spawnObstacle({
+        id: furniture.userData.id,
+        type: furniture.userData.type,
+        name: furniture.userData.name,
+        x: furniture.userData.x,
+        y: furniture.userData.y,
+        z: furniture.userData.z,
+        width: furniture.userData.width,
+        height: furniture.userData.height,
+        depth: furniture.userData.depth,
+        model: furniture.userData.model,
+        scale: furniture.userData.scale,
+        rotation: furniture.userData.rotation,
+      });
 
       console.log(
         `✨ Spawned furniture: ${modelName} at scale 4 size:(${bbox.width.toFixed(
