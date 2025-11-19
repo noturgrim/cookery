@@ -109,9 +109,91 @@ export class SceneManager {
   }
 
   /**
-   * Create an obstacle/counter
+   * Load a furniture model from GLB
    */
-  createObstacle(obstacleData) {
+  async loadFurnitureModel(furnitureName) {
+    return new Promise((resolve, reject) => {
+      this.gltfLoader.load(
+        `/furniture/glb/${furnitureName}.glb`,
+        (gltf) => {
+          gltf.scene.traverse((child) => {
+            if (child.isMesh) {
+              child.castShadow = true;
+              child.receiveShadow = true;
+
+              if (child.material) {
+                child.material.transparent = false;
+                child.material.opacity = 1.0;
+                child.material.depthWrite = true;
+              }
+            }
+          });
+          resolve(gltf.scene);
+        },
+        undefined,
+        (error) => {
+          console.warn(`Failed to load furniture ${furnitureName}:`, error);
+          reject(error);
+        }
+      );
+    });
+  }
+
+  /**
+   * Create an obstacle/counter with 3D model
+   */
+  async createObstacle(obstacleData) {
+    let obstacle;
+
+    // Try to load a 3D model for kitchen counters
+    if (obstacleData.model) {
+      try {
+        const model = await this.loadFurnitureModel(obstacleData.model);
+        obstacle = model;
+
+        // Scale the model if specified
+        if (obstacleData.scale) {
+          obstacle.scale.set(
+            obstacleData.scale,
+            obstacleData.scale,
+            obstacleData.scale
+          );
+        }
+      } catch (error) {
+        console.warn(
+          `Failed to load model ${obstacleData.model}, using box instead`
+        );
+        obstacle = this.createBoxObstacle(obstacleData);
+      }
+    } else {
+      // Fallback to simple box
+      obstacle = this.createBoxObstacle(obstacleData);
+    }
+
+    obstacle.position.set(obstacleData.x, obstacleData.y, obstacleData.z);
+
+    // Apply rotation if specified
+    if (obstacleData.rotation) {
+      obstacle.rotation.y = obstacleData.rotation;
+    }
+
+    obstacle.userData = {
+      id: obstacleData.id,
+      width: obstacleData.width,
+      height: obstacleData.height,
+      depth: obstacleData.depth,
+    };
+
+    this.scene.add(obstacle);
+    this.obstacles.push(obstacle);
+
+    return obstacle;
+  }
+
+  /**
+   * Create a simple box obstacle (fallback)
+   */
+  createBoxObstacle(obstacleData) {
     const geometry = new THREE.BoxGeometry(
       obstacleData.width,
       obstacleData.height,
@@ -124,19 +206,8 @@ export class SceneManager {
     });
 
     const obstacle = new THREE.Mesh(geometry, material);
-    obstacle.position.set(obstacleData.x, obstacleData.y, obstacleData.z);
     obstacle.castShadow = true;
     obstacle.receiveShadow = true;
-
-    obstacle.userData = {
-      id: obstacleData.id,
-      width: obstacleData.width,
-      height: obstacleData.height,
-      depth: obstacleData.depth,
-    };
-
-    this.scene.add(obstacle);
-    this.obstacles.push(obstacle);
 
     return obstacle;
   }
@@ -182,26 +253,55 @@ export class SceneManager {
   /**
    * Spawn a food item in the scene
    */
-  async spawnFoodItem(foodName, x, y, z) {
+  async spawnFoodItem(foodName, x, y, z, scale = 0.3) {
     try {
       const foodModel = await this.loadFoodModel(foodName);
-      foodModel.scale.set(0.3, 0.3, 0.3);
+      foodModel.scale.set(scale, scale, scale);
       foodModel.position.set(x, y, z);
+
+      // Add metadata to make it editable
+      const itemId = `food_${foodName}_${Date.now()}`;
+      foodModel.userData = {
+        id: itemId,
+        type: "food",
+        name: foodName,
+        scale: scale,
+        width: 1,
+        height: 1,
+        depth: 1,
+      };
+
       this.scene.add(foodModel);
 
-      const itemId = `food_${Date.now()}_${Math.random()}`;
       this.foodItems.set(itemId, {
         model: foodModel,
         name: foodName,
         position: { x, y, z },
+        scale: scale,
       });
 
-      console.log(`✅ Spawned ${foodName} at (${x}, ${y}, ${z})`);
-      return itemId;
+      console.log(
+        `✅ Spawned ${foodName} at (${x}, ${y}, ${z}) scale:${scale}`
+      );
+      return foodModel;
     } catch (error) {
       console.error(`Failed to spawn ${foodName}:`, error);
       return null;
     }
+  }
+
+  /**
+   * Get all editable objects (obstacles + food)
+   */
+  getAllEditableObjects() {
+    const editableObjects = [...this.obstacles];
+
+    // Add all food items
+    this.foodItems.forEach((foodData) => {
+      editableObjects.push(foodData.model);
+    });
+
+    return editableObjects;
   }
 
   /**

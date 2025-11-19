@@ -417,22 +417,26 @@ class Game {
   }
 
   /**
-   * Spawn demo food items
+   * Spawn demo food items on the table
    */
   spawnDemoFoodItems() {
+    // Platform dimensions: 40x40 (from -20 to +20)
+    // Table at x:-15, z:0
     const demoFoods = [
-      { name: "tomato", x: 5, y: 1.5, z: 0 },
-      { name: "cheese", x: 5.5, y: 1.5, z: 1 },
-      { name: "bread", x: 4.5, y: 1.5, z: -1 },
-      { name: "burger", x: -5, y: 1.5, z: 5 },
-      { name: "pizza", x: -4, y: 1.5, z: 5 },
-      { name: "carrot", x: 0, y: 1.5, z: -8 },
-      { name: "apple", x: 1, y: 1.5, z: -8 },
-      { name: "banana", x: -1, y: 1.5, z: -8 },
+      // Food items on the left table
+      { name: "tomato", x: -15, y: 1.5, z: -1, scale: 1.5 },
+      { name: "cheese", x: -15, y: 1.5, z: 0, scale: 1.5 },
+      { name: "bread", x: -15, y: 1.5, z: 1, scale: 1.5 },
     ];
 
     demoFoods.forEach((food) => {
-      this.sceneManager.spawnFoodItem(food.name, food.x, food.y, food.z);
+      this.sceneManager.spawnFoodItem(
+        food.name,
+        food.x,
+        food.y,
+        food.z,
+        food.scale
+      );
     });
   }
 

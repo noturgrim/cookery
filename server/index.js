@@ -23,10 +23,20 @@ app.use(express.static(join(__dirname, "../public")));
 const gameState = {
   players: new Map(),
   obstacles: [
-    // Static counters/obstacles with AABB bounds
-    { id: "counter1", x: 5, y: 0.5, z: 0, width: 2, height: 1, depth: 4 },
-    { id: "counter2", x: -5, y: 0.5, z: 5, width: 4, height: 1, depth: 2 },
-    { id: "counter3", x: 0, y: 0.5, z: -8, width: 3, height: 1, depth: 2 },
+    // Platform is 40x40 units (from -20 to +20 on both X and Z axes)
+    // Single test kitchen table on the left side
+    {
+      id: "leftTable1",
+      x: -15, // Left side of the platform (platform goes from -20 to +20)
+      y: 0, // Ground level
+      z: 0, // Center
+      width: 4,
+      height: 2,
+      depth: 3,
+      model: "table", // Using simple table model
+      scale: 4,
+      rotation: 0, // No rotation for now
+    },
   ],
 };
 

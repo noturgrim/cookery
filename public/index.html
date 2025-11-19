@@ -17,6 +17,7 @@
 
     <link rel="stylesheet" href="/css/styles.css" />
     <link rel="stylesheet" href="/css/emote-wheel.css" />
+    <link rel="stylesheet" href="/css/spawn-menu.css" />
 
     <style>
       * {
@@ -283,6 +284,42 @@
     <div id="loading">
       <div>🍳 Loading Supercooked...</div>
       <div class="spinner"></div>
+    </div>
+
+    <!-- Spawn Menu -->
+    <div id="spawn-menu">
+      <button
+        class="spawn-menu-close"
+        onclick="document.getElementById('spawn-menu').classList.remove('active')"
+      >
+        ×
+      </button>
+      <h2>🎨 Spawn Objects</h2>
+
+      <button class="delete-mode-btn" id="delete-mode-btn">
+        🗑️ Delete Mode (OFF)
+      </button>
+
+      <div class="spawn-category">
+        <h3 onclick="this.nextElementSibling.classList.toggle('expanded')">
+          🪑 Furniture
+        </h3>
+        <div class="spawn-items" id="furniture-items"></div>
+      </div>
+
+      <div class="spawn-category">
+        <h3 onclick="this.nextElementSibling.classList.toggle('expanded')">
+          🍔 Food
+        </h3>
+        <div class="spawn-items" id="food-items"></div>
+      </div>
+
+      <div class="spawn-menu-help">
+        Press <strong>B</strong> to open/close • Click items to spawn at
+        center<br />
+        Press <strong>E</strong> to toggle Edit Mode • Drag to move objects<br />
+        Delete Mode: Click objects to delete them
+      </div>
     </div>
 
     <script type="module" src="/js/game.js"></script>
