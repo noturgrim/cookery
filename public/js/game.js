@@ -806,16 +806,31 @@ class Game {
     canvas.width = 256;
     canvas.height = 64;
 
+    // Clear canvas with transparent background
+    context.clearRect(0, 0, canvas.width, canvas.height);
+
+    // Add semi-transparent background for better visibility
+    // context.fillStyle = "rgba(0, 0, 0, 0.5)";
+    // context.fillRect(0, 0, canvas.width, canvas.height);
+
+    // Draw text
     context.fillStyle = `#${color.toString(16).padStart(6, "0")}`;
     context.font = "Bold 40px Arial";
     context.textAlign = "center";
-    context.fillText(text, 128, 45);
+    context.textBaseline = "middle";
+    context.fillText(text, 128, 32);
 
     const texture = new THREE.CanvasTexture(canvas);
-    const spriteMaterial = new THREE.SpriteMaterial({ map: texture });
+    const spriteMaterial = new THREE.SpriteMaterial({
+      map: texture,
+      transparent: true,
+      depthTest: false, // Always render on top
+      depthWrite: false,
+    });
     const sprite = new THREE.Sprite(spriteMaterial);
-    sprite.position.y = 3;
+    sprite.position.y = 4; // Position above character (adjusted for 1.2 scale)
     sprite.scale.set(2, 0.5, 1);
+    sprite.renderOrder = 999; // Render last (on top)
 
     parentGroup.add(sprite);
   }
