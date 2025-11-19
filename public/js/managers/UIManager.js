@@ -78,7 +78,7 @@ export class UIManager {
   }
 
   /**
-   * Draw path trace line showing the route
+   * Draw path trace line showing the route with cute thick rounded animated effect
    */
   drawPathTrace(path) {
     // Remove old path line
@@ -88,30 +88,64 @@ export class UIManager {
 
     if (!path || path.length < 2) return;
 
-    // Create line geometry from path points
+    // Create path points (slightly elevated)
     const points = path.map(
-      (point) => new THREE.Vector3(point.x, 0.15, point.z)
+      (point) => new THREE.Vector3(point.x, 0.25, point.z)
     );
-    const geometry = new THREE.BufferGeometry().setFromPoints(points);
 
-    // Create dashed line material
-    const material = new THREE.LineBasicMaterial({
-      color: 0x00ffff,
-      linewidth: 3,
+    // Create a thick tube along the path for rounded appearance
+    const curve = new THREE.CatmullRomCurve3(points);
+    const tubeGeometry = new THREE.TubeGeometry(curve, 32, 0.15, 8, false);
+
+    // Create glowing material
+    const material = new THREE.MeshBasicMaterial({
+      color: 0xffdd00, // Bright yellow/gold
       transparent: true,
-      opacity: 0.8,
+      opacity: 0.85,
+      emissive: 0xffdd00,
+      emissiveIntensity: 0.5,
     });
 
-    this.pathLine = new THREE.Line(geometry, material);
+    this.pathLine = new THREE.Mesh(tubeGeometry, material);
     this.sceneManager.add(this.pathLine);
 
-    // Fade out path after 2 seconds
-    setTimeout(() => {
-      if (this.pathLine) {
-        this.sceneManager.remove(this.pathLine);
-        this.pathLine = null;
+    // Add animated pulsing glow effect
+    let opacity = 0.85;
+    let emissiveIntensity = 0.5;
+    let fadeDirection = -1;
+    const animateInterval = setInterval(() => {
+      if (this.pathLine && this.pathLine.material) {
+        opacity += fadeDirection * 0.04;
+        emissiveIntensity += fadeDirection * 0.04;
+
+        if (opacity <= 0.5 || opacity >= 0.85) {
+          fadeDirection *= -1;
+        }
+
+        this.pathLine.material.opacity = opacity;
+        this.pathLine.material.emissiveIntensity = emissiveIntensity;
       }
-    }, 2000);
+    }, 50);
+
+    // Fade out path after 3 seconds
+    setTimeout(() => {
+      clearInterval(animateInterval);
+      if (this.pathLine) {
+        // Smooth fade out
+        const fadeOut = setInterval(() => {
+          if (this.pathLine && this.pathLine.material.opacity > 0) {
+            this.pathLine.material.opacity -= 0.08;
+            this.pathLine.material.emissiveIntensity -= 0.05;
+          } else {
+            clearInterval(fadeOut);
+            if (this.pathLine) {
+              this.sceneManager.remove(this.pathLine);
+              this.pathLine = null;
+            }
+          }
+        }, 50);
+      }
+    }, 3000);
   }
 
   /**
