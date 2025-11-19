@@ -510,13 +510,13 @@ export class SceneManager {
    * Create collision box for player based on actual model geometry
    */
   createPlayerCollisionBox(playerMesh) {
-    // Calculate actual bounding box from the player mesh
+    // Calculate actual bounding box from the player mesh (dynamic!)
     const bbox = this.calculateBoundingBox(playerMesh);
 
     const geometry = new THREE.BoxGeometry(bbox.width, bbox.height, bbox.depth);
     const edges = new THREE.EdgesGeometry(geometry);
     const material = new THREE.LineBasicMaterial({
-      color: 0x00ffff, // Cyan for players (different from green obstacles)
+      color: 0x00ffff, // Cyan for player collision
       linewidth: 2,
       transparent: true,
       opacity: 0.9,
@@ -525,6 +525,7 @@ export class SceneManager {
 
     // Position at the center of the bounding box
     wireframe.position.copy(bbox.center);
+
     wireframe.userData.isCollisionBox = true;
     wireframe.userData.isPlayerBox = true;
     wireframe.userData.boundingBox = bbox;

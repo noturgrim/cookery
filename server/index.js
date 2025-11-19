@@ -100,8 +100,8 @@ const getPlayerAABB = (player) => {
 };
 
 const getObstacleAABB = (obstacle) => {
-  // Use actual dimensions for collision (no reduction for pathfinding accuracy)
-  // But we made player smaller so they can navigate better
+  // Use actual dimensions from database - NO PADDING
+  // Exact collision matching the green visualization boxes
   const halfWidth = obstacle.width / 2;
   const halfHeight = obstacle.height / 2;
   const halfDepth = obstacle.depth / 2;
@@ -186,7 +186,8 @@ class AStarPathfinder {
       return false;
     }
 
-    // Create a small test AABB for the pathfinding grid cell
+    // Create a test AABB for the pathfinding grid cell
+    // Use exact player size for accurate pathfinding
     const testAABB = {
       minX: x - PLAYER_SIZE.width / 2,
       maxX: x + PLAYER_SIZE.width / 2,
@@ -200,6 +201,28 @@ class AStarPathfinder {
     for (const obstacle of this.obstacles) {
       const obstacleAABB = getObstacleAABB(obstacle);
       if (checkAABBCollision(testAABB, obstacleAABB)) {
+        return false; // Not walkable
+      }
+    }
+
+    // Check collision with all food items
+    for (const foodItem of gameState.foodItems) {
+      // Food has smaller collision for pathfinding (30% to match movement collision)
+      const collisionReduction = 0.3; // 30% of original size
+      const halfWidth = ((foodItem.width || 1) / 2) * collisionReduction;
+      const halfHeight = ((foodItem.height || 1) / 2) * collisionReduction;
+      const halfDepth = ((foodItem.depth || 1) / 2) * collisionReduction;
+
+      const foodAABB = {
+        minX: foodItem.x - halfWidth,
+        maxX: foodItem.x + halfWidth,
+        minY: foodItem.y - halfHeight,
+        maxY: foodItem.y + halfHeight,
+        minZ: foodItem.z - halfDepth,
+        maxZ: foodItem.z + halfDepth,
+      };
+
+      if (checkAABBCollision(testAABB, foodAABB)) {
         return false; // Not walkable
       }
     }
@@ -444,8 +467,11 @@ class AStarPathfinder {
       return goal;
     }
 
-    // Check if goal is inside an obstacle
-    let targetObstacle = null;
+    // Check if goal is inside an obstacle or food item
+    let targetObject = null;
+    let objectType = null;
+
+    // Check obstacles
     for (const obstacle of this.obstacles) {
       const halfWidth = obstacle.width / 2;
       const halfDepth = obstacle.depth / 2;
@@ -456,26 +482,49 @@ class AStarPathfinder {
         goal.z >= obstacle.z - halfDepth &&
         goal.z <= obstacle.z + halfDepth
       ) {
-        targetObstacle = obstacle;
+        targetObject = obstacle;
+        objectType = "obstacle";
         break;
       }
     }
 
-    if (targetObstacle) {
-      // Find closest accessible point around this obstacle
-      const interactionDistance = 0.3; // Very close to obstacle for interaction
-      const angles = 16; // Check 16 positions around the obstacle
+    // Check food items if no obstacle found
+    if (!targetObject) {
+      for (const foodItem of gameState.foodItems) {
+        const halfWidth = (foodItem.width || 1) / 2;
+        const halfDepth = (foodItem.depth || 1) / 2;
+
+        if (
+          goal.x >= foodItem.x - halfWidth &&
+          goal.x <= foodItem.x + halfWidth &&
+          goal.z >= foodItem.z - halfDepth &&
+          goal.z <= foodItem.z + halfDepth
+        ) {
+          targetObject = foodItem;
+          objectType = "food";
+          break;
+        }
+      }
+    }
+
+    if (targetObject) {
+      // Find closest accessible point around this object
+      const interactionDistance = 0.5; // Distance from object for interaction
+      const angles = 16; // Check 16 positions around the object
       let bestPoint = goal;
       let bestDistance = Infinity;
 
       for (let i = 0; i < angles; i++) {
         const angle = (i * Math.PI * 2) / angles;
+        const objWidth = targetObject.width || 1;
+        const objDepth = targetObject.depth || 1;
+
         const testX =
-          targetObstacle.x +
-          Math.cos(angle) * (targetObstacle.width / 2 + interactionDistance);
+          targetObject.x +
+          Math.cos(angle) * (objWidth / 2 + interactionDistance);
         const testZ =
-          targetObstacle.z +
-          Math.sin(angle) * (targetObstacle.depth / 2 + interactionDistance);
+          targetObject.z +
+          Math.sin(angle) * (objDepth / 2 + interactionDistance);
 
         if (this.isWalkable(testX, testZ)) {
           // Calculate distance from original goal
