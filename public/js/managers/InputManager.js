@@ -82,8 +82,9 @@ export class InputManager {
       this.deleteSelectedObject();
     }
 
-    // Rotation controls for selected object (Q and R keys)
+    // Controls for selected object in edit mode
     if (this.editMode && this.selectedObstacle) {
+      // Rotation controls (Q and R keys)
       if (e.code === "KeyQ") {
         e.preventDefault();
         this.rotateSelectedObject(-Math.PI / 8); // Rotate 22.5 degrees left
@@ -91,6 +92,16 @@ export class InputManager {
       if (e.code === "KeyR") {
         e.preventDefault();
         this.rotateSelectedObject(Math.PI / 8); // Rotate 22.5 degrees right
+      }
+
+      // Vertical movement controls (W and S keys)
+      if (e.code === "KeyW") {
+        e.preventDefault();
+        this.moveSelectedObjectVertically(0.1); // Move up
+      }
+      if (e.code === "KeyS") {
+        e.preventDefault();
+        this.moveSelectedObjectVertically(-0.1); // Move down
       }
     }
   }
@@ -154,6 +165,46 @@ export class InputManager {
         (this.selectedObstacle.rotation.y * 180) /
         Math.PI
       ).toFixed(0)}°`
+    );
+  }
+
+  /**
+   * Move selected object vertically (Y-axis)
+   */
+  moveSelectedObjectVertically(amount) {
+    if (!this.selectedObstacle) return;
+
+    // Update Y position
+    this.selectedObstacle.position.y += amount;
+
+    // Clamp to reasonable bounds (0 to 10 units)
+    this.selectedObstacle.position.y = Math.max(
+      0,
+      Math.min(10, this.selectedObstacle.position.y)
+    );
+
+    // Send update to server
+    if (this.selectedObstacle.userData.type === "food") {
+      this.networkManager.updateFood(
+        this.selectedObstacle.userData.id,
+        this.selectedObstacle.position.x,
+        this.selectedObstacle.position.y,
+        this.selectedObstacle.position.z
+      );
+    } else {
+      this.networkManager.updateObstacle(
+        this.selectedObstacle.userData.id,
+        this.selectedObstacle.position.x,
+        this.selectedObstacle.position.y,
+        this.selectedObstacle.position.z,
+        this.selectedObstacle.rotation.y
+      );
+    }
+
+    console.log(
+      `⬆️ Moved ${
+        this.selectedObstacle.userData.id
+      } to Y: ${this.selectedObstacle.position.y.toFixed(2)}`
     );
   }
 
