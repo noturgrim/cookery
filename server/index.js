@@ -1,8 +1,18 @@
+import "dotenv/config";
 import express from "express";
 import { createServer } from "http";
 import { Server } from "socket.io";
 import { fileURLToPath } from "url";
 import { dirname, join } from "path";
+import {
+  initializeDatabase,
+  loadObstacles,
+  saveObstacle,
+  deleteObstacle,
+  loadFoodItems,
+  saveFoodItem,
+  deleteFoodItem,
+} from "./database.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -22,22 +32,8 @@ app.use(express.static(join(__dirname, "../public")));
 // Game state - Authoritative server
 const gameState = {
   players: new Map(),
-  obstacles: [
-    // Platform is 40x40 units (from -20 to +20 on both X and Z axes)
-    // Single test kitchen table on the left side
-    {
-      id: "leftTable1",
-      x: -15, // Left side of the platform (platform goes from -20 to +20)
-      y: 0, // Ground level
-      z: 0, // Center
-      width: 4,
-      height: 2,
-      depth: 3,
-      model: "table", // Using simple table model
-      scale: 4,
-      rotation: 0, // No rotation for now
-    },
-  ],
+  obstacles: [], // Will be loaded from database
+  foodItems: [], // Will be loaded from database
 };
 
 // Server configuration
@@ -568,6 +564,7 @@ io.on("connection", (socket) => {
         playerId: socket.id,
         players: Array.from(gameState.players.values()),
         obstacles: gameState.obstacles,
+        foodItems: gameState.foodItems,
       });
 
       // Notify other players
@@ -586,7 +583,7 @@ io.on("connection", (socket) => {
   });
 
   // Handle obstacle updates from clients
-  socket.on("updateObstacle", (data) => {
+  socket.on("updateObstacle", async (data) => {
     const { id, x, y, z } = data;
 
     // Find and update the obstacle
@@ -595,6 +592,9 @@ io.on("connection", (socket) => {
       obstacle.x = x;
       obstacle.y = y;
       obstacle.z = z;
+
+      // Save to database
+      await saveObstacle(obstacle);
 
       // Broadcast update to all clients
       io.emit("obstacleUpdated", { id, x, y, z });
@@ -605,6 +605,123 @@ io.on("connection", (socket) => {
       console.log(
         `📦 Obstacle ${id} moved to (${x.toFixed(2)}, ${z.toFixed(2)})`
       );
+    }
+  });
+
+  // Handle spawning new obstacles
+  socket.on("spawnObstacle", async (data) => {
+    const newObstacle = {
+      id: data.id,
+      name: data.name,
+      type: data.type || "furniture",
+      x: data.x,
+      y: data.y,
+      z: data.z,
+      width: data.width,
+      height: data.height,
+      depth: data.depth,
+      model: data.model || null,
+      scale: data.scale || 1.0,
+      rotation: data.rotation || 0.0,
+    };
+
+    // Add to game state
+    gameState.obstacles.push(newObstacle);
+
+    // Save to database
+    await saveObstacle(newObstacle);
+
+    // Recreate pathfinder with new obstacles
+    pathfinder.obstacles = gameState.obstacles;
+
+    // Broadcast to all clients
+    io.emit("obstacleSpawned", newObstacle);
+
+    console.log(`✨ Spawned obstacle: ${newObstacle.id}`);
+  });
+
+  // Handle deleting obstacles
+  socket.on("deleteObstacle", async (data) => {
+    const { id } = data;
+
+    // Remove from game state
+    const index = gameState.obstacles.findIndex((obs) => obs.id === id);
+    if (index > -1) {
+      gameState.obstacles.splice(index, 1);
+
+      // Delete from database
+      await deleteObstacle(id);
+
+      // Recreate pathfinder
+      pathfinder.obstacles = gameState.obstacles;
+
+      // Broadcast to all clients
+      io.emit("obstacleDeleted", { id });
+
+      console.log(`🗑️ Deleted obstacle: ${id}`);
+    }
+  });
+
+  // Handle spawning food items
+  socket.on("spawnFood", async (data) => {
+    const newFood = {
+      id: data.id,
+      name: data.name,
+      x: data.x,
+      y: data.y,
+      z: data.z,
+      scale: data.scale || 1.0,
+    };
+
+    // Add to game state
+    gameState.foodItems.push(newFood);
+
+    // Save to database
+    await saveFoodItem(newFood);
+
+    // Broadcast to all clients
+    io.emit("foodSpawned", newFood);
+
+    console.log(`✨ Spawned food: ${newFood.id}`);
+  });
+
+  // Handle updating food items
+  socket.on("updateFood", async (data) => {
+    const { id, x, y, z } = data;
+
+    // Find and update the food item
+    const foodItem = gameState.foodItems.find((food) => food.id === id);
+    if (foodItem) {
+      foodItem.x = x;
+      foodItem.y = y;
+      foodItem.z = z;
+
+      // Save to database
+      await saveFoodItem(foodItem);
+
+      // Broadcast update to all clients
+      io.emit("foodUpdated", { id, x, y, z });
+
+      console.log(`🍔 Food ${id} moved to (${x.toFixed(2)}, ${z.toFixed(2)})`);
+    }
+  });
+
+  // Handle deleting food items
+  socket.on("deleteFood", async (data) => {
+    const { id } = data;
+
+    // Remove from game state
+    const index = gameState.foodItems.findIndex((food) => food.id === id);
+    if (index > -1) {
+      gameState.foodItems.splice(index, 1);
+
+      // Delete from database
+      await deleteFoodItem(id);
+
+      // Broadcast to all clients
+      io.emit("foodDeleted", { id });
+
+      console.log(`🗑️ Deleted food: ${id}`);
     }
   });
 
@@ -656,7 +773,36 @@ io.on("connection", (socket) => {
 });
 
 const PORT = process.env.PORT || 3000;
-httpServer.listen(PORT, () => {
-  console.log(`🎮 Game server running on http://localhost:${PORT}`);
-  console.log(`📡 WebSocket server ready for connections`);
-});
+
+// Initialize database and start server
+async function startServer() {
+  try {
+    // Initialize database tables
+    await initializeDatabase();
+
+    // Load obstacles from database
+    const loadedObstacles = await loadObstacles();
+    gameState.obstacles = loadedObstacles;
+    console.log(`📦 Loaded ${loadedObstacles.length} obstacles from database`);
+
+    // Load food items from database
+    const loadedFoodItems = await loadFoodItems();
+    gameState.foodItems = loadedFoodItems;
+    console.log(`🍔 Loaded ${loadedFoodItems.length} food items from database`);
+
+    // Recreate pathfinder with loaded obstacles
+    pathfinder.obstacles = gameState.obstacles;
+
+    // Start HTTP server
+    httpServer.listen(PORT, () => {
+      console.log(`🎮 Game server running on http://localhost:${PORT}`);
+      console.log(`📡 WebSocket server ready for connections`);
+      console.log(`💾 Database persistence enabled`);
+    });
+  } catch (error) {
+    console.error("❌ Failed to start server:", error);
+    process.exit(1);
+  }
+}
+
+startServer();

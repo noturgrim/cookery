@@ -170,33 +170,46 @@ export class InputManager {
    */
   handleMouseUp(event) {
     if (this.isDraggingObstacle && this.selectedObstacle) {
-      // Send new position to server
-      this.networkManager.updateObstacle(
-        this.selectedObstacle.userData.id,
-        this.selectedObstacle.position.x,
-        this.selectedObstacle.position.y,
-        this.selectedObstacle.position.z
-      );
+      const isFood = this.selectedObstacle.userData.type === "food";
+
+      // Send new position to server (food or furniture)
+      if (isFood) {
+        this.networkManager.updateFood(
+          this.selectedObstacle.userData.id,
+          this.selectedObstacle.position.x,
+          this.selectedObstacle.position.y,
+          this.selectedObstacle.position.z
+        );
+      } else {
+        this.networkManager.updateObstacle(
+          this.selectedObstacle.userData.id,
+          this.selectedObstacle.position.x,
+          this.selectedObstacle.position.y,
+          this.selectedObstacle.position.z
+        );
+      }
 
       console.log(
-        `✅ Moved ${
+        `✅ Moved ${isFood ? "🍔" : "🪑"} ${
           this.selectedObstacle.userData.id
         } to (${this.selectedObstacle.position.x.toFixed(
           2
         )}, ${this.selectedObstacle.position.z.toFixed(2)})`
       );
 
-      // Log the code snippet for easy copy-paste
-      console.log(`📋 Copy this to server/index.js:`);
-      console.log(`  {`);
-      console.log(`    id: "${this.selectedObstacle.userData.id}",`);
-      console.log(`    x: ${this.selectedObstacle.position.x.toFixed(2)},`);
-      console.log(`    y: ${this.selectedObstacle.position.y.toFixed(2)},`);
-      console.log(`    z: ${this.selectedObstacle.position.z.toFixed(2)},`);
-      console.log(`    width: ${this.selectedObstacle.userData.width},`);
-      console.log(`    height: ${this.selectedObstacle.userData.height},`);
-      console.log(`    depth: ${this.selectedObstacle.userData.depth},`);
-      console.log(`  },`);
+      // Log the code snippet for easy copy-paste (furniture only)
+      if (!isFood) {
+        console.log(`📋 Copy this to server/index.js:`);
+        console.log(`  {`);
+        console.log(`    id: "${this.selectedObstacle.userData.id}",`);
+        console.log(`    x: ${this.selectedObstacle.position.x.toFixed(2)},`);
+        console.log(`    y: ${this.selectedObstacle.position.y.toFixed(2)},`);
+        console.log(`    z: ${this.selectedObstacle.position.z.toFixed(2)},`);
+        console.log(`    width: ${this.selectedObstacle.userData.width},`);
+        console.log(`    height: ${this.selectedObstacle.userData.height},`);
+        console.log(`    depth: ${this.selectedObstacle.userData.depth},`);
+        console.log(`  },`);
+      }
     }
 
     this.isDraggingObstacle = false;
@@ -456,6 +469,9 @@ export class InputManager {
       this.sceneManager.scene.add(furniture);
       this.sceneManager.obstacles.push(furniture);
 
+      // Send to server for database persistence
+      this.networkManager.spawnObstacle(furniture.userData);
+
       console.log(`✨ Spawned furniture: ${modelName} at scale 4`);
     } catch (error) {
       console.error(`Failed to spawn furniture ${modelName}:`, error);
@@ -474,6 +490,16 @@ export class InputManager {
       1.5 // Default scale 1.5 for food
     );
     if (foodModel) {
+      // Send to server for database persistence
+      this.networkManager.spawnFood({
+        id: foodModel.userData.id,
+        name: foodName,
+        x: 0,
+        y: 1.5,
+        z: 0,
+        scale: 1.5,
+      });
+
       console.log(`✨ Spawned food: ${foodName} at scale 1.5`);
     }
   }
@@ -511,11 +537,15 @@ export class InputManager {
     // Remove from appropriate array
     if (objectType === "food") {
       this.sceneManager.foodItems.delete(objectId);
+      // Delete from database via server
+      this.networkManager.deleteFood(objectId);
     } else {
       const index = this.sceneManager.obstacles.indexOf(object);
       if (index > -1) {
         this.sceneManager.obstacles.splice(index, 1);
       }
+      // Delete from database via server
+      this.networkManager.deleteObstacle(objectId);
     }
 
     console.log(`🗑️ Deleted: ${objectId}`);

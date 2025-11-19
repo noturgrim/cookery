@@ -158,6 +158,51 @@ export class NetworkManager {
   }
 
   /**
+   * Spawn obstacle on server
+   */
+  spawnObstacle(obstacleData) {
+    if (this.socket) {
+      this.socket.emit("spawnObstacle", obstacleData);
+    }
+  }
+
+  /**
+   * Delete obstacle on server
+   */
+  deleteObstacle(id) {
+    if (this.socket) {
+      this.socket.emit("deleteObstacle", { id });
+    }
+  }
+
+  /**
+   * Spawn food item on server
+   */
+  spawnFood(foodData) {
+    if (this.socket) {
+      this.socket.emit("spawnFood", foodData);
+    }
+  }
+
+  /**
+   * Update food position on server
+   */
+  updateFood(id, x, y, z) {
+    if (this.socket) {
+      this.socket.emit("updateFood", { id, x, y, z });
+    }
+  }
+
+  /**
+   * Delete food item on server
+   */
+  deleteFood(id) {
+    if (this.socket) {
+      this.socket.emit("deleteFood", { id });
+    }
+  }
+
+  /**
    * Play an emote
    */
   playEmote(emoteName) {
