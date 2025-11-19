@@ -75,7 +75,7 @@ export class NetworkManager {
     // Handle player leaving
     this.socket.on("playerLeft", (playerId) => {
       console.log("👋 Player left:", playerId);
-      this.playerManager.removePlayer(playerId);
+      this.playerManager.removePlayer(playerId, true); // true = with animation
     });
 
     // Handle game state updates

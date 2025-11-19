@@ -65,6 +65,15 @@ export class PlayerManager {
     group.position.set(playerData.x, playerData.y, playerData.z);
     group.rotation.y = playerData.rotation || 0;
 
+    // Start with spawn animation state (invisible and small)
+    group.scale.set(0.1, 0.1, 0.1);
+    group.traverse((child) => {
+      if (child.isMesh && child.material) {
+        child.material.transparent = true;
+        child.material.opacity = 0;
+      }
+    });
+
     this.sceneManager.add(group);
     this.players.set(playerData.id, {
       mesh: group,
@@ -76,6 +85,8 @@ export class PlayerManager {
       targetRotation: playerData.rotation || 0,
       color: playerData.color,
       isMoving: false,
+      spawnProgress: 0, // 0 to 1 for spawn animation
+      isSpawning: true,
     });
 
     // Add name tag
@@ -83,18 +94,129 @@ export class PlayerManager {
     const nameColor = isCurrentPlayer ? 0x00ff00 : 0xffffff;
     const displayName = playerData.name || (isCurrentPlayer ? "You" : "Player");
     this.uiManager.createNameTag(group, displayName, nameColor);
+
+    // Start spawn animation
+    this.playSpawnAnimation(playerData.id);
   }
 
   /**
-   * Remove a player
+   * Play spawn animation for a player
    */
-  removePlayer(playerId) {
+  playSpawnAnimation(playerId) {
     const player = this.players.get(playerId);
-    if (player && player.mesh) {
-      this.sceneManager.remove(player.mesh);
+    if (!player) return;
+
+    console.log(`✨ Spawning player: ${playerId}`);
+  }
+
+  /**
+   * Update spawn animation
+   */
+  updateSpawnAnimation(playerId, delta) {
+    const player = this.players.get(playerId);
+    if (!player || !player.isSpawning) return;
+
+    // Increase spawn progress (takes 0.8 seconds to fully spawn)
+    player.spawnProgress += delta * 1.25;
+
+    if (player.spawnProgress >= 1) {
+      // Animation complete
+      player.spawnProgress = 1;
+      player.isSpawning = false;
+
+      // Ensure final state
+      player.mesh.scale.set(1, 1, 1);
+      player.mesh.traverse((child) => {
+        if (child.isMesh && child.material) {
+          child.material.opacity = 1;
+        }
+      });
+    } else {
+      // Ease-out animation for smooth spawn
+      const easeOut = 1 - Math.pow(1 - player.spawnProgress, 3);
+
+      // Scale up from 0.1 to 1
+      const scale = 0.1 + easeOut * 0.9;
+      player.mesh.scale.set(scale, scale, scale);
+
+      // Fade in
+      player.mesh.traverse((child) => {
+        if (child.isMesh && child.material) {
+          child.material.opacity = easeOut;
+        }
+      });
+
+      // Add a slight bounce at the end
+      if (player.spawnProgress > 0.7) {
+        const bounceProgress = (player.spawnProgress - 0.7) / 0.3;
+        const bounce = Math.sin(bounceProgress * Math.PI) * 0.1;
+        const baseY = player.targetPosition.y;
+        player.mesh.position.y = baseY + bounce;
+      }
     }
-    this.players.delete(playerId);
-    this.animationController.removePlayer(playerId);
+  }
+
+  /**
+   * Remove a player with despawn animation
+   */
+  removePlayer(playerId, withAnimation = false) {
+    const player = this.players.get(playerId);
+    if (!player) return;
+
+    if (withAnimation && player.mesh) {
+      // Play despawn animation before removing
+      this.playDespawnAnimation(playerId);
+    } else {
+      // Remove immediately
+      if (player.mesh) {
+        this.sceneManager.remove(player.mesh);
+      }
+      this.players.delete(playerId);
+      this.animationController.removePlayer(playerId);
+    }
+  }
+
+  /**
+   * Play despawn animation (fade out and shrink)
+   */
+  playDespawnAnimation(playerId) {
+    const player = this.players.get(playerId);
+    if (!player || !player.mesh) return;
+
+    console.log(`💨 Despawning player: ${playerId}`);
+
+    let progress = 0;
+    const duration = 0.5; // 0.5 seconds
+
+    const animate = (timestamp) => {
+      if (!player.mesh) return;
+
+      progress += 0.016; // ~60fps
+      const t = Math.min(progress / duration, 1);
+      const easeIn = Math.pow(t, 2);
+
+      // Scale down
+      const scale = 1 - easeIn;
+      player.mesh.scale.set(scale, scale, scale);
+
+      // Fade out
+      player.mesh.traverse((child) => {
+        if (child.isMesh && child.material) {
+          child.material.opacity = 1 - easeIn;
+        }
+      });
+
+      if (t < 1) {
+        requestAnimationFrame(animate);
+      } else {
+        // Animation complete, remove player
+        this.sceneManager.remove(player.mesh);
+        this.players.delete(playerId);
+        this.animationController.removePlayer(playerId);
+      }
+    };
+
+    requestAnimationFrame(animate);
   }
 
   /**
@@ -120,6 +242,12 @@ export class PlayerManager {
     const lerpFactor = 0.3;
 
     this.players.forEach((player, playerId) => {
+      // Update spawn animation if player is spawning
+      if (player.isSpawning) {
+        this.updateSpawnAnimation(playerId, delta);
+        return; // Skip other updates during spawn
+      }
+
       // Smooth position interpolation
       player.mesh.position.lerp(player.targetPosition, lerpFactor);
 
