@@ -356,27 +356,6 @@
       </div>
     </div>
 
-    <!-- Zoom Controls -->
-    <div
-      id="zoom-controls"
-      class="fixed right-6 bottom-24 flex flex-col gap-2 z-50"
-    >
-      <button
-        onclick="document.dispatchEvent(new WheelEvent('wheel', { deltaY: -100 }))"
-        class="w-12 h-12 rounded-full bg-gray-800/80 hover:bg-gray-700 border-2 border-gray-600 hover:border-yellow-500 text-white text-2xl font-bold transition-all hover:scale-110 backdrop-blur-sm flex items-center justify-center"
-        title="Zoom In"
-      >
-        +
-      </button>
-      <button
-        onclick="document.dispatchEvent(new WheelEvent('wheel', { deltaY: 100 }))"
-        class="w-12 h-12 rounded-full bg-gray-800/80 hover:bg-gray-700 border-2 border-gray-600 hover:border-yellow-500 text-white text-2xl font-bold transition-all hover:scale-110 backdrop-blur-sm flex items-center justify-center"
-        title="Zoom Out"
-      >
-        −
-      </button>
-    </div>
-
     <div id="connection-status">
       <span class="status-dot"></span>
       <span>Connected</span>
