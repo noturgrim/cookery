@@ -108,7 +108,8 @@ const validateDatabaseTypes = {
       );
     }
     // Check for SQL injection patterns (defense in depth)
-    if (/['";\\-]/.test(id)) {
+    // Allow hyphens since UUIDs contain them, but block quotes, semicolons, and backslashes
+    if (/['";\\]/.test(id)) {
       throw new Error(`Invalid id format: contains dangerous characters`);
     }
     return true;
