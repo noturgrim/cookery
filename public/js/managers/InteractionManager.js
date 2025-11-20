@@ -121,7 +121,11 @@ export class InteractionManager {
 
       if (!isSittable) return;
 
-      const distance = playerPos.distanceTo(furniture.position);
+      // Calculate distance to furniture's bounding box center for more accurate detection
+      const bbox = this.sceneManager.calculateBoundingBox(furniture);
+      const furnitureCenter = bbox.center;
+
+      const distance = playerPos.distanceTo(furnitureCenter);
       if (distance < closestDistance) {
         closest = furniture;
         closestDistance = distance;
@@ -189,9 +193,8 @@ export class InteractionManager {
     this.sittingOn = furniture;
     player.isSitting = true; // Mark player as sitting
 
-    // Position player on furniture
-    const sitPosition = furniture.position.clone();
-    sitPosition.y += 0.5; // Slight height adjustment
+    // Calculate proper sitting position based on furniture bounding box
+    const sitPosition = this.calculateSittingPosition(furniture);
 
     player.mesh.position.copy(sitPosition);
     player.targetPosition.copy(sitPosition);
@@ -202,13 +205,18 @@ export class InteractionManager {
     // Stop any movement
     player.isMoving = false;
 
-    // Play sit animation (loop it)
-    this.playerManager.animationController.playAnimationClip(
-      this.networkManager.playerId,
-      "sit",
-      null,
-      true // Loop the animation
-    );
+    // Play sit animation (loop it) - only if animation exists
+    const hasAnimation =
+      this.playerManager.animationController.playAnimationClip(
+        this.networkManager.playerId,
+        "sit",
+        null,
+        true // Loop the animation
+      );
+
+    if (!hasAnimation) {
+      console.warn("⚠️ No sit animation found in character model");
+    }
 
     // Notify server
     this.networkManager.socket.emit("playerSit", {
@@ -220,6 +228,89 @@ export class InteractionManager {
 
     // Update prompt
     this.updateSittingPrompt();
+  }
+
+  /**
+   * Calculate proper sitting position on furniture
+   */
+  calculateSittingPosition(furniture) {
+    const sitPosition = furniture.position.clone();
+
+    // Get the actual bounding box of the furniture
+    const bbox = this.sceneManager.calculateBoundingBox(furniture);
+
+    // Use the bounding box center for X and Z positioning
+    sitPosition.x = bbox.center.x;
+    sitPosition.z = bbox.center.z;
+
+    // Get furniture name to determine type-specific positioning
+    const furnitureName = this.getFurnitureName(furniture).toLowerCase();
+
+    // Calculate seat height based on furniture type
+    let seatHeightMultiplier = 0.35; // Default for most furniture
+    let forwardOffset = 0; // Offset in local Z axis
+
+    // Type-specific adjustments
+    if (furnitureName.includes("stool")) {
+      // Bar stools and high stools
+      seatHeightMultiplier = 0.55; // Stools are higher
+      forwardOffset = 0;
+    } else if (
+      furnitureName.includes("lounge") &&
+      furnitureName.includes("chair")
+    ) {
+      // Lounge/relaxing chairs
+      seatHeightMultiplier = 0.25; // Lounge chairs are lower
+      forwardOffset = -0.1;
+    } else if (
+      furnitureName.includes("sofa") ||
+      furnitureName.includes("couch")
+    ) {
+      // Sofas and couches
+      seatHeightMultiplier = 0.3;
+      forwardOffset = -0.15; // Sit slightly back on the cushion
+    } else if (furnitureName.includes("bench")) {
+      // Benches
+      seatHeightMultiplier = 0.4;
+      forwardOffset = 0;
+    } else if (furnitureName.includes("chair")) {
+      // Regular chairs (check this last to avoid matching lounge chair)
+      seatHeightMultiplier = 0.35;
+      forwardOffset = 0; // Chairs usually centered
+    }
+
+    // Calculate seat height from furniture base
+    const furnitureHeight = bbox.height;
+    const furnitureBase =
+      furniture.position.y -
+      furnitureHeight / 2 +
+      (bbox.center.y - furniture.position.y);
+    const seatHeight = furnitureHeight * seatHeightMultiplier;
+
+    // Set Y position (from base of furniture)
+    sitPosition.y = furnitureBase + seatHeight;
+
+    // Apply forward/backward offset based on furniture rotation
+    if (forwardOffset !== 0) {
+      const offset = new THREE.Vector3(0, 0, forwardOffset);
+      offset.applyAxisAngle(new THREE.Vector3(0, 1, 0), furniture.rotation.y);
+      sitPosition.add(offset);
+    }
+
+    console.log(
+      `📍 Sitting on ${furnitureName} at: (${sitPosition.x.toFixed(
+        2
+      )}, ${sitPosition.y.toFixed(2)}, ${sitPosition.z.toFixed(2)})`
+    );
+    console.log(
+      `   Furniture bbox: height=${bbox.height.toFixed(
+        2
+      )}, center=(${bbox.center.x.toFixed(2)}, ${bbox.center.y.toFixed(
+        2
+      )}, ${bbox.center.z.toFixed(2)})`
+    );
+
+    return sitPosition;
   }
 
   /**
