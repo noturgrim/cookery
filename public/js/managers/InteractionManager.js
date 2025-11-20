@@ -12,9 +12,13 @@ export class InteractionManager {
     this.uiManager = uiManager;
 
     // Interaction state
-    this.interactionRange = 2.5; // Distance to interact
+    this.interactionRange = 2.5; // Distance to interact (from bounding box surface)
     this.nearbyFurniture = null;
     this.showingPrompt = false;
+
+    console.log(
+      "💡 Interaction Detection: Using visual collision boxes for accuracy"
+    );
 
     // Sitting state
     this.isSitting = false;
@@ -139,11 +143,29 @@ export class InteractionManager {
 
       if (!isSittable && !isLyingFurniture) return;
 
-      // Calculate distance to furniture's bounding box center for more accurate detection
+      // Calculate distance to furniture's actual bounding box (same as visual collision box)
       const bbox = this.sceneManager.calculateBoundingBox(furniture);
-      const furnitureCenter = bbox.center;
 
-      const distance = playerPos.distanceTo(furnitureCenter);
+      // Calculate closest point on the bounding box to the player
+      // This matches exactly how the visual collision box works
+      const closestPoint = new THREE.Vector3(
+        Math.max(
+          bbox.center.x - bbox.width / 2,
+          Math.min(playerPos.x, bbox.center.x + bbox.width / 2)
+        ),
+        Math.max(
+          bbox.center.y - bbox.height / 2,
+          Math.min(playerPos.y, bbox.center.y + bbox.height / 2)
+        ),
+        Math.max(
+          bbox.center.z - bbox.depth / 2,
+          Math.min(playerPos.z, bbox.center.z + bbox.depth / 2)
+        )
+      );
+
+      // Distance to closest point on the bounding box surface
+      const distance = playerPos.distanceTo(closestPoint);
+
       if (distance < closestDistance) {
         closest = furniture;
         closestDistance = distance;
@@ -151,6 +173,11 @@ export class InteractionManager {
         furniture.userData.interactionType = isLyingFurniture ? "lie" : "sit";
       }
     });
+
+    // Debug: Log when furniture is in range (uncomment to debug)
+    // if (closest) {
+    //   console.log(`🎯 Nearby: ${this.getFurnitureName(closest)} (${closestDistance.toFixed(2)}m away)`);
+    // }
 
     return closest;
   }
