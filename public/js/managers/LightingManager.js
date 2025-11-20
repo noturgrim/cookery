@@ -15,17 +15,17 @@ export class LightingManager {
       lamp: {
         type: "point",
         color: 0xffdd88, // Warm white
-        intensity: 1.5,
-        distance: 8,
-        decay: 2,
+        intensity: 3.0, // Increased from 1.5
+        distance: 20, // Increased from 8
+        decay: 1.5, // Reduced from 2 for softer falloff
         offset: { x: 0, y: 1.5, z: 0 }, // Height offset from lamp base
       },
       lampWall: {
         type: "point",
         color: 0xffdd88,
-        intensity: 1.2,
-        distance: 6,
-        decay: 2,
+        intensity: 2.5, // Increased from 1.2
+        distance: 15, // Increased from 6
+        decay: 1.5, // Reduced from 2 for softer falloff
         offset: { x: 0, y: 0.5, z: 0 },
       },
       // Add more lamp types as needed
