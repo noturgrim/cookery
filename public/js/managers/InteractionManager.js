@@ -571,11 +571,12 @@ export class InteractionManager {
       return 1;
     }
 
-    // Large beds: calculate based on width
+    // Large beds: calculate based on the SHORTER dimension (bed width, not length)
+    // Players lie side-by-side across the bed width
     // Each person needs roughly 1 meter of space
     if (furnitureName.includes("bed") || furnitureName.includes("bathtub")) {
-      const usableWidth = Math.max(bbox.width, bbox.depth);
-      return Math.max(1, Math.floor(usableWidth / 1.0)); // 1 meter per person
+      const bedWidth = Math.min(bbox.width, bbox.depth); // Use shorter dimension
+      return Math.max(1, Math.floor(bedWidth / 1.0)); // 1 meter per person
     }
 
     return 1; // Default
@@ -623,17 +624,19 @@ export class InteractionManager {
     const furnitureName = this.getFurnitureName(furniture).toLowerCase();
     const lyingCapacity = this.getBedLyingCapacity(furnitureName, bbox);
 
-    // If bed can fit multiple people, offset positions
+    // If bed can fit multiple people, offset positions across bed width
     if (lyingCapacity > 1) {
-      const usableWidth = Math.max(bbox.width, bbox.depth);
-      const spacing = usableWidth / lyingCapacity;
+      // Use SHORTER dimension (bed width) for side-by-side positioning
+      const bedWidth = Math.min(bbox.width, bbox.depth);
+      const spacing = bedWidth / lyingCapacity;
 
       // Calculate offset from center
       const totalWidth = spacing * (lyingCapacity - 1);
       const localOffset = -totalWidth / 2 + spacing * lyingIndex;
 
-      // Determine if bed is oriented along X or Z axis
-      const useXAxis = bbox.width >= bbox.depth;
+      // Determine which axis is the bed width (shorter dimension)
+      // Players should be offset along the width, not the length
+      const useXAxis = bbox.width < bbox.depth; // TRUE if width is along X axis
 
       const offset = new THREE.Vector3(
         useXAxis ? localOffset : 0,
@@ -650,7 +653,9 @@ export class InteractionManager {
       console.log(
         `🛏️ Lying position ${
           lyingIndex + 1
-        }/${lyingCapacity} at offset ${localOffset.toFixed(2)}m`
+        }/${lyingCapacity} at offset ${localOffset.toFixed(2)}m on ${
+          useXAxis ? "X" : "Z"
+        } axis (bed width: ${bedWidth.toFixed(2)}m)`
       );
     }
 
