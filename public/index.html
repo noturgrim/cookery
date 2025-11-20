@@ -159,6 +159,13 @@
         border: 1px solid #555;
         font-size: 12px;
         flex-shrink: 0;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+      }
+
+      .key svg {
+        display: block;
       }
 
       #connection-status {
@@ -710,8 +717,39 @@
         </div>
         <div id="controls-content">
           <ul>
-            <li><span class="key">🖱️</span> Move</li>
-            <li><span class="key">🎡</span> Zoom</li>
+            <li>
+              <span class="key">
+                <svg
+                  viewBox="0 0 24 24"
+                  width="14"
+                  height="14"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                >
+                  <path d="M12 2l9 4.9V17L12 22l-9-4.9V7z" />
+                  <circle cx="12" cy="12" r="3" />
+                </svg>
+              </span>
+              Move
+            </li>
+            <li>
+              <span class="key">
+                <svg
+                  viewBox="0 0 24 24"
+                  width="14"
+                  height="14"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                >
+                  <circle cx="11" cy="11" r="8" />
+                  <path d="m21 21-4.35-4.35" />
+                  <path d="M11 8v6M8 11h6" />
+                </svg>
+              </span>
+              Zoom
+            </li>
             <li><span class="key">F</span> Interact</li>
             <li><span class="key">E</span> Edit Mode</li>
             <li><span class="key">B</span> Spawn</li>
