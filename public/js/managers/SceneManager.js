@@ -252,10 +252,16 @@ export class SceneManager {
     obstacle.userData = {
       id: obstacleData.id,
       type: obstacleData.type || "furniture",
+      name: obstacleData.name || obstacleData.model || obstacleData.id,
       model: obstacleData.model || null,
+      x: obstacleData.x,
+      y: obstacleData.y,
+      z: obstacleData.z,
       width: bbox ? bbox.width : obstacleData.width,
       height: bbox ? bbox.height : obstacleData.height,
       depth: bbox ? bbox.depth : obstacleData.depth,
+      scale: obstacleData.scale || 1,
+      rotation: obstacleData.rotation || 0,
       isPassthrough: obstacleData.isPassthrough || false, // Doorways/archways can be walked through
     };
 

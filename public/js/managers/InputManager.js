@@ -911,6 +911,7 @@ export class InputManager {
         model: modelName,
         scale: 4,
         rotation: 0,
+        isPassthrough: false, // Default to solid obstacle
       };
 
       this.sceneManager.scene.add(furniture);
@@ -935,6 +936,7 @@ export class InputManager {
         model: furniture.userData.model,
         scale: furniture.userData.scale,
         rotation: furniture.userData.rotation,
+        isPassthrough: furniture.userData.isPassthrough || false,
       });
 
       // console.log(
