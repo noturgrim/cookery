@@ -307,6 +307,44 @@ export class NetworkManager {
       console.log(`✨ Obstacle ${obstacleData.id} spawned by another player`);
     });
 
+    // Handle spawn confirmation from server (when we spawn something)
+    this.socket.on("spawnConfirmed", (data) => {
+      console.log(`✅ Spawn confirmed by server:`, data);
+
+      // Update the client object with server-generated UUID
+      if (data.obstacle) {
+        // Find object with clientId and update to serverId
+        const obstacle = this.sceneManager.obstacles.find(
+          (obj) => obj.userData && obj.userData.id === data.clientId
+        );
+        if (obstacle) {
+          obstacle.userData.id = data.serverId;
+          obstacle.userData.isPending = false;
+          console.log(
+            `🔄 Updated obstacle ID: ${data.clientId} → ${data.serverId}`
+          );
+        }
+      } else if (data.food) {
+        // Find food with clientId and update to serverId
+        const foodItem = this.sceneManager.foodItems.get(data.clientId);
+        if (foodItem) {
+          // Remove from map with old ID
+          this.sceneManager.foodItems.delete(data.clientId);
+          // Update ID
+          foodItem.id = data.serverId;
+          if (foodItem.model && foodItem.model.userData) {
+            foodItem.model.userData.id = data.serverId;
+            foodItem.model.userData.isPending = false;
+          }
+          // Re-add with new ID
+          this.sceneManager.foodItems.set(data.serverId, foodItem);
+          console.log(
+            `🔄 Updated food ID: ${data.clientId} → ${data.serverId}`
+          );
+        }
+      }
+    });
+
     // Handle obstacle deleted by other players
     this.socket.on("obstacleDeleted", (data) => {
       const { id } = data;
@@ -350,6 +388,27 @@ export class NetworkManager {
         foodItem.position = { x, y, z };
         console.log(`🍔 Food ${id} updated by another player`);
       }
+    });
+
+    // 🔧 ERROR HANDLERS - Handle spawn failures
+    this.socket.on("spawnError", (data) => {
+      console.error(`❌ Spawn failed:`, data);
+      // Notify input manager to remove the failed spawn
+      if (this.inputManager) {
+        this.inputManager.handleSpawnFailure(data.id, data.error);
+      }
+      // Show error to user
+      this.showError(`Failed to spawn: ${data.error}`);
+    });
+
+    this.socket.on("validationError", (data) => {
+      console.warn(`⚠️ Validation error:`, data);
+      this.showError(`Validation failed: ${data.errors.join(", ")}`);
+    });
+
+    this.socket.on("rateLimitError", (data) => {
+      console.warn(`⚠️ Rate limit:`, data);
+      this.showError(data.message);
     });
 
     // Handle food deleted by other players
@@ -1127,6 +1186,51 @@ export class NetworkManager {
    * Sync all furniture collision data to server
    * This ensures server-side collision detection matches visual collision boxes
    */
+  /**
+   * Show error message to user
+   */
+  showError(message) {
+    // Create or update error notification
+    let errorDiv = document.getElementById("error-notification");
+    if (!errorDiv) {
+      errorDiv = document.createElement("div");
+      errorDiv.id = "error-notification";
+      errorDiv.style.cssText = `
+        position: fixed;
+        top: 80px;
+        right: 20px;
+        background: linear-gradient(135deg, rgba(239, 68, 68, 0.95), rgba(220, 38, 38, 0.95));
+        color: white;
+        padding: 12px 16px;
+        border-radius: 12px;
+        font-size: 14px;
+        font-weight: 500;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+        z-index: 10000;
+        max-width: 300px;
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        backdrop-filter: blur(10px);
+        animation: slideInRight 0.3s ease-out;
+      `;
+      document.body.appendChild(errorDiv);
+    }
+
+    errorDiv.textContent = message;
+    errorDiv.style.display = "block";
+
+    // Auto-hide after 4 seconds
+    setTimeout(() => {
+      if (errorDiv) {
+        errorDiv.style.animation = "slideOutRight 0.3s ease-in";
+        setTimeout(() => {
+          if (errorDiv && errorDiv.parentNode) {
+            errorDiv.parentNode.removeChild(errorDiv);
+          }
+        }, 300);
+      }
+    }, 4000);
+  }
+
   syncAllFurnitureCollisions() {
     if (!this.sceneManager || !this.socket) return;
 

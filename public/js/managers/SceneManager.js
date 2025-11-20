@@ -355,6 +355,7 @@ export class SceneManager {
         z: z,
         scale: scale,
         width: bbox.width,
+        isPending: !itemId, // Mark as pending if this is a new spawn (no itemId provided)
         height: bbox.height,
         depth: bbox.depth,
         rotation: 0,

@@ -223,6 +223,12 @@ setInterval(() => {
   rateLimiter.cleanup();
 }, 60000);
 
+// 🔒 Mutex for spawn operations to prevent race conditions with multiple players
+const spawnLocks = {
+  obstacle: false,
+  food: false,
+};
+
 // Cleanup expired sessions every 30 minutes
 setInterval(async () => {
   await cleanupExpiredSessions();
@@ -1504,79 +1510,91 @@ io.on("connection", (socket) => {
         return;
       }
 
-      // Check obstacle limit
-      if (gameState.obstacles.length >= VALIDATION_RULES.MAX_OBSTACLES) {
-        console.warn(
-          `⚠️ Maximum obstacles reached (${VALIDATION_RULES.MAX_OBSTACLES})`
+      // 🔒 MULTI-PLAYER RACE CONDITION FIX: Wait for lock to prevent simultaneous spawns
+      while (spawnLocks.obstacle) {
+        await new Promise((resolve) => setTimeout(resolve, 10));
+      }
+      spawnLocks.obstacle = true;
+
+      try {
+        // Check obstacle limit (now atomic with lock)
+        if (gameState.obstacles.length >= VALIDATION_RULES.MAX_OBSTACLES) {
+          console.warn(
+            `⚠️ Maximum obstacles reached (${VALIDATION_RULES.MAX_OBSTACLES})`
+          );
+          socket.emit("spawnError", {
+            id: data.id,
+            error: `Maximum obstacles limit reached (${VALIDATION_RULES.MAX_OBSTACLES})`,
+          });
+          return;
+        }
+
+        // Validate obstacle data
+        const validation = validateObstacleData(data);
+        if (!validation.valid) {
+          console.warn(
+            `⚠️ Obstacle validation failed for ${socket.id}:`,
+            validation.errors
+          );
+          socket.emit("validationError", {
+            action: "spawnObstacle",
+            errors: validation.errors,
+          });
+          return;
+        }
+
+        const newObstacle = validation.sanitized;
+
+        // 🔒 RACE CONDITION FIX: Generate server-side UUID to prevent duplicates
+        const serverGeneratedId = randomUUID();
+        const clientRequestedId = newObstacle.id; // Keep client's ID for reference
+        newObstacle.id = serverGeneratedId;
+
+        // Check if obstacle already exists (shouldn't happen with UUIDs, but defensive)
+        const existingIndex = gameState.obstacles.findIndex(
+          (obs) => obs.id === newObstacle.id
         );
-        socket.emit("spawnError", {
-          id: data.id,
-          error: `Maximum obstacles limit reached (${VALIDATION_RULES.MAX_OBSTACLES})`,
+        if (existingIndex !== -1) {
+          console.warn(
+            `⚠️ Obstacle ${newObstacle.id} already exists (UUID collision!), updating instead`
+          );
+          // Update existing obstacle
+          gameState.obstacles[existingIndex] = newObstacle;
+        } else {
+          // Add to game state (now atomic with lock)
+          gameState.obstacles.push(newObstacle);
+        }
+
+        // Save to database (async but don't block)
+        const saveSuccess = await saveObstacle(newObstacle);
+
+        // Recreate pathfinder with new obstacles
+        pathfinder.obstacles = gameState.obstacles;
+
+        // Broadcast to all OTHER clients (spawner already has it)
+        socket.broadcast.emit("obstacleSpawned", newObstacle);
+
+        // Send confirmation to spawner with NEW server-generated ID
+        socket.emit("spawnConfirmed", {
+          clientId: clientRequestedId, // Original client ID for matching
+          serverId: serverGeneratedId, // New authoritative server ID
+          obstacle: newObstacle, // Full obstacle data with server ID
+          success: saveSuccess,
         });
-        return;
-      }
 
-      // Validate obstacle data
-      const validation = validateObstacleData(data);
-      if (!validation.valid) {
-        console.warn(
-          `⚠️ Obstacle validation failed for ${socket.id}:`,
-          validation.errors
+        console.log(
+          `✨ Spawned obstacle: ${newObstacle.id} ${
+            newObstacle.isPassthrough ? "[PASSTHROUGH]" : ""
+          } - DB: ${saveSuccess ? "✅" : "❌"}`
         );
-        socket.emit("validationError", {
-          action: "spawnObstacle",
-          errors: validation.errors,
-        });
-        return;
+      } finally {
+        // 🔓 Always release the lock
+        spawnLocks.obstacle = false;
       }
-
-      const newObstacle = validation.sanitized;
-
-      // 🔒 RACE CONDITION FIX: Generate server-side UUID to prevent duplicates
-      const serverGeneratedId = randomUUID();
-      const clientRequestedId = newObstacle.id; // Keep client's ID for reference
-      newObstacle.id = serverGeneratedId;
-
-      // Check if obstacle already exists (shouldn't happen with UUIDs, but defensive)
-      const existingIndex = gameState.obstacles.findIndex(
-        (obs) => obs.id === newObstacle.id
-      );
-      if (existingIndex !== -1) {
-        console.warn(
-          `⚠️ Obstacle ${newObstacle.id} already exists (UUID collision!), updating instead`
-        );
-        // Update existing obstacle
-        gameState.obstacles[existingIndex] = newObstacle;
-      } else {
-        // Add to game state
-        gameState.obstacles.push(newObstacle);
-      }
-
-      // Save to database (async but don't block)
-      const saveSuccess = await saveObstacle(newObstacle);
-
-      // Recreate pathfinder with new obstacles
-      pathfinder.obstacles = gameState.obstacles;
-
-      // Broadcast to all OTHER clients (spawner already has it)
-      socket.broadcast.emit("obstacleSpawned", newObstacle);
-
-      // Send confirmation to spawner with NEW server-generated ID
-      socket.emit("spawnConfirmed", {
-        clientId: clientRequestedId, // Original client ID for matching
-        serverId: serverGeneratedId, // New authoritative server ID
-        obstacle: newObstacle, // Full obstacle data with server ID
-        success: saveSuccess,
-      });
-
-      console.log(
-        `✨ Spawned obstacle: ${newObstacle.id} ${
-          newObstacle.isPassthrough ? "[PASSTHROUGH]" : ""
-        } - DB: ${saveSuccess ? "✅" : "❌"}`
-      );
     } catch (error) {
       console.error(`❌ Error spawning obstacle:`, error);
       socket.emit("spawnError", { id: data?.id, error: error.message });
+      spawnLocks.obstacle = false; // Release lock on error
     }
   });
 
@@ -1642,78 +1660,90 @@ io.on("connection", (socket) => {
         return;
       }
 
-      // Check food item limit
-      if (gameState.foodItems.length >= VALIDATION_RULES.MAX_FOOD_ITEMS) {
-        console.warn(
-          `⚠️ Maximum food items reached (${VALIDATION_RULES.MAX_FOOD_ITEMS})`
+      // 🔒 MULTI-PLAYER RACE CONDITION FIX: Wait for lock to prevent simultaneous spawns
+      while (spawnLocks.food) {
+        await new Promise((resolve) => setTimeout(resolve, 10));
+      }
+      spawnLocks.food = true;
+
+      try {
+        // Check food item limit (now atomic with lock)
+        if (gameState.foodItems.length >= VALIDATION_RULES.MAX_FOOD_ITEMS) {
+          console.warn(
+            `⚠️ Maximum food items reached (${VALIDATION_RULES.MAX_FOOD_ITEMS})`
+          );
+          socket.emit("spawnError", {
+            id: data.id,
+            error: `Maximum food items limit reached (${VALIDATION_RULES.MAX_FOOD_ITEMS})`,
+          });
+          return;
+        }
+
+        // Validate food data
+        const validation = validateFoodData(data);
+        if (!validation.valid) {
+          console.warn(
+            `⚠️ Food validation failed for ${socket.id}:`,
+            validation.errors
+          );
+          socket.emit("validationError", {
+            action: "spawnFood",
+            errors: validation.errors,
+          });
+          return;
+        }
+
+        const newFood = validation.sanitized;
+
+        // 🔒 RACE CONDITION FIX: Generate server-side UUID to prevent duplicates
+        const serverGeneratedId = randomUUID();
+        const clientRequestedId = newFood.id; // Keep client's ID for reference
+        newFood.id = serverGeneratedId;
+
+        // Check if food item already exists (shouldn't happen with UUIDs, but defensive)
+        const existingIndex = gameState.foodItems.findIndex(
+          (food) => food.id === newFood.id
         );
-        socket.emit("spawnError", {
-          id: data.id,
-          error: `Maximum food items limit reached (${VALIDATION_RULES.MAX_FOOD_ITEMS})`,
+        if (existingIndex !== -1) {
+          console.warn(
+            `⚠️ Food ${newFood.id} already exists (UUID collision!), updating instead`
+          );
+          // Update existing food item
+          gameState.foodItems[existingIndex] = newFood;
+        } else {
+          // Add to game state (now atomic with lock)
+          gameState.foodItems.push(newFood);
+        }
+
+        // Save to database (async but don't block)
+        const saveSuccess = await saveFoodItem(newFood);
+
+        // Broadcast to all OTHER clients (spawner already has it)
+        socket.broadcast.emit("foodSpawned", newFood);
+
+        // Send confirmation to spawner with NEW server-generated ID
+        socket.emit("spawnConfirmed", {
+          clientId: clientRequestedId, // Original client ID for matching
+          serverId: serverGeneratedId, // New authoritative server ID
+          food: newFood, // Full food data with server ID
+          success: saveSuccess,
         });
-        return;
-      }
 
-      // Validate food data
-      const validation = validateFoodData(data);
-      if (!validation.valid) {
-        console.warn(
-          `⚠️ Food validation failed for ${socket.id}:`,
-          validation.errors
+        console.log(
+          `✨ Spawned food: ${newFood.id} (${newFood.width.toFixed(
+            2
+          )}x${newFood.height.toFixed(2)}x${newFood.depth.toFixed(2)}) - DB: ${
+            saveSuccess ? "✅" : "❌"
+          }`
         );
-        socket.emit("validationError", {
-          action: "spawnFood",
-          errors: validation.errors,
-        });
-        return;
+      } finally {
+        // 🔓 Always release the lock
+        spawnLocks.food = false;
       }
-
-      const newFood = validation.sanitized;
-
-      // 🔒 RACE CONDITION FIX: Generate server-side UUID to prevent duplicates
-      const serverGeneratedId = randomUUID();
-      const clientRequestedId = newFood.id; // Keep client's ID for reference
-      newFood.id = serverGeneratedId;
-
-      // Check if food item already exists (shouldn't happen with UUIDs, but defensive)
-      const existingIndex = gameState.foodItems.findIndex(
-        (food) => food.id === newFood.id
-      );
-      if (existingIndex !== -1) {
-        console.warn(
-          `⚠️ Food ${newFood.id} already exists (UUID collision!), updating instead`
-        );
-        // Update existing food item
-        gameState.foodItems[existingIndex] = newFood;
-      } else {
-        // Add to game state
-        gameState.foodItems.push(newFood);
-      }
-
-      // Save to database (async but don't block)
-      const saveSuccess = await saveFoodItem(newFood);
-
-      // Broadcast to all OTHER clients (spawner already has it)
-      socket.broadcast.emit("foodSpawned", newFood);
-
-      // Send confirmation to spawner with NEW server-generated ID
-      socket.emit("spawnConfirmed", {
-        clientId: clientRequestedId, // Original client ID for matching
-        serverId: serverGeneratedId, // New authoritative server ID
-        food: newFood, // Full food data with server ID
-        success: saveSuccess,
-      });
-
-      console.log(
-        `✨ Spawned food: ${newFood.id} (${newFood.width.toFixed(
-          2
-        )}x${newFood.height.toFixed(2)}x${newFood.depth.toFixed(2)}) - DB: ${
-          saveSuccess ? "✅" : "❌"
-        }`
-      );
     } catch (error) {
       console.error(`❌ Error spawning food:`, error);
       socket.emit("spawnError", { id: data?.id, error: error.message });
+      spawnLocks.food = false; // Release lock on error
     }
   });
 

@@ -447,6 +447,14 @@ export class InputManager {
         targetObject = targetObject.parent;
       }
 
+      // Check if object is pending server confirmation
+      if (targetObject.userData.isPending) {
+        console.log(
+          `⏳ Object ${targetObject.userData.id} is pending server confirmation...`
+        );
+        return; // Don't allow interaction with pending objects
+      }
+
       // If in delete mode, delete the object
       if (this.deleteMode) {
         this.deleteObject(targetObject);
@@ -887,6 +895,34 @@ export class InputManager {
   }
 
   /**
+   * Handle spawn failure from server
+   */
+  handleSpawnFailure(clientId, errorMessage) {
+    console.error(`🚫 Spawn failed for ${clientId}: ${errorMessage}`);
+
+    // Find and remove the failed object from scene
+    // For obstacles/furniture
+    const obstacleIndex = this.sceneManager.obstacles.findIndex(
+      (obj) => obj.userData && obj.userData.id === clientId
+    );
+    if (obstacleIndex !== -1) {
+      const failedObj = this.sceneManager.obstacles[obstacleIndex];
+      this.sceneManager.scene.remove(failedObj);
+      this.sceneManager.obstacles.splice(obstacleIndex, 1);
+      console.log(`🗑️ Removed failed obstacle ${clientId} from scene`);
+      return;
+    }
+
+    // For food items
+    const foodItem = this.sceneManager.foodItems.get(clientId);
+    if (foodItem && foodItem.model) {
+      this.sceneManager.scene.remove(foodItem.model);
+      this.sceneManager.foodItems.delete(clientId);
+      console.log(`🗑️ Removed failed food ${clientId} from scene`);
+    }
+  }
+
+  /**
    * Spawn furniture at center
    */
   async spawnFurniture(modelName) {
@@ -898,8 +934,10 @@ export class InputManager {
       // Calculate actual bounding box after scaling
       const bbox = this.sceneManager.calculateBoundingBox(furniture);
 
+      const clientId = `furniture_${modelName}_${Date.now()}`;
+
       furniture.userData = {
-        id: `furniture_${modelName}_${Date.now()}`,
+        id: clientId,
         type: "furniture",
         name: modelName,
         x: furniture.position.x,
@@ -912,6 +950,7 @@ export class InputManager {
         scale: 4,
         rotation: 0,
         isPassthrough: false, // Default to solid obstacle
+        isPending: true, // Mark as pending until server confirms
       };
 
       this.sceneManager.scene.add(furniture);
