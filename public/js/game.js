@@ -5,6 +5,7 @@ import { PlayerManager } from "./managers/PlayerManager.js";
 import { UIManager } from "./managers/UIManager.js";
 import { InputManager } from "./managers/InputManager.js";
 import { NetworkManager } from "./managers/NetworkManager.js";
+import { InteractionManager } from "./managers/InteractionManager.js";
 
 /**
  * Main Game Class
@@ -18,6 +19,7 @@ class Game {
     this.uiManager = null;
     this.inputManager = null;
     this.networkManager = null;
+    this.interactionManager = null;
     this.soundManager = new SoundManager();
 
     // Player customization
@@ -449,6 +451,17 @@ class Game {
     // Set input manager reference in network manager for edit mode sync
     this.networkManager.setInputManager(this.inputManager);
 
+    // Initialize interaction manager
+    this.interactionManager = new InteractionManager(
+      this.sceneManager,
+      this.playerManager,
+      this.networkManager,
+      this.uiManager
+    );
+
+    // Set interaction manager reference in network manager
+    this.networkManager.setInteractionManager(this.interactionManager);
+
     // If animate loop isn't running yet, start it
     if (!this.sceneManager.renderer) {
       console.log("🎬 Starting renderer...");
@@ -543,6 +556,11 @@ class Game {
     // Update all players
     if (this.playerManager) {
       this.playerManager.updatePlayers(delta, this.soundManager);
+    }
+
+    // Update interactions
+    if (this.interactionManager) {
+      this.interactionManager.update();
     }
 
     // Render the scene

@@ -32,6 +32,13 @@ export class NetworkManager {
   }
 
   /**
+   * Set interaction manager reference (called after InteractionManager is created)
+   */
+  setInteractionManager(interactionManager) {
+    this.interactionManager = interactionManager;
+  }
+
+  /**
    * Update player dimensions on the server
    */
   updatePlayerDimensions(boundingBox) {
@@ -268,6 +275,20 @@ export class NetworkManager {
         this.executePlayerAction(playerId, otherPlayer, action);
 
         // Action indicator removed - animations are self-explanatory
+      }
+    });
+
+    // Handle player sitting
+    this.socket.on("playerSit", (data) => {
+      if (this.interactionManager) {
+        this.interactionManager.handleOtherPlayerSit(data);
+      }
+    });
+
+    // Handle player standing up
+    this.socket.on("playerStandUp", (data) => {
+      if (this.interactionManager) {
+        this.interactionManager.handleOtherPlayerStandUp(data);
       }
     });
   }

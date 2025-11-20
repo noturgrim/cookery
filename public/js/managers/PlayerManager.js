@@ -285,8 +285,35 @@ export class PlayerManager {
         return; // Skip other updates during spawn
       }
 
-      // Smooth position interpolation
-      player.mesh.position.lerp(player.targetPosition, lerpFactor);
+      // Skip position updates if player is sitting
+      if (!player.isSitting) {
+        // Smooth position interpolation
+        player.mesh.position.lerp(player.targetPosition, lerpFactor);
+
+        // Smooth rotation interpolation
+        const currentRotation = player.mesh.rotation.y;
+        let targetRotation = player.targetRotation;
+
+        // Handle rotation wrap-around
+        const diff = targetRotation - currentRotation;
+        if (Math.abs(diff) > Math.PI) {
+          if (diff > 0) {
+            targetRotation -= Math.PI * 2;
+          } else {
+            targetRotation += Math.PI * 2;
+          }
+        }
+
+        player.mesh.rotation.y +=
+          (targetRotation - currentRotation) * lerpFactor;
+
+        // Update walking animation (only if not sitting)
+        this.updateWalkingAnimation(
+          playerId,
+          player.isMoving || false,
+          soundManager
+        );
+      }
 
       // Update collision box position if it exists
       if (player.collisionBox) {
@@ -295,29 +322,6 @@ export class PlayerManager {
           player.mesh
         );
       }
-
-      // Smooth rotation interpolation
-      const currentRotation = player.mesh.rotation.y;
-      let targetRotation = player.targetRotation;
-
-      // Handle rotation wrap-around
-      const diff = targetRotation - currentRotation;
-      if (Math.abs(diff) > Math.PI) {
-        if (diff > 0) {
-          targetRotation -= Math.PI * 2;
-        } else {
-          targetRotation += Math.PI * 2;
-        }
-      }
-
-      player.mesh.rotation.y += (targetRotation - currentRotation) * lerpFactor;
-
-      // Update walking animation
-      this.updateWalkingAnimation(
-        playerId,
-        player.isMoving || false,
-        soundManager
-      );
     });
 
     // Update animation mixers

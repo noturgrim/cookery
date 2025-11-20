@@ -222,6 +222,11 @@ export class InputManager {
     // If in edit mode, don't move player
     if (this.editMode) return;
 
+    // Don't allow movement clicks if player is sitting
+    if (this.networkManager.interactionManager?.isPlayerSitting()) {
+      return;
+    }
+
     // Update raycaster
     this.raycaster.setFromCamera(this.mouse, this.sceneManager.camera);
 

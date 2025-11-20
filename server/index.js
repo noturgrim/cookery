@@ -711,6 +711,11 @@ const getObstacleRepulsion = (player) => {
 
 // Process player input and update position
 const processPlayerInput = (player) => {
+  // Skip movement if player is sitting
+  if (player.isSitting) {
+    return;
+  }
+
   let deltaX = 0;
   let deltaZ = 0;
 
@@ -1232,6 +1237,12 @@ io.on("connection", (socket) => {
   socket.on("moveTo", (target) => {
     const player = gameState.players.get(socket.id);
     if (player && target.x !== undefined && target.z !== undefined) {
+      // Don't allow movement if player is sitting
+      if (player.isSitting) {
+        console.log(`⚠️ Player ${socket.id} is sitting, ignoring move command`);
+        return;
+      }
+
       // Update pathfinder with player's actual dimensions
       pathfinder.setPlayerSize(player.width, player.height, player.depth);
 
@@ -1302,6 +1313,47 @@ io.on("connection", (socket) => {
     });
 
     console.log(`🎬 Player ${playerId} performed action: ${action}`);
+  });
+
+  // Handle player sitting on furniture
+  socket.on("playerSit", (data) => {
+    const player = gameState.players.get(data.playerId);
+    if (player) {
+      // Mark player as sitting
+      player.isSitting = true;
+      player.moveTarget = null; // Clear any movement target
+      player.path = null; // Clear path
+
+      // Update position to sitting position
+      player.x = data.position.x;
+      player.y = data.position.y;
+      player.z = data.position.z;
+      player.rotation = data.rotation;
+    }
+
+    // Broadcast to all players
+    io.emit("playerSit", data);
+    console.log(
+      `🪑 Player ${data.playerId} sat on furniture ${data.furnitureId}`
+    );
+  });
+
+  // Handle player standing up
+  socket.on("playerStandUp", (data) => {
+    const player = gameState.players.get(data.playerId);
+    if (player) {
+      // Mark player as no longer sitting
+      player.isSitting = false;
+
+      // Update position to standing position
+      player.x = data.position.x;
+      player.y = data.position.y;
+      player.z = data.position.z;
+    }
+
+    // Broadcast to all players
+    io.emit("playerStandUp", data);
+    console.log(`🚶 Player ${data.playerId} stood up`);
   });
 
   // Handle disconnection
