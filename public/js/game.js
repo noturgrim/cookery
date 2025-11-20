@@ -492,8 +492,9 @@ class Game {
     console.log("🔊 Loading sound effects...");
 
     const tryLoadSound = async (name, basePath) => {
-      // Try formats in order: m4a (your voice format), mp3, then fallbacks
-      const formats = [".m4a", ".mp3", ".ogg", ".wav"];
+      // Try formats in order based on what we have
+      // Voices are .m4a, others are .mp3
+      const formats = [".mp3", ".m4a", ".ogg", ".wav"];
 
       for (const format of formats) {
         const success = await this.soundManager.loadSound(

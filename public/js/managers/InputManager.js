@@ -355,9 +355,9 @@ export class InputManager {
       // Visual feedback
       this.uiManager.createMoveMarker(point.x, point.z);
 
-      console.log(
-        `🎯 Moving to: (${point.x.toFixed(2)}, ${point.z.toFixed(2)})`
-      );
+      // console.log(
+      //   `🎯 Moving to: (${point.x.toFixed(2)}, ${point.z.toFixed(2)})`
+      // );
     }
   }
 
