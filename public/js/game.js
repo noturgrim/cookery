@@ -644,7 +644,7 @@ class Game {
   async loadSoundEffects() {
     console.log("🔊 Loading sound effects...");
 
-    const tryLoadSound = async (name, basePath) => {
+    const tryLoadSound = async (name, basePath, usePool = false) => {
       // Try formats in order based on what we have
       // Voices are .m4a, others are .mp3
       const formats = [".mp3", ".m4a", ".ogg", ".wav"];
@@ -652,10 +652,13 @@ class Game {
       for (const format of formats) {
         const success = await this.soundManager.loadSound(
           name,
-          basePath + format
+          basePath + format,
+          usePool
         );
         if (success) {
-          console.log(`✅ Loaded ${name} as ${format}`);
+          console.log(
+            `✅ Loaded ${name} as ${format}${usePool ? " (pooled)" : ""}`
+          );
           return true;
         }
       }
@@ -664,7 +667,8 @@ class Game {
       return false;
     };
 
-    await tryLoadSound("footstep", "/sounds/step");
+    // Use audio pool for footsteps (most frequent sound)
+    await tryLoadSound("footstep", "/sounds/step", true);
     await tryLoadSound("click", "/sounds/click");
     await tryLoadSound("hello", "/sounds/voices/hello");
     await tryLoadSound("help", "/sounds/voices/help");

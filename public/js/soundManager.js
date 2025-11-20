@@ -10,6 +10,10 @@ export class SoundManager {
     this.masterVolume = 0.3; // 30% volume by default
     this.audioUnlocked = false; // Browser requires user interaction to play audio
 
+    // Audio pool for frequently played sounds (reduces HTTP requests)
+    this.audioPools = new Map();
+    this.poolSize = 3; // Number of pre-loaded instances per pooled sound
+
     // Check if user has sound preference saved
     const savedSoundPref = localStorage.getItem("supercooked_soundEnabled");
     if (savedSoundPref !== null) {
@@ -57,8 +61,9 @@ export class SoundManager {
 
   /**
    * Load a sound file
+   * @param {boolean} usePool - If true, creates a pool of audio instances to reduce HTTP requests
    */
-  async loadSound(name, url) {
+  async loadSound(name, url, usePool = false) {
     try {
       const audio = new Audio(url);
       audio.volume = this.masterVolume;
@@ -71,7 +76,24 @@ export class SoundManager {
       });
 
       this.sounds.set(name, audio);
-      console.log(`🔊 Loaded sound: ${name}`);
+
+      // Create audio pool for frequently played sounds
+      if (usePool) {
+        const pool = [];
+        for (let i = 0; i < this.poolSize; i++) {
+          const poolAudio = audio.cloneNode();
+          poolAudio.volume = this.masterVolume;
+          poolAudio.preload = "auto";
+          pool.push({ audio: poolAudio, playing: false });
+        }
+        this.audioPools.set(name, pool);
+        console.log(
+          `🔊 Loaded sound with pool: ${name} (${this.poolSize} instances)`
+        );
+      } else {
+        console.log(`🔊 Loaded sound: ${name}`);
+      }
+
       return true;
     } catch (error) {
       console.warn(`⚠️ Failed to load sound ${name}:`, error);
@@ -91,18 +113,48 @@ export class SoundManager {
       return;
     }
 
+    // Check if this sound uses an audio pool
+    const pool = this.audioPools.get(name);
+    if (pool) {
+      // Find an available audio instance in the pool
+      const available = pool.find((item) => !item.playing);
+
+      if (available) {
+        available.audio.volume = (options.volume || 1.0) * this.masterVolume;
+        available.audio.playbackRate = options.playbackRate || 1.0;
+        available.audio.currentTime = 0; // Reset to start
+        available.playing = true;
+
+        available.audio.play().catch((err) => {
+          console.warn(`⚠️ Error playing pooled sound ${name}:`, err);
+        });
+
+        // Mark as available when done
+        available.audio.addEventListener(
+          "ended",
+          () => {
+            available.playing = false;
+          },
+          { once: true }
+        );
+
+        return available.audio;
+      }
+      // If no available instance, skip this play (acceptable for footsteps)
+      return;
+    }
+
+    // Non-pooled sounds: use cloning (for less frequent sounds)
     const sound = this.sounds.get(name);
     if (!sound) {
       console.warn(`⚠️ Sound not found: ${name}`);
       return;
     }
 
-    // Clone the audio to allow overlapping sounds
     const audioClone = sound.cloneNode();
     audioClone.volume = (options.volume || 1.0) * this.masterVolume;
     audioClone.playbackRate = options.playbackRate || 1.0;
 
-    // Play and clean up after
     audioClone.play().catch((err) => {
       console.warn(`⚠️ Error playing sound ${name}:`, err);
     });

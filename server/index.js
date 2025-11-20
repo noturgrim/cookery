@@ -98,7 +98,33 @@ const io = new Server(httpServer, {
 
 // Middleware
 app.use(express.json()); // Parse JSON request bodies
-app.use(express.static(join(__dirname, "../public"))); // Serve static files
+
+// Static file serving with aggressive caching for assets
+app.use(
+  express.static(join(__dirname, "../public"), {
+    maxAge: "1d", // Cache for 1 day by default
+    setHeaders: (res, path) => {
+      // Aggressive caching for audio files (1 year)
+      if (
+        path.endsWith(".mp3") ||
+        path.endsWith(".ogg") ||
+        path.endsWith(".wav")
+      ) {
+        res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
+      }
+      // Cache images for 1 week
+      else if (path.match(/\.(jpg|jpeg|png|gif|svg|webp)$/)) {
+        res.setHeader("Cache-Control", "public, max-age=604800");
+      }
+      // Cache JS/CSS for 1 day
+      else if (path.match(/\.(js|css)$/)) {
+        res.setHeader("Cache-Control", "public, max-age=86400");
+      }
+      // Accept range requests for media files
+      res.setHeader("Accept-Ranges", "bytes");
+    },
+  })
+);
 
 // Authentication API endpoints
 app.post("/api/auth/register", async (req, res) => {
