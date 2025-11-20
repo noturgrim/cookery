@@ -331,6 +331,17 @@ class Game {
     // Populate current values
     document.getElementById("settings-player-name").value = this.playerName;
 
+    // Update platform size slider with current value
+    if (this.sceneManager) {
+      const currentSize = this.sceneManager.platformSize || 40;
+      const platformSizeSlider = document.getElementById(
+        "platform-size-slider"
+      );
+      const platformSizeValue = document.getElementById("platform-size-value");
+      platformSizeSlider.value = currentSize;
+      platformSizeValue.textContent = `${currentSize}x${currentSize}`;
+    }
+
     // Setup skin selector only if not already initialized
     const skinSelector = document.getElementById("settings-skin-selector");
     if (skinSelector.children.length === 0) {
@@ -364,6 +375,32 @@ class Game {
 
     // Close button
     document.getElementById("settings-close-btn").onclick = closeModal;
+
+    // Platform size slider
+    const platformSizeSlider = document.getElementById("platform-size-slider");
+    const platformSizeValue = document.getElementById("platform-size-value");
+    const platformSizeApply = document.getElementById("platform-size-apply");
+
+    // Update platform size value display on slider change
+    platformSizeSlider.oninput = () => {
+      const size = platformSizeSlider.value;
+      platformSizeValue.textContent = `${size}x${size}`;
+    };
+
+    // Apply platform size change
+    platformSizeApply.onclick = () => {
+      const newSize = parseInt(platformSizeSlider.value);
+      if (newSize >= 20 && newSize <= 200) {
+        if (this.networkManager) {
+          this.networkManager.updatePlatformSize(newSize);
+          console.log(
+            `📏 Platform size change requested: ${newSize}x${newSize}`
+          );
+        }
+      } else {
+        alert("Platform size must be between 20 and 200!");
+      }
+    };
 
     // Save button
     document.getElementById("settings-save-btn").onclick = () => {

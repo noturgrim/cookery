@@ -264,12 +264,31 @@ export async function initializeDatabase() {
       ON CONFLICT (id) DO NOTHING
     `);
 
+    // Create world_settings table (single row for global world configuration)
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS world_settings (
+        id INTEGER PRIMARY KEY DEFAULT 1,
+        platform_size INTEGER NOT NULL DEFAULT 40,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        CONSTRAINT single_world_settings_check CHECK (id = 1),
+        CONSTRAINT platform_size_range CHECK (platform_size >= 20 AND platform_size <= 200)
+      )
+    `);
+
+    // Insert default world settings if not exists
+    await pool.query(`
+      INSERT INTO world_settings (id, platform_size)
+      VALUES (1, 40)
+      ON CONFLICT (id) DO NOTHING
+    `);
+
     console.log("✅ Database tables initialized");
     console.log("   - users table ready");
     console.log("   - sessions table ready");
     console.log("   - obstacles table ready");
     console.log("   - food_items table ready");
     console.log("   - world_time table ready");
+    console.log("   - world_settings table ready");
   } catch (error) {
     console.error("❌ Error initializing database:", error);
   }
@@ -768,6 +787,64 @@ export async function updateWorldTime(currentTime, timeSpeed, isPaused) {
     return true;
   } catch (error) {
     console.error("❌ Error updating world time:", error.message);
+    return false;
+  }
+}
+
+/**
+ * Get world settings (platform size, etc.)
+ */
+export async function getWorldSettings() {
+  try {
+    const result = await pool.query(
+      `SELECT platform_size, updated_at FROM world_settings WHERE id = 1`
+    );
+
+    if (result.rows.length > 0) {
+      return {
+        platformSize: parseInt(result.rows[0].platform_size),
+        updatedAt: result.rows[0].updated_at,
+      };
+    }
+
+    // Return default if not found
+    return {
+      platformSize: 40,
+      updatedAt: new Date(),
+    };
+  } catch (error) {
+    console.error("❌ Error getting world settings:", error);
+    return {
+      platformSize: 40,
+      updatedAt: new Date(),
+    };
+  }
+}
+
+/**
+ * Update world settings (platform size)
+ */
+export async function updateWorldSettings(platformSize) {
+  try {
+    // Validate inputs
+    if (typeof platformSize !== "number" || !Number.isInteger(platformSize)) {
+      throw new Error("Invalid platformSize: must be an integer");
+    }
+    if (platformSize < 20 || platformSize > 200) {
+      throw new Error("Invalid platformSize: must be between 20 and 200");
+    }
+
+    await pool.query(
+      `UPDATE world_settings 
+       SET platform_size = $1, updated_at = CURRENT_TIMESTAMP
+       WHERE id = 1`,
+      [platformSize]
+    );
+
+    console.log(`🌍 Updated platform size to: ${platformSize}`);
+    return true;
+  } catch (error) {
+    console.error("❌ Error updating world settings:", error.message);
     return false;
   }
 }

@@ -13,6 +13,8 @@ export class SceneManager {
     this.camera = null;
     this.renderer = null;
     this.floor = null;
+    this.gridHelper = null;
+    this.platformSize = 40; // Default platform size
     this.raycaster = new THREE.Raycaster();
     this.gltfLoader = new GLTFLoader();
     this.clock = new THREE.Clock();
@@ -169,8 +171,23 @@ export class SceneManager {
   /**
    * Create the game floor with texture
    */
-  createFloor() {
-    const floorGeometry = new THREE.PlaneGeometry(40, 40);
+  createFloor(size = this.platformSize) {
+    // Remove existing floor and grid if they exist
+    if (this.floor) {
+      this.scene.remove(this.floor);
+      this.floor.geometry.dispose();
+      this.floor.material.map?.dispose();
+      this.floor.material.dispose();
+    }
+    if (this.gridHelper) {
+      this.scene.remove(this.gridHelper);
+      this.gridHelper.geometry.dispose();
+      this.gridHelper.material.dispose();
+    }
+
+    this.platformSize = size;
+
+    const floorGeometry = new THREE.PlaneGeometry(size, size);
 
     // Load texture from file using the loading manager
     const texture = this.textureLoader.load("/floor/floor2.jpg");
@@ -178,7 +195,9 @@ export class SceneManager {
     // Configure texture for tiling
     texture.wrapS = THREE.RepeatWrapping;
     texture.wrapT = THREE.RepeatWrapping;
-    texture.repeat.set(8, 8); // Adjust this number to make tiles bigger (smaller number) or smaller (larger number)
+    // Scale texture repeats with platform size (maintain consistent tile size)
+    const tileRepeat = size / 5; // 5 units per tile
+    texture.repeat.set(tileRepeat, tileRepeat);
 
     const floorMaterial = new THREE.MeshStandardMaterial({
       map: texture,
@@ -192,10 +211,36 @@ export class SceneManager {
     this.scene.add(this.floor);
 
     // Add subtle grid helper (optional - remove if you don't want the grid)
-    const gridHelper = new THREE.GridHelper(40, 20, 0x999999, 0xcccccc);
-    gridHelper.material.opacity = 0.2;
-    gridHelper.material.transparent = true;
-    this.scene.add(gridHelper);
+    const gridDivisions = Math.max(10, size / 2); // Adjust grid divisions based on size
+    this.gridHelper = new THREE.GridHelper(
+      size,
+      gridDivisions,
+      0x999999,
+      0xcccccc
+    );
+    this.gridHelper.material.opacity = 0.2;
+    this.gridHelper.material.transparent = true;
+    this.scene.add(this.gridHelper);
+
+    console.log(`🟦 Floor created/updated: ${size}x${size}`);
+  }
+
+  /**
+   * Update platform size
+   */
+  updatePlatformSize(newSize) {
+    if (
+      typeof newSize !== "number" ||
+      !Number.isInteger(newSize) ||
+      newSize < 20 ||
+      newSize > 200
+    ) {
+      console.error(`❌ Invalid platform size: ${newSize}`);
+      return;
+    }
+
+    console.log(`📏 Updating platform size to ${newSize}x${newSize}...`);
+    this.createFloor(newSize);
   }
 
   /**

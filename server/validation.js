@@ -5,9 +5,9 @@
 
 // Configuration constants
 export const VALIDATION_RULES = {
-  // World boundaries
+  // World boundaries (half of platform size, will be updated dynamically)
   WORLD_BOUNDS: 20,
-  MAX_WORLD_BOUNDS: 50,
+  MAX_WORLD_BOUNDS: 100, // Maximum is half of 200 (max platform size)
 
   // Player constraints
   PLAYER_NAME_MIN_LENGTH: 1,
@@ -532,3 +532,28 @@ export class RateLimiter {
     }
   }
 }
+
+/**
+ * Update world bounds based on platform size
+ * @param {number} platformSize - The platform size (e.g., 40 for a 40x40 platform)
+ */
+export const updateWorldBounds = (platformSize) => {
+  if (
+    typeof platformSize !== "number" ||
+    !Number.isInteger(platformSize) ||
+    platformSize < 20 ||
+    platformSize > 200
+  ) {
+    console.error(
+      `⚠️ Invalid platform size: ${platformSize}. Must be integer between 20-200`
+    );
+    return false;
+  }
+
+  // World bounds is half the platform size (since coordinates are centered at 0,0)
+  VALIDATION_RULES.WORLD_BOUNDS = platformSize / 2;
+  console.log(
+    `📏 Updated world bounds to ±${VALIDATION_RULES.WORLD_BOUNDS} (platform: ${platformSize}x${platformSize})`
+  );
+  return true;
+};

@@ -56,6 +56,17 @@ export class NetworkManager {
   }
 
   /**
+   * Update platform size
+   */
+  updatePlatformSize(platformSize) {
+    if (!this.socket) return;
+
+    this.socket.emit("updatePlatformSize", {
+      platformSize: parseInt(platformSize),
+    });
+  }
+
+  /**
    * Setup Socket.io connection
    */
   setupSocket() {
@@ -114,6 +125,18 @@ export class NetworkManager {
           );
         } catch (error) {
           console.warn("⚠️ Failed to sync world time:", error);
+        }
+      }
+
+      // Initialize platform size from server
+      if (data.worldSettings && data.worldSettings.platformSize) {
+        try {
+          this.sceneManager.updatePlatformSize(data.worldSettings.platformSize);
+          console.log(
+            `🟦 Platform size synced: ${data.worldSettings.platformSize}x${data.worldSettings.platformSize}`
+          );
+        } catch (error) {
+          console.warn("⚠️ Failed to sync platform size:", error);
         }
       }
 
@@ -319,6 +342,16 @@ export class NetworkManager {
     this.socket.on("worldTimeUpdate", (data) => {
       if (this.sceneManager.dayNightCycle) {
         this.sceneManager.dayNightCycle.syncFromServer(data);
+      }
+    });
+
+    // Handle platform size updates
+    this.socket.on("platformSizeUpdate", (data) => {
+      if (data.platformSize && this.sceneManager) {
+        this.sceneManager.updatePlatformSize(data.platformSize);
+        console.log(
+          `🟦 Platform size updated: ${data.platformSize}x${data.platformSize}`
+        );
       }
     });
 

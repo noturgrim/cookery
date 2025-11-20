@@ -16,6 +16,8 @@ import pool, {
   cleanupExpiredSessions,
   getWorldTime,
   updateWorldTime,
+  getWorldSettings,
+  updateWorldSettings,
 } from "./database.js";
 import {
   registerUser,
@@ -33,6 +35,7 @@ import {
   sanitizeString,
   RateLimiter,
   VALIDATION_RULES,
+  updateWorldBounds,
 } from "./validation.js";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -1411,12 +1414,27 @@ io.on("connection", (socket) => {
         };
       }
 
+      // Get world settings (platform size)
+      let worldSettings;
+      try {
+        worldSettings = await getWorldSettings();
+      } catch (error) {
+        console.error(
+          "⚠️ Failed to get world settings, using defaults:",
+          error.message
+        );
+        worldSettings = {
+          platformSize: 40,
+        };
+      }
+
       socket.emit("init", {
         playerId: socket.id,
         players: Array.from(gameState.players.values()),
         obstacles: gameState.obstacles,
         foodItems: gameState.foodItems,
         worldTime: worldTime, // Send world time to new player
+        worldSettings: worldSettings, // Send world settings to new player
       });
 
       // Notify other players
@@ -2540,6 +2558,58 @@ io.on("connection", (socket) => {
     })
   );
 
+  // Handle platform size update
+  socket.on("updatePlatformSize", async (data) => {
+    try {
+      // Rate limiting
+      if (!rateLimiter.checkLimit(socket.id, "ACTIONS")) {
+        const status = rateLimiter.getStatus(socket.id, "ACTIONS");
+        console.warn(
+          `⚠️ Rate limit exceeded for ${socket.id}: ACTIONS (${status.current}/${status.max})`
+        );
+        socket.emit("rateLimitError", {
+          action: "updatePlatformSize",
+          message: "Too many actions. Please slow down.",
+          retryAfter: 1000,
+        });
+        return;
+      }
+
+      const { platformSize } = data;
+
+      if (
+        !platformSize ||
+        typeof platformSize !== "number" ||
+        !Number.isInteger(platformSize)
+      ) {
+        console.error("❌ Invalid platform size data");
+        return;
+      }
+
+      // Validate platform size range (20-200)
+      if (platformSize < 20 || platformSize > 200) {
+        console.error(`❌ Platform size ${platformSize} out of range (20-200)`);
+        return;
+      }
+
+      // Update in database
+      const success = await updateWorldSettings(platformSize);
+
+      if (success) {
+        // Update validation bounds based on new platform size
+        updateWorldBounds(platformSize);
+
+        // Broadcast to all clients (including sender for confirmation)
+        io.emit("platformSizeUpdate", { platformSize });
+        console.log(
+          `🟦 Platform size updated: ${platformSize}x${platformSize}`
+        );
+      }
+    } catch (error) {
+      console.error("❌ Error handling platform size update:", error);
+    }
+  });
+
   // Handle disconnection
   socket.on("disconnect", () => {
     console.log(`Player disconnected: ${socket.id}`);
@@ -2566,6 +2636,10 @@ async function startServer() {
     const loadedFoodItems = await loadFoodItems();
     gameState.foodItems = loadedFoodItems;
     console.log(`🍔 Loaded ${loadedFoodItems.length} food items from database`);
+
+    // Load world settings and update validation bounds
+    const worldSettings = await getWorldSettings();
+    updateWorldBounds(worldSettings.platformSize);
 
     // Recreate pathfinder with loaded obstacles
     pathfinder.obstacles = gameState.obstacles;
