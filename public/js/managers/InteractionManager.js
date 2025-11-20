@@ -495,21 +495,56 @@ export class InteractionManager {
 
     console.log("🚶 Standing up");
 
+    // Get furniture reference before clearing
+    const furniture = this.sittingOn;
+
     // Clear sitting state
     this.isSitting = false;
-    const previousFurniture = this.sittingOn;
     this.sittingOn = null;
     player.isSitting = false; // Mark player as no longer sitting
     player.sittingOn = null; // Clear furniture reference
     player.seatIndex = undefined; // Clear seat index
 
-    // Move player slightly forward from furniture
-    const standPosition = player.mesh.position.clone();
-    const forwardOffset = new THREE.Vector3(0, 0, 1.5);
-    forwardOffset.applyQuaternion(player.mesh.quaternion);
-    standPosition.add(forwardOffset);
-    standPosition.y = 0; // Reset to ground level
+    // Calculate a safe standing position
+    let standPosition = player.mesh.position.clone();
 
+    // If we have the furniture reference, move away from it intelligently
+    if (furniture) {
+      const furnitureBBox = this.sceneManager.calculateBoundingBox(furniture);
+      const furnitureCenter = furnitureBBox.center;
+
+      // Calculate direction away from furniture center
+      const awayDirection = new THREE.Vector3(
+        standPosition.x - furnitureCenter.x,
+        0,
+        standPosition.z - furnitureCenter.z
+      );
+
+      // If player is at furniture center, use forward direction
+      if (awayDirection.length() < 0.1) {
+        awayDirection.set(0, 0, 1);
+        awayDirection.applyQuaternion(player.mesh.quaternion);
+      } else {
+        awayDirection.normalize();
+      }
+
+      // Move at least 2.5 units away from furniture (beyond collision range)
+      const furnitureSize = Math.max(furnitureBBox.width, furnitureBBox.depth);
+      const safeDistance = furnitureSize / 2 + 1.5; // Half furniture size + 1.5 units buffer
+
+      standPosition.x = furnitureCenter.x + awayDirection.x * safeDistance;
+      standPosition.z = furnitureCenter.z + awayDirection.z * safeDistance;
+    } else {
+      // Fallback: move forward from current rotation
+      const forwardOffset = new THREE.Vector3(0, 0, 2.5);
+      forwardOffset.applyQuaternion(player.mesh.quaternion);
+      standPosition.add(forwardOffset);
+    }
+
+    // Ensure ground level
+    standPosition.y = 0;
+
+    // Set position immediately
     player.mesh.position.copy(standPosition);
     player.targetPosition.copy(standPosition);
 
@@ -526,6 +561,12 @@ export class InteractionManager {
       playerId: this.networkManager.playerId,
       position: { x: standPosition.x, y: standPosition.y, z: standPosition.z },
     });
+
+    console.log(
+      `📍 Standing at: (${standPosition.x.toFixed(
+        2
+      )}, ${standPosition.z.toFixed(2)}) - moved away from furniture`
+    );
 
     // Hide prompt
     this.hidePrompt();
