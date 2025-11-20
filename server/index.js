@@ -13,6 +13,17 @@ import {
   saveFoodItem,
   deleteFoodItem,
 } from "./database.js";
+import {
+  validatePlayerName,
+  validateSkinIndex,
+  validateCoordinates,
+  validateObstacleData,
+  validateFoodData,
+  validateId,
+  sanitizeString,
+  RateLimiter,
+  VALIDATION_RULES,
+} from "./validation.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -112,6 +123,14 @@ const gameState = {
   obstacles: [], // Will be loaded from database
   foodItems: [], // Will be loaded from database
 };
+
+// Rate limiter instance
+const rateLimiter = new RateLimiter();
+
+// Cleanup rate limiter every 60 seconds
+setInterval(() => {
+  rateLimiter.cleanup();
+}, 60000);
 
 // Server configuration
 const SERVER_TICK_RATE = 20; // Reduced from 30 to 20 updates per second for bandwidth
@@ -1178,23 +1197,48 @@ io.on("connection", (socket) => {
   // Handle player customization
   socket.on("playerCustomization", (data) => {
     const player = gameState.players.get(socket.id);
-    if (player) {
-      player.name = data.name || "Player";
-      player.skinIndex = data.skinIndex || 0;
+    if (!player) return;
 
-      // Now send initial game state
-      socket.emit("init", {
-        playerId: socket.id,
-        players: Array.from(gameState.players.values()),
-        obstacles: gameState.obstacles,
-        foodItems: gameState.foodItems,
+    // Validate and sanitize player name
+    const nameValidation = validatePlayerName(data.name);
+    player.name = nameValidation.sanitized;
+
+    if (!nameValidation.valid) {
+      console.warn(
+        `⚠️ Player ${socket.id} name validation failed: ${nameValidation.error}`
+      );
+      socket.emit("validationError", {
+        field: "name",
+        error: nameValidation.error,
       });
-
-      // Notify other players
-      io.emit("playerJoined", player);
-
-      console.log(`👨‍🍳 ${player.name} (${socket.id}) joined the kitchen!`);
     }
+
+    // Validate skin index
+    const skinValidation = validateSkinIndex(data.skinIndex);
+    player.skinIndex = skinValidation.sanitized;
+
+    if (!skinValidation.valid) {
+      console.warn(
+        `⚠️ Player ${socket.id} skin validation failed: ${skinValidation.error}`
+      );
+      socket.emit("validationError", {
+        field: "skinIndex",
+        error: skinValidation.error,
+      });
+    }
+
+    // Now send initial game state
+    socket.emit("init", {
+      playerId: socket.id,
+      players: Array.from(gameState.players.values()),
+      obstacles: gameState.obstacles,
+      foodItems: gameState.foodItems,
+    });
+
+    // Notify other players
+    io.emit("playerJoined", player);
+
+    console.log(`👨‍🍳 ${player.name} (${socket.id}) joined the kitchen!`);
   });
 
   // Handle player dimensions update from client
@@ -1222,56 +1266,133 @@ io.on("connection", (socket) => {
 
   // Handle obstacle updates from clients
   socket.on("updateObstacle", async (data) => {
-    const { id, x, y, z, rotation, isPassthrough } = data;
-
-    // Find and update the obstacle
-    const obstacle = gameState.obstacles.find((obs) => obs.id === id);
-    if (obstacle) {
-      obstacle.x = x;
-      obstacle.y = y;
-      obstacle.z = z;
-      if (rotation !== undefined) {
-        obstacle.rotation = rotation;
+    try {
+      // Rate limiting
+      if (!rateLimiter.checkLimit(socket.id, "UPDATE_OBSTACLE")) {
+        const status = rateLimiter.getStatus(socket.id, "UPDATE_OBSTACLE");
+        console.warn(
+          `⚠️ Rate limit exceeded for ${socket.id}: UPDATE_OBSTACLE (${status.current}/${status.max})`
+        );
+        socket.emit("rateLimitError", {
+          action: "updateObstacle",
+          message: "Too many update requests. Please slow down.",
+        });
+        return;
       }
-      if (isPassthrough !== undefined) {
-        obstacle.isPassthrough = isPassthrough;
+
+      // Validate ID
+      const idValidation = validateId(data.id);
+      if (!idValidation.valid) {
+        console.warn(`⚠️ Invalid obstacle ID: ${data.id}`);
+        return;
+      }
+
+      // Find the obstacle
+      const obstacle = gameState.obstacles.find(
+        (obs) => obs.id === idValidation.sanitized
+      );
+      if (!obstacle) {
+        console.warn(`⚠️ Obstacle not found: ${data.id}`);
+        return;
+      }
+
+      // Validate coordinates
+      const coordsValidation = validateCoordinates(data.x, data.y, data.z);
+      if (!coordsValidation.valid) {
+        console.warn(`⚠️ Invalid coordinates for obstacle ${data.id}`);
+        socket.emit("validationError", {
+          action: "updateObstacle",
+          errors: [coordsValidation.error],
+        });
+        return;
+      }
+
+      // Update obstacle
+      obstacle.x = coordsValidation.sanitized.x;
+      obstacle.y = coordsValidation.sanitized.y;
+      obstacle.z = coordsValidation.sanitized.z;
+
+      if (data.rotation !== undefined) {
+        const rotationValidation = validateCoordinates(data.rotation, 0, 0);
+        obstacle.rotation = rotationValidation.sanitized.x;
+      }
+
+      if (data.isPassthrough !== undefined) {
+        obstacle.isPassthrough = Boolean(data.isPassthrough);
       }
 
       // Save to database
       await saveObstacle(obstacle);
 
       // Broadcast update to all clients
-      io.emit("obstacleUpdated", { id, x, y, z, rotation, isPassthrough });
+      io.emit("obstacleUpdated", {
+        id: obstacle.id,
+        x: obstacle.x,
+        y: obstacle.y,
+        z: obstacle.z,
+        rotation: obstacle.rotation,
+        isPassthrough: obstacle.isPassthrough,
+      });
 
       // Recreate pathfinder with updated obstacles
       pathfinder.obstacles = gameState.obstacles;
 
       console.log(
-        `📦 Obstacle ${id} moved to (${x.toFixed(2)}, ${z.toFixed(2)}) ${
-          isPassthrough ? "[PASSTHROUGH]" : ""
+        `📦 Obstacle ${obstacle.id} moved to (${obstacle.x.toFixed(
+          2
+        )}, ${obstacle.z.toFixed(2)}) ${
+          obstacle.isPassthrough ? "[PASSTHROUGH]" : ""
         }`
       );
+    } catch (error) {
+      console.error(`❌ Error updating obstacle:`, error);
     }
   });
 
   // Handle spawning new obstacles
   socket.on("spawnObstacle", async (data) => {
     try {
-      const newObstacle = {
-        id: data.id,
-        name: data.name,
-        type: data.type || "furniture",
-        x: data.x,
-        y: data.y,
-        z: data.z,
-        width: data.width,
-        height: data.height,
-        depth: data.depth,
-        model: data.model || null,
-        scale: data.scale || 1.0,
-        rotation: data.rotation || 0.0,
-        isPassthrough: data.isPassthrough || false,
-      };
+      // Rate limiting
+      if (!rateLimiter.checkLimit(socket.id, "SPAWN_OBSTACLE")) {
+        const status = rateLimiter.getStatus(socket.id, "SPAWN_OBSTACLE");
+        console.warn(
+          `⚠️ Rate limit exceeded for ${socket.id}: SPAWN_OBSTACLE (${status.current}/${status.max})`
+        );
+        socket.emit("rateLimitError", {
+          action: "spawnObstacle",
+          message: "Too many spawn requests. Please slow down.",
+          retryAfter: 1000,
+        });
+        return;
+      }
+
+      // Check obstacle limit
+      if (gameState.obstacles.length >= VALIDATION_RULES.MAX_OBSTACLES) {
+        console.warn(
+          `⚠️ Maximum obstacles reached (${VALIDATION_RULES.MAX_OBSTACLES})`
+        );
+        socket.emit("spawnError", {
+          id: data.id,
+          error: `Maximum obstacles limit reached (${VALIDATION_RULES.MAX_OBSTACLES})`,
+        });
+        return;
+      }
+
+      // Validate obstacle data
+      const validation = validateObstacleData(data);
+      if (!validation.valid) {
+        console.warn(
+          `⚠️ Obstacle validation failed for ${socket.id}:`,
+          validation.errors
+        );
+        socket.emit("validationError", {
+          action: "spawnObstacle",
+          errors: validation.errors,
+        });
+        return;
+      }
+
+      const newObstacle = validation.sanitized;
 
       // Check if obstacle already exists (prevent duplicates)
       const existingIndex = gameState.obstacles.findIndex(
@@ -1310,46 +1431,99 @@ io.on("connection", (socket) => {
       );
     } catch (error) {
       console.error(`❌ Error spawning obstacle:`, error);
-      socket.emit("spawnError", { id: data.id, error: error.message });
+      socket.emit("spawnError", { id: data?.id, error: error.message });
     }
   });
 
   // Handle deleting obstacles
   socket.on("deleteObstacle", async (data) => {
-    const { id } = data;
+    try {
+      // Rate limiting
+      if (!rateLimiter.checkLimit(socket.id, "DELETE_ACTIONS")) {
+        console.warn(`⚠️ Rate limit exceeded for ${socket.id}: DELETE_ACTIONS`);
+        socket.emit("rateLimitError", {
+          action: "deleteObstacle",
+          message: "Too many delete requests. Please slow down.",
+        });
+        return;
+      }
 
-    // Remove from game state
-    const index = gameState.obstacles.findIndex((obs) => obs.id === id);
-    if (index > -1) {
-      gameState.obstacles.splice(index, 1);
+      // Validate ID
+      const idValidation = validateId(data?.id);
+      if (!idValidation.valid) {
+        console.warn(`⚠️ Invalid obstacle ID for deletion: ${data?.id}`);
+        return;
+      }
 
-      // Delete from database
-      await deleteObstacle(id);
+      const id = idValidation.sanitized;
 
-      // Recreate pathfinder
-      pathfinder.obstacles = gameState.obstacles;
+      // Remove from game state
+      const index = gameState.obstacles.findIndex((obs) => obs.id === id);
+      if (index > -1) {
+        gameState.obstacles.splice(index, 1);
 
-      // Broadcast to all OTHER clients (deleter already removed it)
-      socket.broadcast.emit("obstacleDeleted", { id });
+        // Delete from database
+        await deleteObstacle(id);
 
-      console.log(`🗑️ Deleted obstacle: ${id}`);
+        // Recreate pathfinder
+        pathfinder.obstacles = gameState.obstacles;
+
+        // Broadcast to all OTHER clients (deleter already removed it)
+        socket.broadcast.emit("obstacleDeleted", { id });
+
+        console.log(`🗑️ Deleted obstacle: ${id}`);
+      } else {
+        console.warn(`⚠️ Obstacle not found for deletion: ${id}`);
+      }
+    } catch (error) {
+      console.error(`❌ Error deleting obstacle:`, error);
     }
   });
 
   // Handle spawning food items
   socket.on("spawnFood", async (data) => {
     try {
-      const newFood = {
-        id: data.id,
-        name: data.name,
-        x: data.x,
-        y: data.y,
-        z: data.z,
-        scale: data.scale || 1.0,
-        width: data.width || 1.0,
-        height: data.height || 1.0,
-        depth: data.depth || 1.0,
-      };
+      // Rate limiting
+      if (!rateLimiter.checkLimit(socket.id, "SPAWN_FOOD")) {
+        const status = rateLimiter.getStatus(socket.id, "SPAWN_FOOD");
+        console.warn(
+          `⚠️ Rate limit exceeded for ${socket.id}: SPAWN_FOOD (${status.current}/${status.max})`
+        );
+        socket.emit("rateLimitError", {
+          action: "spawnFood",
+          message: "Too many spawn requests. Please slow down.",
+          retryAfter: 1000,
+        });
+        return;
+      }
+
+      // Check food item limit
+      if (gameState.foodItems.length >= VALIDATION_RULES.MAX_FOOD_ITEMS) {
+        console.warn(
+          `⚠️ Maximum food items reached (${VALIDATION_RULES.MAX_FOOD_ITEMS})`
+        );
+        socket.emit("spawnError", {
+          id: data.id,
+          error: `Maximum food items limit reached (${VALIDATION_RULES.MAX_FOOD_ITEMS})`,
+        });
+        return;
+      }
+
+      // Validate food data
+      const validation = validateFoodData(data);
+      if (!validation.valid) {
+        console.warn(
+          `⚠️ Food validation failed for ${socket.id}:`,
+          validation.errors
+        );
+        socket.emit("validationError", {
+          action: "spawnFood",
+          errors: validation.errors,
+        });
+        return;
+      }
+
+      const newFood = validation.sanitized;
 
       // Check if food item already exists (prevent duplicates)
       const existingIndex = gameState.foodItems.findIndex(
@@ -1382,40 +1556,74 @@ io.on("connection", (socket) => {
       );
     } catch (error) {
       console.error(`❌ Error spawning food:`, error);
-      socket.emit("spawnError", { id: data.id, error: error.message });
+      socket.emit("spawnError", { id: data?.id, error: error.message });
     }
   });
 
   // Handle updating food items
   socket.on("updateFood", async (data) => {
     try {
-      const { id, x, y, z } = data;
+      // Rate limiting
+      if (!rateLimiter.checkLimit(socket.id, "UPDATE_FOOD")) {
+        console.warn(`⚠️ Rate limit exceeded for ${socket.id}: UPDATE_FOOD`);
+        socket.emit("rateLimitError", {
+          action: "updateFood",
+          message: "Too many update requests. Please slow down.",
+        });
+        return;
+      }
+
+      // Validate ID
+      const idValidation = validateId(data?.id);
+      if (!idValidation.valid) {
+        console.warn(`⚠️ Invalid food ID: ${data?.id}`);
+        return;
+      }
 
       // Find and update the food item
-      const foodItem = gameState.foodItems.find((food) => food.id === id);
-      if (foodItem) {
-        foodItem.x = x;
-        foodItem.y = y;
-        foodItem.z = z;
-
-        // Save to database
-        const saveSuccess = await saveFoodItem(foodItem);
-
-        if (!saveSuccess) {
-          console.error(`❌ Failed to save food update for ${id}`);
-        }
-
-        // Broadcast update to all clients
-        io.emit("foodUpdated", { id, x, y, z });
-
-        console.log(
-          `🍔 Food ${id} moved to (${x.toFixed(2)}, ${z.toFixed(2)}) - DB: ${
-            saveSuccess ? "✅" : "❌"
-          }`
-        );
-      } else {
-        console.warn(`⚠️ Food ${id} not found in game state`);
+      const foodItem = gameState.foodItems.find(
+        (food) => food.id === idValidation.sanitized
+      );
+      if (!foodItem) {
+        console.warn(`⚠️ Food ${data.id} not found in game state`);
+        return;
       }
+
+      // Validate coordinates
+      const coordsValidation = validateCoordinates(data.x, data.y, data.z);
+      if (!coordsValidation.valid) {
+        console.warn(`⚠️ Invalid coordinates for food ${data.id}`);
+        socket.emit("validationError", {
+          action: "updateFood",
+          errors: [coordsValidation.error],
+        });
+        return;
+      }
+
+      foodItem.x = coordsValidation.sanitized.x;
+      foodItem.y = coordsValidation.sanitized.y;
+      foodItem.z = coordsValidation.sanitized.z;
+
+      // Save to database
+      const saveSuccess = await saveFoodItem(foodItem);
+
+      if (!saveSuccess) {
+        console.error(`❌ Failed to save food update for ${foodItem.id}`);
+      }
+
+      // Broadcast update to all clients
+      io.emit("foodUpdated", {
+        id: foodItem.id,
+        x: foodItem.x,
+        y: foodItem.y,
+        z: foodItem.z,
+      });
+
+      console.log(
+        `🍔 Food ${foodItem.id} moved to (${foodItem.x.toFixed(
+          2
+        )}, ${foodItem.z.toFixed(2)}) - DB: ${saveSuccess ? "✅" : "❌"}`
+      );
     } catch (error) {
       console.error(`❌ Error updating food:`, error);
     }
@@ -1424,7 +1632,24 @@ io.on("connection", (socket) => {
   // Handle deleting food items
   socket.on("deleteFood", async (data) => {
     try {
-      const { id } = data;
+      // Rate limiting
+      if (!rateLimiter.checkLimit(socket.id, "DELETE_ACTIONS")) {
+        console.warn(`⚠️ Rate limit exceeded for ${socket.id}: DELETE_ACTIONS`);
+        socket.emit("rateLimitError", {
+          action: "deleteFood",
+          message: "Too many delete requests. Please slow down.",
+        });
+        return;
+      }
+
+      // Validate ID
+      const idValidation = validateId(data?.id);
+      if (!idValidation.valid) {
+        console.warn(`⚠️ Invalid food ID for deletion: ${data?.id}`);
+        return;
+      }
+
+      const id = idValidation.sanitized;
 
       // Remove from game state
       const index = gameState.foodItems.findIndex((food) => food.id === id);
@@ -1454,15 +1679,43 @@ io.on("connection", (socket) => {
 
   // Handle click-to-move with pathfinding
   socket.on("moveTo", (target) => {
-    const player = gameState.players.get(socket.id);
-    if (player && target.x !== undefined && target.z !== undefined) {
+    try {
+      // Rate limiting
+      if (!rateLimiter.checkLimit(socket.id, "MOVE_COMMANDS")) {
+        // Don't spam console for move commands, just silently reject
+        return;
+      }
+
+      const player = gameState.players.get(socket.id);
+      if (!player) return;
+
+      // Validate target coordinates
+      if (
+        target?.x === undefined ||
+        target?.z === undefined ||
+        typeof target.x !== "number" ||
+        typeof target.z !== "number"
+      ) {
+        console.warn(`⚠️ Invalid move target from ${socket.id}`);
+        return;
+      }
+
+      // Validate coordinates are within bounds
+      const coordsValidation = validateCoordinates(
+        target.x,
+        0,
+        target.z,
+        VALIDATION_RULES.WORLD_BOUNDS
+      );
+      if (!coordsValidation.valid) {
+        console.warn(
+          `⚠️ Move target out of bounds for ${socket.id}: (${target.x}, ${target.z})`
+        );
+        return;
+      }
+
       // Don't allow movement if player is sitting or lying
       if (player.isSitting || player.isLying) {
-        console.log(
-          `⚠️ Player ${socket.id} is ${
-            player.isSitting ? "sitting" : "lying"
-          }, ignoring move command`
-        );
         return;
       }
 
@@ -1471,25 +1724,15 @@ io.on("connection", (socket) => {
 
       // Calculate path using A*
       const start = { x: player.x, z: player.z };
-      let goal = { x: target.x, z: target.z };
+      let goal = {
+        x: coordsValidation.sanitized.x,
+        z: coordsValidation.sanitized.z,
+      };
 
       // If clicking on an obstacle, find the best interaction point
       goal = pathfinder.findInteractionPoint(goal);
 
       const path = pathfinder.findPath(start, goal);
-
-      // Validate path doesn't go through obstacles
-      let pathValid = true;
-      for (let i = 0; i < path.length; i++) {
-        if (!pathfinder.isWalkable(path[i].x, path[i].z)) {
-          console.log(
-            `⚠️ WARNING: Waypoint ${i} at (${path[i].x.toFixed(2)}, ${path[
-              i
-            ].z.toFixed(2)}) is NOT walkable!`
-          );
-          pathValid = false;
-        }
-      }
 
       player.path = path;
       player.moveTarget = goal;
@@ -1499,104 +1742,220 @@ io.on("connection", (socket) => {
         playerId: socket.id,
         path: path,
       });
-
-      console.log(
-        `🗺️ Player ${socket.id} pathfinding: (${start.x.toFixed(
-          2
-        )}, ${start.z.toFixed(2)}) → (${goal.x.toFixed(2)}, ${goal.z.toFixed(
-          2
-        )}) - ${path.length} waypoints, ${
-          gameState.obstacles.length
-        } obstacles${pathValid ? " ✓" : " ✗ INVALID PATH"}`
-      );
+    } catch (error) {
+      console.error(`❌ Error processing moveTo for ${socket.id}:`, error);
     }
   });
 
   // Handle emote/voice from players
   socket.on("playEmote", (data) => {
-    const { playerId, emote } = data;
+    try {
+      // Rate limiting
+      if (!rateLimiter.checkLimit(socket.id, "EMOTES")) {
+        console.warn(`⚠️ Rate limit exceeded for ${socket.id}: EMOTES`);
+        socket.emit("rateLimitError", {
+          action: "playEmote",
+          message: "Too many emotes. Please slow down.",
+        });
+        return;
+      }
 
-    // Broadcast to all players (including sender for consistency)
-    io.emit("playerEmote", {
-      playerId: playerId,
-      emote: emote,
-    });
+      // Validate playerId matches socket
+      if (data?.playerId !== socket.id) {
+        console.warn(
+          `⚠️ Player ${socket.id} tried to send emote as ${data?.playerId}`
+        );
+        return;
+      }
 
-    console.log(`🎵 Player ${playerId} played emote: ${emote}`);
+      // Validate emote string
+      const emote = sanitizeString(data?.emote, 50);
+      if (!emote) {
+        console.warn(`⚠️ Invalid emote from ${socket.id}`);
+        return;
+      }
+
+      // Broadcast to all players (including sender for consistency)
+      io.emit("playerEmote", {
+        playerId: socket.id,
+        emote: emote,
+      });
+
+      console.log(`🎵 Player ${socket.id} played emote: ${emote}`);
+    } catch (error) {
+      console.error(`❌ Error processing emote for ${socket.id}:`, error);
+    }
   });
 
   // Handle player actions
   socket.on("playerAction", (data) => {
-    const { playerId, action } = data;
+    try {
+      // Rate limiting
+      if (!rateLimiter.checkLimit(socket.id, "ACTIONS")) {
+        console.warn(`⚠️ Rate limit exceeded for ${socket.id}: ACTIONS`);
+        socket.emit("rateLimitError", {
+          action: "playerAction",
+          message: "Too many actions. Please slow down.",
+        });
+        return;
+      }
 
-    // Broadcast to all players (including sender for consistency)
-    io.emit("playerAction", {
-      playerId: playerId,
-      action: action,
-    });
+      // Validate playerId matches socket
+      if (data?.playerId !== socket.id) {
+        console.warn(
+          `⚠️ Player ${socket.id} tried to perform action as ${data?.playerId}`
+        );
+        return;
+      }
 
-    console.log(`🎬 Player ${playerId} performed action: ${action}`);
+      // Validate action string
+      const action = sanitizeString(data?.action, 50);
+      if (!action) {
+        console.warn(`⚠️ Invalid action from ${socket.id}`);
+        return;
+      }
+
+      // Broadcast to all players (including sender for consistency)
+      io.emit("playerAction", {
+        playerId: socket.id,
+        action: action,
+      });
+
+      console.log(`🎬 Player ${socket.id} performed action: ${action}`);
+    } catch (error) {
+      console.error(`❌ Error processing action for ${socket.id}:`, error);
+    }
   });
 
   // Handle player sitting on furniture
   socket.on("playerSit", (data) => {
-    const player = gameState.players.get(data.playerId);
-    if (player) {
+    try {
+      // Rate limiting
+      if (!rateLimiter.checkLimit(socket.id, "SIT_ACTIONS")) {
+        console.warn(`⚠️ Rate limit exceeded for ${socket.id}: SIT_ACTIONS`);
+        return;
+      }
+
+      // Validate playerId matches socket
+      if (data?.playerId !== socket.id) {
+        console.warn(
+          `⚠️ Player ${socket.id} tried to sit as ${data?.playerId}`
+        );
+        return;
+      }
+
+      const player = gameState.players.get(socket.id);
+      if (!player) return;
+
+      // Validate furniture ID
+      const furnitureIdValidation = validateId(data?.furnitureId);
+      if (!furnitureIdValidation.valid) {
+        console.warn(`⚠️ Invalid furniture ID from ${socket.id}`);
+        return;
+      }
+
+      // Validate position
+      const posValidation = validateCoordinates(
+        data?.position?.x,
+        data?.position?.y,
+        data?.position?.z
+      );
+      if (!posValidation.valid) {
+        console.warn(`⚠️ Invalid sit position from ${socket.id}`);
+        return;
+      }
+
+      // Validate seat index
+      const seatIndex =
+        data?.seatIndex !== undefined ? parseInt(data.seatIndex, 10) : 0;
+      if (isNaN(seatIndex) || seatIndex < 0 || seatIndex > 100) {
+        console.warn(`⚠️ Invalid seat index from ${socket.id}`);
+        return;
+      }
       // Mark player as sitting
       player.isSitting = true;
-      player.sittingOn = data.furnitureId;
-      player.seatIndex = data.seatIndex !== undefined ? data.seatIndex : 0;
+      player.sittingOn = furnitureIdValidation.sanitized;
+      player.seatIndex = seatIndex;
       player.moveTarget = null; // Clear any movement target
       player.path = null; // Clear path
 
       // Update position to sitting position
-      player.x = data.position.x;
-      player.y = data.position.y;
-      player.z = data.position.z;
-      player.rotation = data.rotation;
+      player.x = posValidation.sanitized.x;
+      player.y = posValidation.sanitized.y;
+      player.z = posValidation.sanitized.z;
+      player.rotation = parseFloat(data?.rotation) || 0;
 
       // Sync furniture dimensions AND center from client (ensures exact collision match)
-      if (data.furnitureDimensions) {
+      if (data?.furnitureDimensions) {
         const furniture = gameState.obstacles.find(
-          (obs) => obs.id === data.furnitureId
+          (obs) => obs.id === player.sittingOn
         );
         if (furniture) {
-          furniture.width = data.furnitureDimensions.width;
-          furniture.height = data.furnitureDimensions.height;
-          furniture.depth = data.furnitureDimensions.depth;
-          furniture.centerX = data.furnitureDimensions.centerX;
-          furniture.centerY = data.furnitureDimensions.centerY;
-          furniture.centerZ = data.furnitureDimensions.centerZ;
-          console.log(
-            `📦 Synced furniture ${
-              data.furnitureId
-            }: size=${furniture.width.toFixed(2)}x${furniture.height.toFixed(
-              2
-            )}x${furniture.depth.toFixed(
-              2
-            )}, center=(${furniture.centerX.toFixed(
-              2
-            )}, ${furniture.centerY.toFixed(2)}, ${furniture.centerZ.toFixed(
-              2
-            )})`
-          );
+          const dims = data.furnitureDimensions;
+          furniture.width = parseFloat(dims.width) || furniture.width;
+          furniture.height = parseFloat(dims.height) || furniture.height;
+          furniture.depth = parseFloat(dims.depth) || furniture.depth;
+          furniture.centerX = parseFloat(dims.centerX) || furniture.centerX;
+          furniture.centerY = parseFloat(dims.centerY) || furniture.centerY;
+          furniture.centerZ = parseFloat(dims.centerZ) || furniture.centerZ;
         }
       }
-    }
 
-    // Broadcast to all players
-    io.emit("playerSit", data);
-    console.log(
-      `🪑 Player ${data.playerId} sat on furniture ${data.furnitureId} (seat ${
-        data.seatIndex !== undefined ? data.seatIndex + 1 : 1
-      })`
-    );
+      // Broadcast to all players
+      io.emit("playerSit", {
+        playerId: socket.id,
+        furnitureId: player.sittingOn,
+        seatIndex: player.seatIndex,
+        position: {
+          x: player.x,
+          y: player.y,
+          z: player.z,
+        },
+        rotation: player.rotation,
+        furnitureDimensions: data?.furnitureDimensions,
+      });
+
+      console.log(
+        `🪑 Player ${socket.id} sat on furniture ${player.sittingOn} (seat ${
+          player.seatIndex + 1
+        })`
+      );
+    } catch (error) {
+      console.error(`❌ Error processing playerSit for ${socket.id}:`, error);
+    }
   });
 
   // Handle player standing up
   socket.on("playerStandUp", (data) => {
-    const player = gameState.players.get(data.playerId);
-    if (player) {
+    try {
+      // Rate limiting
+      if (!rateLimiter.checkLimit(socket.id, "SIT_ACTIONS")) {
+        console.warn(`⚠️ Rate limit exceeded for ${socket.id}: SIT_ACTIONS`);
+        return;
+      }
+
+      // Validate playerId matches socket
+      if (data?.playerId !== socket.id) {
+        console.warn(
+          `⚠️ Player ${socket.id} tried to stand up as ${data?.playerId}`
+        );
+        return;
+      }
+
+      const player = gameState.players.get(socket.id);
+      if (!player) return;
+
+      // Validate position
+      const posValidation = validateCoordinates(
+        data?.position?.x,
+        data?.position?.y,
+        data?.position?.z
+      );
+      if (!posValidation.valid) {
+        console.warn(`⚠️ Invalid stand up position from ${socket.id}`);
+        return;
+      }
+
       // Mark player as no longer sitting
       player.isSitting = false;
       player.sittingOn = null;
@@ -1609,80 +1968,162 @@ io.on("connection", (socket) => {
       player.stuckCounter = 0;
 
       // Update position to standing position
-      player.x = data.position.x;
-      player.y = data.position.y;
-      player.z = data.position.z;
+      player.x = posValidation.sanitized.x;
+      player.y = posValidation.sanitized.y;
+      player.z = posValidation.sanitized.z;
 
       console.log(
-        `🚶 Player ${data.playerId} stood up at (${data.position.x.toFixed(
+        `🚶 Player ${socket.id} stood up at (${player.x.toFixed(
           2
-        )}, ${data.position.z.toFixed(2)})`
+        )}, ${player.z.toFixed(2)})`
+      );
+
+      // Broadcast to all players
+      io.emit("playerStandUp", {
+        playerId: socket.id,
+        position: {
+          x: player.x,
+          y: player.y,
+          z: player.z,
+        },
+      });
+    } catch (error) {
+      console.error(
+        `❌ Error processing playerStandUp for ${socket.id}:`,
+        error
       );
     }
-
-    // Broadcast to all players
-    io.emit("playerStandUp", data);
   });
 
   // Handle player lying down on bed
   socket.on("playerLie", (data) => {
-    const player = gameState.players.get(data.playerId);
-    if (player) {
+    try {
+      // Rate limiting
+      if (!rateLimiter.checkLimit(socket.id, "SIT_ACTIONS")) {
+        console.warn(`⚠️ Rate limit exceeded for ${socket.id}: SIT_ACTIONS`);
+        return;
+      }
+
+      // Validate playerId matches socket
+      if (data?.playerId !== socket.id) {
+        console.warn(
+          `⚠️ Player ${socket.id} tried to lie as ${data?.playerId}`
+        );
+        return;
+      }
+
+      const player = gameState.players.get(socket.id);
+      if (!player) return;
+
+      // Validate furniture ID
+      const furnitureIdValidation = validateId(data?.furnitureId);
+      if (!furnitureIdValidation.valid) {
+        console.warn(`⚠️ Invalid furniture ID from ${socket.id}`);
+        return;
+      }
+
+      // Validate position
+      const posValidation = validateCoordinates(
+        data?.position?.x,
+        data?.position?.y,
+        data?.position?.z
+      );
+      if (!posValidation.valid) {
+        console.warn(`⚠️ Invalid lying position from ${socket.id}`);
+        return;
+      }
+
+      // Validate lying index
+      const lyingIndex =
+        data?.lyingIndex !== undefined ? parseInt(data.lyingIndex, 10) : 0;
+      if (isNaN(lyingIndex) || lyingIndex < 0 || lyingIndex > 100) {
+        console.warn(`⚠️ Invalid lying index from ${socket.id}`);
+        return;
+      }
       // Mark player as lying
       player.isLying = true;
-      player.lyingOn = data.furnitureId;
-      player.lyingIndex = data.lyingIndex !== undefined ? data.lyingIndex : 0;
+      player.lyingOn = furnitureIdValidation.sanitized;
+      player.lyingIndex = lyingIndex;
       player.moveTarget = null;
       player.path = null;
 
       // Update position to lying position
-      player.x = data.position.x;
-      player.y = data.position.y;
-      player.z = data.position.z;
-      player.rotation = data.rotation;
+      player.x = posValidation.sanitized.x;
+      player.y = posValidation.sanitized.y;
+      player.z = posValidation.sanitized.z;
+      player.rotation = parseFloat(data?.rotation) || 0;
 
       // Sync furniture dimensions AND center from client (ensures exact collision match)
-      if (data.furnitureDimensions) {
+      if (data?.furnitureDimensions) {
         const furniture = gameState.obstacles.find(
-          (obs) => obs.id === data.furnitureId
+          (obs) => obs.id === player.lyingOn
         );
         if (furniture) {
-          furniture.width = data.furnitureDimensions.width;
-          furniture.height = data.furnitureDimensions.height;
-          furniture.depth = data.furnitureDimensions.depth;
-          furniture.centerX = data.furnitureDimensions.centerX;
-          furniture.centerY = data.furnitureDimensions.centerY;
-          furniture.centerZ = data.furnitureDimensions.centerZ;
-          console.log(
-            `📦 Synced furniture ${
-              data.furnitureId
-            }: size=${furniture.width.toFixed(2)}x${furniture.height.toFixed(
-              2
-            )}x${furniture.depth.toFixed(
-              2
-            )}, center=(${furniture.centerX.toFixed(
-              2
-            )}, ${furniture.centerY.toFixed(2)}, ${furniture.centerZ.toFixed(
-              2
-            )})`
-          );
+          const dims = data.furnitureDimensions;
+          furniture.width = parseFloat(dims.width) || furniture.width;
+          furniture.height = parseFloat(dims.height) || furniture.height;
+          furniture.depth = parseFloat(dims.depth) || furniture.depth;
+          furniture.centerX = parseFloat(dims.centerX) || furniture.centerX;
+          furniture.centerY = parseFloat(dims.centerY) || furniture.centerY;
+          furniture.centerZ = parseFloat(dims.centerZ) || furniture.centerZ;
         }
       }
-    }
 
-    // Broadcast to all players
-    io.emit("playerLie", data);
-    console.log(
-      `🛏️ Player ${data.playerId} lying on furniture ${
-        data.furnitureId
-      } (position ${data.lyingIndex !== undefined ? data.lyingIndex + 1 : 1})`
-    );
+      // Broadcast to all players
+      io.emit("playerLie", {
+        playerId: socket.id,
+        furnitureId: player.lyingOn,
+        lyingIndex: player.lyingIndex,
+        position: {
+          x: player.x,
+          y: player.y,
+          z: player.z,
+        },
+        rotation: player.rotation,
+        furnitureDimensions: data?.furnitureDimensions,
+      });
+
+      console.log(
+        `🛏️ Player ${socket.id} lying on furniture ${
+          player.lyingOn
+        } (position ${player.lyingIndex + 1})`
+      );
+    } catch (error) {
+      console.error(`❌ Error processing playerLie for ${socket.id}:`, error);
+    }
   });
 
   // Handle player getting up from lying
   socket.on("playerGetUp", (data) => {
-    const player = gameState.players.get(data.playerId);
-    if (player) {
+    try {
+      // Rate limiting
+      if (!rateLimiter.checkLimit(socket.id, "SIT_ACTIONS")) {
+        console.warn(`⚠️ Rate limit exceeded for ${socket.id}: SIT_ACTIONS`);
+        return;
+      }
+
+      // Validate playerId matches socket
+      if (data?.playerId !== socket.id) {
+        console.warn(
+          `⚠️ Player ${socket.id} tried to get up as ${data?.playerId}`
+        );
+        return;
+      }
+
+      const player = gameState.players.get(socket.id);
+      if (!player) return;
+
+      // Validate position
+      const posValidation = validateCoordinates(
+        data?.position?.x,
+        data?.position?.y,
+        data?.position?.z
+      );
+      if (!posValidation.valid) {
+        console.warn(`⚠️ Invalid get up position from ${socket.id}`);
+        return;
+      }
+
       // Mark player as no longer lying
       player.isLying = false;
       player.lyingOn = null;
@@ -1695,19 +2136,28 @@ io.on("connection", (socket) => {
       player.stuckCounter = 0;
 
       // Update position to standing position
-      player.x = data.position.x;
-      player.y = data.position.y;
-      player.z = data.position.z;
+      player.x = posValidation.sanitized.x;
+      player.y = posValidation.sanitized.y;
+      player.z = posValidation.sanitized.z;
 
       console.log(
-        `🚶 Player ${data.playerId} got up at (${data.position.x.toFixed(
+        `🚶 Player ${socket.id} got up at (${player.x.toFixed(
           2
-        )}, ${data.position.z.toFixed(2)})`
+        )}, ${player.z.toFixed(2)})`
       );
-    }
 
-    // Broadcast to all players
-    io.emit("playerGetUp", data);
+      // Broadcast to all players
+      io.emit("playerGetUp", {
+        playerId: socket.id,
+        position: {
+          x: player.x,
+          y: player.y,
+          z: player.z,
+        },
+      });
+    } catch (error) {
+      console.error(`❌ Error processing playerGetUp for ${socket.id}:`, error);
+    }
   });
 
   // Handle furniture collision sync from client
@@ -1736,6 +2186,7 @@ io.on("connection", (socket) => {
   socket.on("disconnect", () => {
     console.log(`Player disconnected: ${socket.id}`);
     gameState.players.delete(socket.id);
+    rateLimiter.clearPlayer(socket.id); // Clean up rate limiter data
     io.emit("playerLeft", socket.id);
   });
 });
