@@ -102,26 +102,35 @@ const getPlayerAABB = (player) => {
 };
 
 const getObstacleAABB = (obstacle) => {
-  // Use actual dimensions from database - NO PADDING
-  // Exact collision matching the green visualization boxes
+  // Use actual dimensions and CENTER from client
+  // The center is where the actual bounding box is, not necessarily the pivot point
   const halfWidth = obstacle.width / 2;
   const halfHeight = obstacle.height / 2;
   const halfDepth = obstacle.depth / 2;
 
+  // Use bounding box center if available (synced from client), otherwise use position
+  const centerX =
+    obstacle.centerX !== undefined ? obstacle.centerX : obstacle.x;
+  const centerY =
+    obstacle.centerY !== undefined ? obstacle.centerY : obstacle.y;
+  const centerZ =
+    obstacle.centerZ !== undefined ? obstacle.centerZ : obstacle.z;
+
   return {
-    minX: obstacle.x - halfWidth,
-    maxX: obstacle.x + halfWidth,
-    minY: obstacle.y - halfHeight,
-    maxY: obstacle.y + halfHeight,
-    minZ: obstacle.z - halfDepth,
-    maxZ: obstacle.z + halfDepth,
+    minX: centerX - halfWidth,
+    maxX: centerX + halfWidth,
+    minY: centerY - halfHeight,
+    maxY: centerY + halfHeight,
+    minZ: centerZ - halfDepth,
+    maxZ: centerZ + halfDepth,
   };
 };
 
-const validatePlayerMovement = (player, newX, newZ) => {
+const validatePlayerMovement = (player, newX, newZ, debug = false) => {
   // Check world bounds
   const WORLD_BOUNDS = 20;
   if (Math.abs(newX) > WORLD_BOUNDS || Math.abs(newZ) > WORLD_BOUNDS) {
+    if (debug) console.log(`   ❌ World bounds exceeded`);
     return false;
   }
 
@@ -139,10 +148,44 @@ const validatePlayerMovement = (player, newX, newZ) => {
     maxZ: newZ + halfDepth,
   };
 
+  if (debug) {
+    console.log(
+      `   Player AABB: X[${playerAABB.minX.toFixed(
+        2
+      )}, ${playerAABB.maxX.toFixed(2)}] Z[${playerAABB.minZ.toFixed(
+        2
+      )}, ${playerAABB.maxZ.toFixed(2)}]`
+    );
+    console.log(
+      `   Player dimensions: width=${player.width?.toFixed(
+        2
+      )}, depth=${player.depth?.toFixed(2)}, height=${player.height?.toFixed(
+        2
+      )}`
+    );
+  }
+
   // Check collision with all obstacles (furniture)
   for (const obstacle of gameState.obstacles) {
     const obstacleAABB = getObstacleAABB(obstacle);
     if (checkAABBCollision(playerAABB, obstacleAABB)) {
+      if (debug) {
+        console.log(
+          `   ❌ Collision with obstacle: ${obstacle.id || obstacle.model}`
+        );
+        console.log(
+          `      Obstacle AABB: X[${obstacleAABB.minX.toFixed(
+            2
+          )}, ${obstacleAABB.maxX.toFixed(2)}] Z[${obstacleAABB.minZ.toFixed(
+            2
+          )}, ${obstacleAABB.maxZ.toFixed(2)}]`
+        );
+        console.log(
+          `      Obstacle position: (${obstacle.x.toFixed(
+            2
+          )}, ${obstacle.z.toFixed(2)})`
+        );
+      }
       return false; // Collision detected
     }
   }
@@ -165,10 +208,21 @@ const validatePlayerMovement = (player, newX, newZ) => {
     };
 
     if (checkAABBCollision(playerAABB, foodAABB)) {
+      if (debug) {
+        console.log(`   ❌ Collision with food: ${foodItem.name}`);
+        console.log(
+          `      Food AABB: X[${foodAABB.minX.toFixed(
+            2
+          )}, ${foodAABB.maxX.toFixed(2)}] Z[${foodAABB.minZ.toFixed(
+            2
+          )}, ${foodAABB.maxZ.toFixed(2)}]`
+        );
+      }
       return false; // Collision detected
     }
   }
 
+  if (debug) console.log(`   ✅ No collision, movement valid`);
   return true; // No collision, movement valid
 };
 
@@ -855,6 +909,21 @@ const processPlayerInput = (player) => {
       player.collisionCounter = 0;
     } else {
       // If collision detected during movement
+      // Run validation again with debug mode to see what's blocking
+      const isFirstCollision =
+        !player.collisionCounter || player.collisionCounter === 0;
+      if (isFirstCollision) {
+        console.log(
+          `⚠️ Movement blocked for player ${player.id} at (${player.x.toFixed(
+            2
+          )}, ${player.z.toFixed(2)}) trying to move to (${newX.toFixed(
+            2
+          )}, ${newZ.toFixed(2)})`
+        );
+        console.log(`   🔍 Running collision debug:`);
+        validatePlayerMovement(player, newX, newZ, true); // Debug mode
+      }
+
       if (player.moveTarget) {
         // Initialize or check collision counter
         player.collisionCounter = (player.collisionCounter || 0) + 1;
@@ -1337,6 +1406,34 @@ io.on("connection", (socket) => {
       player.y = data.position.y;
       player.z = data.position.z;
       player.rotation = data.rotation;
+
+      // Sync furniture dimensions AND center from client (ensures exact collision match)
+      if (data.furnitureDimensions) {
+        const furniture = gameState.obstacles.find(
+          (obs) => obs.id === data.furnitureId
+        );
+        if (furniture) {
+          furniture.width = data.furnitureDimensions.width;
+          furniture.height = data.furnitureDimensions.height;
+          furniture.depth = data.furnitureDimensions.depth;
+          furniture.centerX = data.furnitureDimensions.centerX;
+          furniture.centerY = data.furnitureDimensions.centerY;
+          furniture.centerZ = data.furnitureDimensions.centerZ;
+          console.log(
+            `📦 Synced furniture ${
+              data.furnitureId
+            }: size=${furniture.width.toFixed(2)}x${furniture.height.toFixed(
+              2
+            )}x${furniture.depth.toFixed(
+              2
+            )}, center=(${furniture.centerX.toFixed(
+              2
+            )}, ${furniture.centerY.toFixed(2)}, ${furniture.centerZ.toFixed(
+              2
+            )})`
+          );
+        }
+      }
     }
 
     // Broadcast to all players
@@ -1357,15 +1454,26 @@ io.on("connection", (socket) => {
       player.sittingOn = null;
       player.seatIndex = undefined;
 
+      // Clear any existing paths or movement targets
+      player.moveTarget = null;
+      player.path = null;
+      player.collisionCounter = 0;
+      player.stuckCounter = 0;
+
       // Update position to standing position
       player.x = data.position.x;
       player.y = data.position.y;
       player.z = data.position.z;
+
+      console.log(
+        `🚶 Player ${data.playerId} stood up at (${data.position.x.toFixed(
+          2
+        )}, ${data.position.z.toFixed(2)})`
+      );
     }
 
     // Broadcast to all players
     io.emit("playerStandUp", data);
-    console.log(`🚶 Player ${data.playerId} stood up`);
   });
 
   // Handle player lying down on bed
@@ -1383,6 +1491,34 @@ io.on("connection", (socket) => {
       player.y = data.position.y;
       player.z = data.position.z;
       player.rotation = data.rotation;
+
+      // Sync furniture dimensions AND center from client (ensures exact collision match)
+      if (data.furnitureDimensions) {
+        const furniture = gameState.obstacles.find(
+          (obs) => obs.id === data.furnitureId
+        );
+        if (furniture) {
+          furniture.width = data.furnitureDimensions.width;
+          furniture.height = data.furnitureDimensions.height;
+          furniture.depth = data.furnitureDimensions.depth;
+          furniture.centerX = data.furnitureDimensions.centerX;
+          furniture.centerY = data.furnitureDimensions.centerY;
+          furniture.centerZ = data.furnitureDimensions.centerZ;
+          console.log(
+            `📦 Synced furniture ${
+              data.furnitureId
+            }: size=${furniture.width.toFixed(2)}x${furniture.height.toFixed(
+              2
+            )}x${furniture.depth.toFixed(
+              2
+            )}, center=(${furniture.centerX.toFixed(
+              2
+            )}, ${furniture.centerY.toFixed(2)}, ${furniture.centerZ.toFixed(
+              2
+            )})`
+          );
+        }
+      }
     }
 
     // Broadcast to all players
@@ -1400,15 +1536,48 @@ io.on("connection", (socket) => {
       player.isLying = false;
       player.lyingOn = null;
 
+      // Clear any existing paths or movement targets
+      player.moveTarget = null;
+      player.path = null;
+      player.collisionCounter = 0;
+      player.stuckCounter = 0;
+
       // Update position to standing position
       player.x = data.position.x;
       player.y = data.position.y;
       player.z = data.position.z;
+
+      console.log(
+        `🚶 Player ${data.playerId} got up at (${data.position.x.toFixed(
+          2
+        )}, ${data.position.z.toFixed(2)})`
+      );
     }
 
     // Broadcast to all players
     io.emit("playerGetUp", data);
-    console.log(`🚶 Player ${data.playerId} got up`);
+  });
+
+  // Handle furniture collision sync from client
+  socket.on("syncFurnitureCollisions", (furnitureDataArray) => {
+    let syncedCount = 0;
+    furnitureDataArray.forEach((furnitureData) => {
+      const furniture = gameState.obstacles.find(
+        (obs) => obs.id === furnitureData.id
+      );
+      if (furniture) {
+        furniture.width = furnitureData.width;
+        furniture.height = furnitureData.height;
+        furniture.depth = furnitureData.depth;
+        furniture.centerX = furnitureData.centerX;
+        furniture.centerY = furnitureData.centerY;
+        furniture.centerZ = furnitureData.centerZ;
+        syncedCount++;
+      }
+    });
+    console.log(
+      `📦 Synced ${syncedCount} furniture collision boxes from client ${socket.id}`
+    );
   });
 
   // Handle disconnection

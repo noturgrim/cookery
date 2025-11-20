@@ -79,6 +79,11 @@ export class NetworkManager {
       // Clear existing players
       this.playerManager.clear();
 
+      // Sync all furniture collision boxes to server after a delay (wait for scene to load)
+      setTimeout(() => {
+        this.syncAllFurnitureCollisions();
+      }, 1000);
+
       // Create all existing players
       data.players.forEach((player) => {
         this.playerManager.createPlayer(player);
@@ -1041,5 +1046,40 @@ export class NetworkManager {
    */
   isConnected() {
     return this.socket && this.socket.connected;
+  }
+
+  /**
+   * Sync all furniture collision data to server
+   * This ensures server-side collision detection matches visual collision boxes
+   */
+  syncAllFurnitureCollisions() {
+    if (!this.sceneManager || !this.socket) return;
+
+    const furnitureData = [];
+
+    // Get all obstacles from scene
+    this.sceneManager.obstacles.forEach((furniture) => {
+      if (furniture && furniture.userData && furniture.userData.id) {
+        // Calculate actual bounding box
+        const bbox = this.sceneManager.calculateBoundingBox(furniture);
+
+        furnitureData.push({
+          id: furniture.userData.id,
+          width: bbox.width,
+          height: bbox.height,
+          depth: bbox.depth,
+          centerX: bbox.center.x,
+          centerY: bbox.center.y,
+          centerZ: bbox.center.z,
+        });
+      }
+    });
+
+    if (furnitureData.length > 0) {
+      this.socket.emit("syncFurnitureCollisions", furnitureData);
+      console.log(
+        `📦 Synced ${furnitureData.length} furniture collision boxes to server`
+      );
+    }
   }
 }

@@ -261,13 +261,22 @@ export class InteractionManager {
       console.log("🪑 Using procedural sitting animation");
     }
 
-    // Notify server
+    // Notify server with EXACT furniture dimensions AND center (for accurate collision)
+    // Reuse bbox calculated earlier
     this.networkManager.socket.emit("playerSit", {
       playerId: this.networkManager.playerId,
       furnitureId: furniture.userData.id,
       seatIndex: seatIndex,
       position: { x: sitPosition.x, y: sitPosition.y, z: sitPosition.z },
       rotation: furniture.rotation.y,
+      furnitureDimensions: {
+        width: furniture.userData.width,
+        height: furniture.userData.height,
+        depth: furniture.userData.depth,
+        centerX: bbox.center.x,
+        centerY: bbox.center.y,
+        centerZ: bbox.center.z,
+      },
     });
 
     // Update prompt
@@ -282,8 +291,13 @@ export class InteractionManager {
   calculateSittingPosition(furniture, seatIndex = null) {
     const sitPosition = furniture.position.clone();
 
-    // Get the actual bounding box of the furniture
+    // Get the actual bounding box of the furniture (EXACT collision box)
     const bbox = this.sceneManager.calculateBoundingBox(furniture);
+
+    // Ensure userData is synced with live bbox (for server accuracy)
+    furniture.userData.width = bbox.width;
+    furniture.userData.height = bbox.height;
+    furniture.userData.depth = bbox.depth;
 
     // Get furniture name to determine type-specific positioning
     const furnitureName = this.getFurnitureName(furniture).toLowerCase();
@@ -548,6 +562,11 @@ export class InteractionManager {
       const furnitureBBox = this.sceneManager.calculateBoundingBox(furniture);
       const furnitureCenter = furnitureBBox.center;
 
+      // Sync userData with live bbox
+      furniture.userData.width = furnitureBBox.width;
+      furniture.userData.height = furnitureBBox.height;
+      furniture.userData.depth = furnitureBBox.depth;
+
       // Calculate direction away from furniture center
       const awayDirection = new THREE.Vector3(
         standPosition.x - furnitureCenter.x,
@@ -565,7 +584,8 @@ export class InteractionManager {
 
       // Move at least 2.5 units away from furniture (beyond collision range)
       const furnitureSize = Math.max(furnitureBBox.width, furnitureBBox.depth);
-      const safeDistance = furnitureSize / 2 + 1.5; // Half furniture size + 1.5 units buffer
+      const playerCollisionSize = 0.6; // Player collision box size
+      const safeDistance = furnitureSize / 2 + playerCollisionSize + 0.5; // Furniture radius + player size + buffer
 
       standPosition.x = furnitureCenter.x + awayDirection.x * safeDistance;
       standPosition.z = furnitureCenter.z + awayDirection.z * safeDistance;
@@ -622,9 +642,14 @@ export class InteractionManager {
     player.isLying = true;
     player.lyingOn = furniture.userData.id;
 
-    // Calculate lying position (center of bed)
+    // Calculate lying position (center of bed) using EXACT collision box
     const bbox = this.sceneManager.calculateBoundingBox(furniture);
     const lyingPosition = bbox.center.clone();
+
+    // Sync userData with live bbox
+    furniture.userData.width = bbox.width;
+    furniture.userData.height = bbox.height;
+    furniture.userData.depth = bbox.depth;
 
     // Adjust height - lie on top of bed surface
     lyingPosition.y = furniture.position.y + bbox.height * 0.5;
@@ -654,7 +679,10 @@ export class InteractionManager {
       console.log("🛏️ Using procedural lying animation");
     }
 
-    // Notify server
+    // Get bbox for accurate collision center
+    const bboxForSync = this.sceneManager.calculateBoundingBox(furniture);
+
+    // Notify server with EXACT furniture dimensions AND center (for accurate collision)
     this.networkManager.socket.emit("playerLie", {
       playerId: this.networkManager.playerId,
       furnitureId: furniture.userData.id,
@@ -664,6 +692,14 @@ export class InteractionManager {
         z: lyingPosition.z,
       },
       rotation: furniture.rotation.y,
+      furnitureDimensions: {
+        width: furniture.userData.width,
+        height: furniture.userData.height,
+        depth: furniture.userData.depth,
+        centerX: bboxForSync.center.x,
+        centerY: bboxForSync.center.y,
+        centerZ: bboxForSync.center.z,
+      },
     });
 
     // Update prompt
@@ -695,6 +731,11 @@ export class InteractionManager {
       const furnitureBBox = this.sceneManager.calculateBoundingBox(furniture);
       const furnitureCenter = furnitureBBox.center;
 
+      // Sync userData with live bbox
+      furniture.userData.width = furnitureBBox.width;
+      furniture.userData.height = furnitureBBox.height;
+      furniture.userData.depth = furnitureBBox.depth;
+
       const awayDirection = new THREE.Vector3(
         standPosition.x - furnitureCenter.x,
         0,
@@ -709,7 +750,8 @@ export class InteractionManager {
       }
 
       const furnitureSize = Math.max(furnitureBBox.width, furnitureBBox.depth);
-      const safeDistance = furnitureSize / 2 + 1.5;
+      const playerCollisionSize = 0.6; // Player collision box size
+      const safeDistance = furnitureSize / 2 + playerCollisionSize + 0.5; // Furniture radius + player size + buffer
 
       standPosition.x = furnitureCenter.x + awayDirection.x * safeDistance;
       standPosition.z = furnitureCenter.z + awayDirection.z * safeDistance;
@@ -755,6 +797,15 @@ export class InteractionManager {
     );
     console.log(
       `   State cleared: isLying=${player.isLying}, isSitting=${player.isSitting}`
+    );
+    console.log(
+      `   Position: mesh=(${player.mesh.position.x.toFixed(
+        2
+      )}, ${player.mesh.position.z.toFixed(
+        2
+      )}), target=(${player.targetPosition.x.toFixed(
+        2
+      )}, ${player.targetPosition.z.toFixed(2)})`
     );
 
     this.hidePrompt();
