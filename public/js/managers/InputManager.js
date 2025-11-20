@@ -732,6 +732,10 @@ export class InputManager {
     // Show wheel when T is pressed
     window.addEventListener("keydown", (e) => {
       if ((e.key === "t" || e.key === "T") && !this.emoteWheelActive) {
+        // Don't activate if any menu is open
+        if (this.isAnyMenuOpen()) {
+          return;
+        }
         e.preventDefault();
         this.emoteWheelActive = true;
         container.classList.add("active");
@@ -789,6 +793,10 @@ export class InputManager {
     // Show wheel when C is pressed
     window.addEventListener("keydown", (e) => {
       if ((e.key === "c" || e.key === "C") && !this.actionWheelActive) {
+        // Don't activate if any menu is open
+        if (this.isAnyMenuOpen()) {
+          return;
+        }
         e.preventDefault();
         this.actionWheelActive = true;
         container.classList.add("active");
