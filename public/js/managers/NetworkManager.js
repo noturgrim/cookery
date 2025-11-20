@@ -267,12 +267,7 @@ export class NetworkManager {
         // Execute the action animation
         this.executePlayerAction(playerId, otherPlayer, action);
 
-        // Show action indicator
-        this.uiManager.showActionIndicator(
-          otherPlayer.mesh,
-          action,
-          this.sceneManager.camera
-        );
+        // Action indicator removed - animations are self-explanatory
       }
     });
   }
@@ -446,12 +441,12 @@ export class NetworkManager {
       });
     }
 
-    // Show action indicator
-    this.uiManager.showActionIndicator(
-      player.mesh,
-      action,
-      this.sceneManager.camera
-    );
+    // Action indicator removed - animations are self-explanatory
+    // this.uiManager.showActionIndicator(
+    //   player.mesh,
+    //   action,
+    //   this.sceneManager.camera
+    // );
   }
 
   /**
