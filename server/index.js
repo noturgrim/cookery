@@ -19,10 +19,56 @@ const __dirname = dirname(__filename);
 
 const app = express();
 const httpServer = createServer(app);
+
+// CORS Configuration - Secure setup
+const getAllowedOrigins = () => {
+  const origins = process.env.ALLOWED_ORIGINS
+    ? process.env.ALLOWED_ORIGINS.split(",").map((origin) => origin.trim())
+    : [];
+
+  // In development, allow localhost
+  if (process.env.NODE_ENV !== "production") {
+    origins.push("http://localhost:3000", "http://127.0.0.1:3000");
+  }
+
+  return origins.length > 0 ? origins : false;
+};
+
+const allowedOrigins = getAllowedOrigins();
+
 const io = new Server(httpServer, {
   cors: {
-    origin: "*",
+    origin: (origin, callback) => {
+      // Allow requests with no origin (like mobile apps, Postman, or same-origin)
+      if (!origin) {
+        return callback(null, true);
+      }
+
+      // If no origins configured, block all cross-origin requests in production
+      if (allowedOrigins === false) {
+        console.warn(
+          `⚠️ CORS: No allowed origins configured. Blocking: ${origin}`
+        );
+        return callback(
+          new Error("CORS policy: No allowed origins configured"),
+          false
+        );
+      }
+
+      // Check if origin is allowed
+      if (allowedOrigins.includes(origin)) {
+        callback(null, true);
+      } else {
+        console.warn(`⚠️ CORS: Origin not allowed: ${origin}`);
+        callback(
+          new Error(`CORS policy: Origin ${origin} is not allowed`),
+          false
+        );
+      }
+    },
     methods: ["GET", "POST"],
+    credentials: true, // Allow cookies for future authentication
+    allowedHeaders: ["Content-Type", "Authorization"],
   },
 });
 
@@ -1720,6 +1766,13 @@ async function startServer() {
       console.log(`🎮 Game server running on http://localhost:${PORT}`);
       console.log(`📡 WebSocket server ready for connections`);
       console.log(`💾 Database persistence enabled`);
+      console.log(`🔒 CORS Configuration:`);
+      console.log(`   Environment: ${process.env.NODE_ENV || "development"}`);
+      if (allowedOrigins === false) {
+        console.log(`   ⚠️  WARNING: No allowed origins configured!`);
+      } else {
+        console.log(`   Allowed origins: ${allowedOrigins.join(", ")}`);
+      }
     });
   } catch (error) {
     console.error("❌ Failed to start server:", error);
