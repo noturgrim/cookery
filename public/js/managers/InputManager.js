@@ -1091,11 +1091,12 @@ export class InputManager {
     if (this.sceneManager) {
       this.sceneManager.toggleCollisionBoxes(playerManager);
 
-      // Show notification
+      // Show notification in console
       const isOn = this.sceneManager.showCollisionBoxes;
-      this.uiManager?.showNotification(
-        isOn ? "Collision Boxes: ON (V to toggle)" : "Collision Boxes: OFF",
-        isOn ? "success" : "info"
+      console.log(
+        `${isOn ? "✅" : "❌"} Collision Boxes: ${
+          isOn ? "ON" : "OFF"
+        } (Press V to toggle)`
       );
     }
   }

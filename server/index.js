@@ -5,7 +5,7 @@ import { Server } from "socket.io";
 import { fileURLToPath } from "url";
 import { dirname, join } from "path";
 import { randomUUID } from "crypto";
-import {
+import pool, {
   initializeDatabase,
   loadObstacles,
   saveObstacle,
@@ -1381,6 +1381,81 @@ io.on("connection", (socket) => {
       callback(...args);
     };
   };
+
+  // Handle player customization updates (name/skin)
+  socket.on(
+    "playerCustomization",
+    requireAuth(async (data) => {
+      const player = gameState.players.get(socket.id);
+      if (!player) return;
+
+      let updated = false;
+      const updates = {};
+
+      // Validate and update name
+      if (data.name && typeof data.name === "string") {
+        const sanitizedName = data.name.trim().substring(0, 20);
+        if (sanitizedName.length > 0) {
+          player.name = sanitizedName;
+          updates.displayName = sanitizedName;
+          updated = true;
+          console.log(
+            `✏️ ${player.username} (@${player.username}) changed name to: ${sanitizedName}`
+          );
+        }
+      }
+
+      // Validate and update skin
+      if (typeof data.skinIndex === "number") {
+        if (data.skinIndex >= 0 && data.skinIndex <= 17) {
+          player.skinIndex = data.skinIndex;
+          updates.skinIndex = data.skinIndex;
+          updated = true;
+          console.log(
+            `👤 ${player.name} (@${player.username}) changed skin to: ${data.skinIndex}`
+          );
+        }
+      }
+
+      // Update database if changes were made
+      if (updated && userId) {
+        try {
+          const updateFields = [];
+          const values = [];
+          let paramCount = 1;
+
+          if (updates.displayName) {
+            updateFields.push(`display_name = $${paramCount++}`);
+            values.push(updates.displayName);
+          }
+          if (updates.skinIndex !== undefined) {
+            updateFields.push(`skin_index = $${paramCount++}`);
+            values.push(updates.skinIndex);
+          }
+
+          values.push(userId); // Last parameter for WHERE clause
+
+          const query = `
+            UPDATE users 
+            SET ${updateFields.join(", ")}
+            WHERE id = $${paramCount}
+          `;
+
+          await pool.query(query, values);
+          console.log(`💾 Updated user ${player.username} in database`);
+        } catch (error) {
+          console.error(`❌ Failed to update user in database:`, error);
+        }
+      }
+
+      // Broadcast update to all players
+      io.emit("playerCustomizationUpdated", {
+        playerId: socket.id,
+        name: player.name,
+        skinIndex: player.skinIndex,
+      });
+    })
+  );
 
   // Handle player dimensions update from client
   socket.on(

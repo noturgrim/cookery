@@ -229,6 +229,32 @@ export class NetworkManager {
       }
     });
 
+    // Handle player customization updates
+    this.socket.on("playerCustomizationUpdated", (data) => {
+      console.log(`🎨 Player ${data.playerId} updated customization:`, data);
+      const player = this.playerManager.getAllPlayers().get(data.playerId);
+      if (player) {
+        // Update name tag
+        if (data.name && player.nameTag) {
+          player.nameTag.visible = false;
+          player.group.remove(player.nameTag);
+          this.playerManager.uiManager.createNameTag(
+            player.group,
+            data.name,
+            player.color
+          );
+        }
+        // Update skin (reload character model)
+        if (
+          typeof data.skinIndex === "number" &&
+          data.skinIndex !== player.skinIndex
+        ) {
+          player.skinIndex = data.skinIndex;
+          this.playerManager.updatePlayerModel(data.playerId, data.skinIndex);
+        }
+      }
+    });
+
     // Handle player leaving
     this.socket.on("playerLeft", (playerId) => {
       console.log("👋 Player left:", playerId);

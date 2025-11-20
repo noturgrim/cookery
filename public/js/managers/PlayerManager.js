@@ -389,4 +389,71 @@ export class PlayerManager {
   getAllPlayers() {
     return this.players;
   }
+
+  /**
+   * Update player model (skin change)
+   */
+  updatePlayerModel(playerId, newSkinIndex) {
+    const player = this.players.get(playerId);
+    if (!player) {
+      console.log(`⚠️ Player ${playerId} not found in players map`);
+      return;
+    }
+
+    // Don't update local player's model (they see first-person view)
+    if (playerId === this.playerId) {
+      console.log(
+        `ℹ️ Skipping model update for local player (first-person view)`
+      );
+      player.skinIndex = newSkinIndex; // Just update the skinIndex
+      return;
+    }
+
+    // Check if player has required properties
+    if (!player.group) {
+      console.error(`❌ Player ${playerId} missing group property`);
+      return;
+    }
+
+    try {
+      // Validate skin index
+      if (
+        newSkinIndex < 0 ||
+        newSkinIndex >= this.characterManager.characterModels.length
+      ) {
+        console.error(`❌ Invalid skin index: ${newSkinIndex}`);
+        return;
+      }
+
+      // Remove old character model
+      if (player.character) {
+        player.group.remove(player.character);
+      }
+
+      // Get new character model from loaded models
+      const modelData = this.characterManager.characterModels[newSkinIndex];
+      if (!modelData) {
+        console.error(`❌ Character model ${newSkinIndex} not found`);
+        return;
+      }
+
+      // Clone the character model
+      const characterModel = modelData.scene.clone();
+
+      player.character = characterModel;
+      player.skinIndex = newSkinIndex;
+      player.group.add(characterModel);
+
+      // Re-register animations
+      this.animationController.registerPlayer(
+        playerId,
+        characterModel,
+        newSkinIndex
+      );
+
+      console.log(`✅ Updated player ${playerId} to skin ${newSkinIndex}`);
+    } catch (error) {
+      console.error(`❌ Failed to update player model:`, error);
+    }
+  }
 }

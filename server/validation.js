@@ -21,14 +21,14 @@ export const VALIDATION_RULES = {
   // Object constraints
   OBSTACLE_NAME_MAX_LENGTH: 50,
   OBSTACLE_MIN_DIMENSION: 0.1,
-  OBSTACLE_MAX_DIMENSION: 20.0,
+  OBSTACLE_MAX_DIMENSION: 50.0, // Increased for large furniture models
   OBSTACLE_MIN_SCALE: 0.1,
   OBSTACLE_MAX_SCALE: 10.0,
   MAX_OBSTACLES: parseInt(process.env.MAX_OBSTACLES) || 2000, // Increased for detailed restaurants
 
   FOOD_NAME_MAX_LENGTH: 50,
   FOOD_MIN_DIMENSION: 0.1,
-  FOOD_MAX_DIMENSION: 10.0,
+  FOOD_MAX_DIMENSION: 20.0, // Increased for large food models
   FOOD_MIN_SCALE: 0.1,
   FOOD_MAX_SCALE: 5.0,
   MAX_FOOD_ITEMS: parseInt(process.env.MAX_FOOD_ITEMS) || 3000, // Increased for active kitchens
