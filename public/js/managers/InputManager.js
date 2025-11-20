@@ -259,6 +259,13 @@ export class InputManager {
       Math.min(10, this.selectedObstacle.position.y)
     );
 
+    // Update lamp light position if this is a lamp
+    if (this.sceneManager.lightingManager) {
+      this.sceneManager.lightingManager.updateLightPosition(
+        this.selectedObstacle
+      );
+    }
+
     // Send update to server
     if (this.selectedObstacle.userData.type === "food") {
       this.networkManager.updateFood(
@@ -485,6 +492,13 @@ export class InputManager {
       if (intersection) {
         this.selectedObstacle.position.x = intersection.x - this.dragOffset.x;
         this.selectedObstacle.position.z = intersection.z - this.dragOffset.z;
+
+        // Update lamp light position if this is a lamp
+        if (this.sceneManager.lightingManager) {
+          this.sceneManager.lightingManager.updateLightPosition(
+            this.selectedObstacle
+          );
+        }
       }
     }
   }
@@ -1168,6 +1182,11 @@ export class InputManager {
 
     const objectId = object.userData.id;
     const objectType = object.userData.type;
+
+    // Remove light if this is a lamp
+    if (this.sceneManager.lightingManager) {
+      this.sceneManager.lightingManager.removeLight(objectId);
+    }
 
     // Remove from scene
     this.sceneManager.scene.remove(object);

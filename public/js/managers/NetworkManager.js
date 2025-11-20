@@ -212,6 +212,11 @@ export class NetworkManager {
         }
       });
 
+      // After all obstacles are loaded, detect and add lights to lamps
+      setTimeout(() => {
+        this.sceneManager.detectLampsAndAddLights();
+      }, 1000);
+
       // Create all food items
       if (data.foodItems && data.foodItems.length > 0) {
         data.foodItems.forEach(async (foodItem) => {
@@ -369,8 +374,24 @@ export class NetworkManager {
           (obj) => obj.userData && obj.userData.id === data.clientId
         );
         if (obstacle) {
+          // Remove light with old ID if it's a lamp
+          if (this.sceneManager.lightingManager) {
+            this.sceneManager.lightingManager.removeLight(data.clientId);
+          }
+
+          // Update ID
           obstacle.userData.id = data.serverId;
           obstacle.userData.isPending = false;
+
+          // Re-add light with new ID if it's a lamp
+          if (
+            this.sceneManager.lightingManager &&
+            this.sceneManager.lightingManager.isLampObject(obstacle)
+          ) {
+            this.sceneManager.lightingManager.addLightToObject(obstacle);
+            console.log(`🔦 Re-added lamp light with new ID: ${data.serverId}`);
+          }
+
           console.log(
             `🔄 Updated obstacle ID: ${data.clientId} → ${data.serverId}`
           );

@@ -1,6 +1,7 @@
 import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js";
 import { GLTFLoader } from "https://unpkg.com/three@0.160.0/examples/jsm/loaders/GLTFLoader.js";
 import { DayNightCycle } from "./DayNightCycle.js";
+import { LightingManager } from "./LightingManager.js";
 
 /**
  * Scene Manager
@@ -41,6 +42,9 @@ export class SceneManager {
 
     // Day-Night Cycle
     this.dayNightCycle = null;
+
+    // Lighting manager (will be initialized after day-night cycle)
+    this.lightingManager = null;
   }
 
   /**
@@ -157,6 +161,9 @@ export class SceneManager {
       this.directionalLight,
       null // NetworkManager will be set later in game.js
     );
+
+    // Initialize lighting manager for lamps and dynamic lights
+    this.lightingManager = new LightingManager(this.scene, this.dayNightCycle);
   }
 
   /**
@@ -223,6 +230,15 @@ export class SceneManager {
   }
 
   /**
+   * Detect and add lights to all lamp objects
+   */
+  detectLampsAndAddLights() {
+    if (this.lightingManager) {
+      this.lightingManager.detectAndAddLampsLights(this.obstacles);
+    }
+  }
+
+  /**
    * Create an obstacle/counter with 3D model
    */
   async createObstacle(obstacleData) {
@@ -284,6 +300,14 @@ export class SceneManager {
 
     this.scene.add(obstacle);
     this.obstacles.push(obstacle);
+
+    // Check if this is a lamp and add light to it
+    if (this.lightingManager) {
+      if (this.lightingManager.isLampObject(obstacle)) {
+        console.log(`🔦 Detected lamp on spawn: ${obstacle.userData.id}`);
+        this.lightingManager.addLightToObject(obstacle);
+      }
+    }
 
     return obstacle;
   }
@@ -458,6 +482,11 @@ export class SceneManager {
       if (this.dayNightCycle) {
         const delta = this.clock.getDelta();
         this.dayNightCycle.update(delta);
+      }
+
+      // Update lighting based on time of day
+      if (this.lightingManager) {
+        this.lightingManager.updateLightsForTimeOfDay();
       }
 
       this.renderer.render(this.scene, this.camera);
