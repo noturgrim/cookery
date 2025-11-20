@@ -80,6 +80,11 @@ export class InputManager {
       this.toggleSpawnMenu();
     }
 
+    // Toggle collision boxes with C key (when not in action wheel)
+    if (e.code === "KeyV" && !this.actionWheelActive) {
+      this.toggleCollisionBoxes();
+    }
+
     if (
       (e.code === "Delete" || e.code === "Backspace") &&
       this.editMode &&
@@ -222,8 +227,11 @@ export class InputManager {
     // If in edit mode, don't move player
     if (this.editMode) return;
 
-    // Don't allow movement clicks if player is sitting
-    if (this.networkManager.interactionManager?.isPlayerSitting()) {
+    // Don't allow movement clicks if player is sitting or lying
+    if (
+      this.networkManager.interactionManager?.isPlayerSitting() ||
+      this.networkManager.interactionManager?.isPlayerLying()
+    ) {
       return;
     }
 
@@ -981,6 +989,25 @@ export class InputManager {
     if (this.selectedObstacle) {
       this.deleteObject(this.selectedObstacle);
       this.selectedObstacle = null;
+    }
+  }
+
+  /**
+   * Toggle collision box visualization
+   */
+  toggleCollisionBoxes() {
+    // Get player manager from network manager
+    const playerManager = this.networkManager?.playerManager;
+
+    if (this.sceneManager) {
+      this.sceneManager.toggleCollisionBoxes(playerManager);
+
+      // Show notification
+      const isOn = this.sceneManager.showCollisionBoxes;
+      this.uiManager?.showNotification(
+        isOn ? "Collision Boxes: ON (V to toggle)" : "Collision Boxes: OFF",
+        isOn ? "success" : "info"
+      );
     }
   }
 }

@@ -20,6 +20,10 @@ export class InteractionManager {
     this.isSitting = false;
     this.sittingOn = null;
 
+    // Lying state
+    this.isLying = false;
+    this.lyingOn = null;
+
     // Define furniture types that can be sat on
     this.sittableFurniture = [
       "chair",
@@ -30,6 +34,9 @@ export class InteractionManager {
       "armchair",
       "seat",
     ];
+
+    // Define furniture types that can be laid on
+    this.lyingFurniture = ["bed", "bathtub"];
 
     // Setup interaction prompt
     this.setupInteractionPrompt();
@@ -87,12 +94,18 @@ export class InteractionManager {
       return;
     }
 
+    // Show get-up prompt if lying
+    if (this.isLying) {
+      this.updateLyingPrompt();
+      return;
+    }
+
     const player = this.playerManager.players.get(this.networkManager.playerId);
     if (!player || !player.mesh) return;
 
     const playerPos = player.mesh.position;
 
-    // Find nearby furniture
+    // Find nearby furniture (both sittable and lying)
     const nearby = this.findNearbyFurniture(playerPos);
 
     if (nearby) {
@@ -112,14 +125,19 @@ export class InteractionManager {
     let closestDistance = this.interactionRange;
 
     this.sceneManager.obstacles.forEach((furniture) => {
-      // Check if this furniture can be sat on
       const furnitureName =
         furniture.userData.model || furniture.userData.type || "";
+      const furnitureNameLower = furnitureName.toLowerCase();
+
+      // Check if this furniture can be sat on or laid on
       const isSittable = this.sittableFurniture.some((type) =>
-        furnitureName.toLowerCase().includes(type)
+        furnitureNameLower.includes(type)
+      );
+      const isLyingFurniture = this.lyingFurniture.some((type) =>
+        furnitureNameLower.includes(type)
       );
 
-      if (!isSittable) return;
+      if (!isSittable && !isLyingFurniture) return;
 
       // Calculate distance to furniture's bounding box center for more accurate detection
       const bbox = this.sceneManager.calculateBoundingBox(furniture);
@@ -129,6 +147,8 @@ export class InteractionManager {
       if (distance < closestDistance) {
         closest = furniture;
         closestDistance = distance;
+        // Mark furniture type for interaction
+        furniture.userData.interactionType = isLyingFurniture ? "lie" : "sit";
       }
     });
 
@@ -143,7 +163,10 @@ export class InteractionManager {
     if (!prompt) return;
 
     const furnitureName = this.getFurnitureName(furniture);
-    prompt.innerHTML = `Press <strong>F</strong> to sit on ${furnitureName}`;
+    const interactionType = furniture.userData.interactionType || "sit";
+    const action = interactionType === "lie" ? "lie down on" : "sit on";
+
+    prompt.innerHTML = `Press <strong>F</strong> to ${action} ${furnitureName}`;
     prompt.style.display = "block";
     this.showingPrompt = true;
   }
@@ -174,8 +197,16 @@ export class InteractionManager {
   handleInteraction() {
     if (this.isSitting) {
       this.standUp();
+    } else if (this.isLying) {
+      this.getUp();
     } else if (this.nearbyFurniture) {
-      this.sitDown(this.nearbyFurniture);
+      const interactionType =
+        this.nearbyFurniture.userData.interactionType || "sit";
+      if (interactionType === "lie") {
+        this.lieDown(this.nearbyFurniture);
+      } else {
+        this.sitDown(this.nearbyFurniture);
+      }
     }
   }
 
@@ -213,7 +244,7 @@ export class InteractionManager {
     // Stop any movement
     player.isMoving = false;
 
-    // Play sit animation (loop it) - only if animation exists
+    // Try to play sit animation from GLB, fallback to procedural
     const hasAnimation =
       this.playerManager.animationController.playAnimationClip(
         this.networkManager.playerId,
@@ -223,7 +254,11 @@ export class InteractionManager {
       );
 
     if (!hasAnimation) {
-      console.warn("⚠️ No sit animation found in character model");
+      // Use procedural sitting pose
+      this.playerManager.animationController.applySittingPose(
+        this.networkManager.playerId
+      );
+      console.log("🪑 Using procedural sitting animation");
     }
 
     // Notify server
@@ -573,6 +608,159 @@ export class InteractionManager {
   }
 
   /**
+   * Lie down on furniture (beds, bathtubs)
+   */
+  lieDown(furniture) {
+    const player = this.playerManager.players.get(this.networkManager.playerId);
+    if (!player || !player.mesh) return;
+
+    console.log(`🛏️ Lying down on ${this.getFurnitureName(furniture)}`);
+
+    // Get furniture reference
+    this.isLying = true;
+    this.lyingOn = furniture;
+    player.isLying = true;
+    player.lyingOn = furniture.userData.id;
+
+    // Calculate lying position (center of bed)
+    const bbox = this.sceneManager.calculateBoundingBox(furniture);
+    const lyingPosition = bbox.center.clone();
+
+    // Adjust height - lie on top of bed surface
+    lyingPosition.y = furniture.position.y + bbox.height * 0.5;
+
+    player.mesh.position.copy(lyingPosition);
+    player.targetPosition.copy(lyingPosition);
+
+    // Rotate player to align with bed (usually beds are aligned with their rotation)
+    player.mesh.rotation.y = furniture.rotation.y;
+
+    // Stop any movement
+    player.isMoving = false;
+
+    // Try to play lie animation from GLB
+    let hasAnimation = this.playerManager.animationController.playAnimationClip(
+      this.networkManager.playerId,
+      "lie",
+      null,
+      true // Loop
+    );
+
+    if (!hasAnimation) {
+      // Use procedural lying pose
+      this.playerManager.animationController.applyLyingPose(
+        this.networkManager.playerId
+      );
+      console.log("🛏️ Using procedural lying animation");
+    }
+
+    // Notify server
+    this.networkManager.socket.emit("playerLie", {
+      playerId: this.networkManager.playerId,
+      furnitureId: furniture.userData.id,
+      position: {
+        x: lyingPosition.x,
+        y: lyingPosition.y,
+        z: lyingPosition.z,
+      },
+      rotation: furniture.rotation.y,
+    });
+
+    // Update prompt
+    this.updateLyingPrompt();
+  }
+
+  /**
+   * Get up from lying position
+   */
+  getUp() {
+    const player = this.playerManager.players.get(this.networkManager.playerId);
+    if (!player || !player.mesh) return;
+
+    console.log("🚶 Getting up");
+
+    // Get furniture reference before clearing
+    const furniture = this.lyingOn;
+
+    // Clear lying state
+    this.isLying = false;
+    this.lyingOn = null;
+    player.isLying = false;
+    player.lyingOn = null;
+
+    // Calculate a safe standing position (same logic as standUp)
+    let standPosition = player.mesh.position.clone();
+
+    if (furniture) {
+      const furnitureBBox = this.sceneManager.calculateBoundingBox(furniture);
+      const furnitureCenter = furnitureBBox.center;
+
+      const awayDirection = new THREE.Vector3(
+        standPosition.x - furnitureCenter.x,
+        0,
+        standPosition.z - furnitureCenter.z
+      );
+
+      if (awayDirection.length() < 0.1) {
+        awayDirection.set(0, 0, 1);
+        awayDirection.applyQuaternion(player.mesh.quaternion);
+      } else {
+        awayDirection.normalize();
+      }
+
+      const furnitureSize = Math.max(furnitureBBox.width, furnitureBBox.depth);
+      const safeDistance = furnitureSize / 2 + 1.5;
+
+      standPosition.x = furnitureCenter.x + awayDirection.x * safeDistance;
+      standPosition.z = furnitureCenter.z + awayDirection.z * safeDistance;
+    } else {
+      const forwardOffset = new THREE.Vector3(0, 0, 2.5);
+      forwardOffset.applyQuaternion(player.mesh.quaternion);
+      standPosition.add(forwardOffset);
+    }
+
+    standPosition.y = 0;
+
+    // Force update position immediately
+    player.mesh.position.copy(standPosition);
+    player.targetPosition.copy(standPosition);
+
+    // Ensure movement is enabled
+    player.isMoving = false;
+
+    // Double-check lying state is cleared
+    player.isLying = false;
+    player.lyingOn = null;
+    this.isLying = false;
+    this.lyingOn = null;
+
+    // Stop animation and reset to idle
+    this.playerManager.animationController.stopCurrentAnimation(
+      this.networkManager.playerId
+    );
+    this.playerManager.animationController.resetToIdle(
+      this.networkManager.playerId
+    );
+
+    // Notify server
+    this.networkManager.socket.emit("playerGetUp", {
+      playerId: this.networkManager.playerId,
+      position: { x: standPosition.x, y: standPosition.y, z: standPosition.z },
+    });
+
+    console.log(
+      `📍 Getting up at: (${standPosition.x.toFixed(
+        2
+      )}, ${standPosition.z.toFixed(2)}) - moved away from bed`
+    );
+    console.log(
+      `   State cleared: isLying=${player.isLying}, isSitting=${player.isSitting}`
+    );
+
+    this.hidePrompt();
+  }
+
+  /**
    * Update prompt while sitting
    */
   updateSittingPrompt() {
@@ -580,6 +768,17 @@ export class InteractionManager {
     if (!prompt) return;
 
     prompt.innerHTML = `Press <strong>F</strong> to stand up`;
+    prompt.style.display = "block";
+  }
+
+  /**
+   * Update prompt while lying
+   */
+  updateLyingPrompt() {
+    const prompt = document.getElementById("interaction-prompt");
+    if (!prompt) return;
+
+    prompt.innerHTML = `Press <strong>F</strong> to get up`;
     prompt.style.display = "block";
   }
 
@@ -603,13 +802,18 @@ export class InteractionManager {
       player.mesh.rotation.y = rotation;
       player.targetRotation = rotation;
 
-      // Play sit animation for other player (loop it)
-      this.playerManager.animationController.playAnimationClip(
-        playerId,
-        "sit",
-        null,
-        true // Loop the animation
-      );
+      // Try GLB animation, fallback to procedural
+      const hasAnimation =
+        this.playerManager.animationController.playAnimationClip(
+          playerId,
+          "sit",
+          null,
+          true // Loop the animation
+        );
+
+      if (!hasAnimation) {
+        this.playerManager.animationController.applySittingPose(playerId);
+      }
 
       console.log(
         `👀 Player ${playerId} is now sitting on ${furnitureId} (seat ${
@@ -647,9 +851,78 @@ export class InteractionManager {
   }
 
   /**
+   * Handle other player lying down (from network)
+   */
+  handleOtherPlayerLie(data) {
+    const { playerId, furnitureId, position, rotation } = data;
+    const player = this.playerManager.players.get(playerId);
+
+    if (player && player.mesh) {
+      // Mark player as lying
+      player.isLying = true;
+      player.isMoving = false;
+      player.lyingOn = furnitureId;
+
+      // Set position and rotation
+      player.mesh.position.set(position.x, position.y, position.z);
+      player.targetPosition.set(position.x, position.y, position.z);
+      player.mesh.rotation.y = rotation;
+      player.targetRotation = rotation;
+
+      // Try GLB lie animation, fallback to procedural
+      let hasAnimation =
+        this.playerManager.animationController.playAnimationClip(
+          playerId,
+          "lie",
+          null,
+          true
+        );
+
+      if (!hasAnimation) {
+        this.playerManager.animationController.applyLyingPose(playerId);
+      }
+
+      console.log(`👀 Player ${playerId} is now lying on ${furnitureId}`);
+    }
+  }
+
+  /**
+   * Handle other player getting up (from network)
+   */
+  handleOtherPlayerGetUp(data) {
+    const { playerId, position } = data;
+    const player = this.playerManager.players.get(playerId);
+
+    if (player) {
+      // Mark player as no longer lying
+      player.isLying = false;
+      player.lyingOn = null;
+
+      // Update position if provided
+      if (position) {
+        player.mesh.position.set(position.x, position.y, position.z);
+        player.targetPosition.set(position.x, position.y, position.z);
+      }
+
+      // Stop animation and reset to idle
+      this.playerManager.animationController.stopCurrentAnimation(playerId);
+      this.playerManager.animationController.resetToIdle(playerId);
+
+      console.log(`👀 Player ${playerId} got up`);
+    }
+  }
+
+  /**
    * Check if player is sitting
    */
   isPlayerSitting() {
     return this.isSitting;
+  }
+
+  /**
+   * Check if player is lying
+   */
+  isPlayerLying() {
+    return this.isLying;
   }
 }

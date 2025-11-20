@@ -711,8 +711,8 @@ const getObstacleRepulsion = (player) => {
 
 // Process player input and update position
 const processPlayerInput = (player) => {
-  // Skip movement if player is sitting
-  if (player.isSitting) {
+  // Skip movement if player is sitting or lying
+  if (player.isSitting || player.isLying) {
     return;
   }
 
@@ -998,6 +998,7 @@ const gameLoop = () => {
       name: p.name,
       skinIndex: p.skinIndex,
       isSitting: p.isSitting || false, // Include sitting state
+      isLying: p.isLying || false, // Include lying state
     })),
   };
 
@@ -1238,9 +1239,13 @@ io.on("connection", (socket) => {
   socket.on("moveTo", (target) => {
     const player = gameState.players.get(socket.id);
     if (player && target.x !== undefined && target.z !== undefined) {
-      // Don't allow movement if player is sitting
-      if (player.isSitting) {
-        console.log(`⚠️ Player ${socket.id} is sitting, ignoring move command`);
+      // Don't allow movement if player is sitting or lying
+      if (player.isSitting || player.isLying) {
+        console.log(
+          `⚠️ Player ${socket.id} is ${
+            player.isSitting ? "sitting" : "lying"
+          }, ignoring move command`
+        );
         return;
       }
 
@@ -1361,6 +1366,49 @@ io.on("connection", (socket) => {
     // Broadcast to all players
     io.emit("playerStandUp", data);
     console.log(`🚶 Player ${data.playerId} stood up`);
+  });
+
+  // Handle player lying down on bed
+  socket.on("playerLie", (data) => {
+    const player = gameState.players.get(data.playerId);
+    if (player) {
+      // Mark player as lying
+      player.isLying = true;
+      player.lyingOn = data.furnitureId;
+      player.moveTarget = null;
+      player.path = null;
+
+      // Update position to lying position
+      player.x = data.position.x;
+      player.y = data.position.y;
+      player.z = data.position.z;
+      player.rotation = data.rotation;
+    }
+
+    // Broadcast to all players
+    io.emit("playerLie", data);
+    console.log(
+      `🛏️ Player ${data.playerId} lying on furniture ${data.furnitureId}`
+    );
+  });
+
+  // Handle player getting up from lying
+  socket.on("playerGetUp", (data) => {
+    const player = gameState.players.get(data.playerId);
+    if (player) {
+      // Mark player as no longer lying
+      player.isLying = false;
+      player.lyingOn = null;
+
+      // Update position to standing position
+      player.x = data.position.x;
+      player.y = data.position.y;
+      player.z = data.position.z;
+    }
+
+    // Broadcast to all players
+    io.emit("playerGetUp", data);
+    console.log(`🚶 Player ${data.playerId} got up`);
   });
 
   // Handle disconnection

@@ -457,6 +457,100 @@ export class AnimationController {
   }
 
   /**
+   * Apply procedural lying down pose
+   * @param {string} playerId - Player identifier
+   */
+  applyLyingPose(playerId) {
+    const animData = this.mixers.get(playerId);
+    if (!animData) return false;
+
+    const { limbs, originalTransforms } = animData;
+
+    // Rotate limbs to create lying down pose
+    // Legs: straighten them completely (set to original or slightly less bent)
+    if (limbs.leftLeg && originalTransforms.leftLeg) {
+      limbs.leftLeg.rotation.x = originalTransforms.leftLeg.rotation.x - 0.2; // Negative to straighten
+      limbs.leftLeg.position.copy(originalTransforms.leftLeg.position);
+    }
+    if (limbs.rightLeg && originalTransforms.rightLeg) {
+      limbs.rightLeg.rotation.x = originalTransforms.rightLeg.rotation.x - 0.2; // Negative to straighten
+      limbs.rightLeg.position.copy(originalTransforms.rightLeg.position);
+    }
+
+    // Arms: position along sides or above head
+    if (limbs.leftArm && originalTransforms.leftArm) {
+      limbs.leftArm.rotation.x = originalTransforms.leftArm.rotation.x - 0.3;
+      limbs.leftArm.rotation.z = originalTransforms.leftArm.rotation.z - 0.3;
+      limbs.leftArm.position.copy(originalTransforms.leftArm.position);
+    }
+    if (limbs.rightArm && originalTransforms.rightArm) {
+      limbs.rightArm.rotation.x = originalTransforms.rightArm.rotation.x - 0.3;
+      limbs.rightArm.rotation.z = originalTransforms.rightArm.rotation.z + 0.3;
+      limbs.rightArm.position.copy(originalTransforms.rightArm.position);
+    }
+
+    // Torso: tilt back to lying position
+    if (limbs.torso && originalTransforms.torso) {
+      limbs.torso.rotation.x = originalTransforms.torso.rotation.x - 1.5; // Lean way back (lying)
+      limbs.torso.position.copy(originalTransforms.torso.position);
+    }
+
+    // Head: keep relatively straight
+    if (limbs.head && originalTransforms.head) {
+      limbs.head.position.copy(originalTransforms.head.position);
+      limbs.head.rotation.copy(originalTransforms.head.rotation);
+    }
+
+    console.log(`🛏️ Applied lying pose for player ${playerId}`);
+    return true;
+  }
+
+  /**
+   * Apply procedural sitting pose (enhanced)
+   * @param {string} playerId - Player identifier
+   */
+  applySittingPose(playerId) {
+    const animData = this.mixers.get(playerId);
+    if (!animData) return false;
+
+    const { limbs, originalTransforms } = animData;
+
+    // Legs: bend at knees (sitting position)
+    if (limbs.leftLeg && originalTransforms.leftLeg) {
+      limbs.leftLeg.rotation.x = originalTransforms.leftLeg.rotation.x + 1.2;
+      limbs.leftLeg.position.copy(originalTransforms.leftLeg.position);
+    }
+    if (limbs.rightLeg && originalTransforms.rightLeg) {
+      limbs.rightLeg.rotation.x = originalTransforms.rightLeg.rotation.x + 1.2;
+      limbs.rightLeg.position.copy(originalTransforms.rightLeg.position);
+    }
+
+    // Arms: rest position
+    if (limbs.leftArm && originalTransforms.leftArm) {
+      limbs.leftArm.rotation.x = originalTransforms.leftArm.rotation.x + 0.3;
+      limbs.leftArm.position.copy(originalTransforms.leftArm.position);
+    }
+    if (limbs.rightArm && originalTransforms.rightArm) {
+      limbs.rightArm.rotation.x = originalTransforms.rightArm.rotation.x + 0.3;
+      limbs.rightArm.position.copy(originalTransforms.rightArm.position);
+    }
+
+    // Torso: upright sitting
+    if (limbs.torso && originalTransforms.torso) {
+      limbs.torso.rotation.x = originalTransforms.torso.rotation.x - 0.1;
+      limbs.torso.position.copy(originalTransforms.torso.position);
+    }
+
+    // Head: normal position
+    if (limbs.head && originalTransforms.head) {
+      limbs.head.position.copy(originalTransforms.head.position);
+      limbs.head.rotation.copy(originalTransforms.head.rotation);
+    }
+
+    return true;
+  }
+
+  /**
    * Get all mixer data (for debugging)
    * @returns {Map} All mixer data
    */

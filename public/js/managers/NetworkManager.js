@@ -173,9 +173,9 @@ export class NetworkManager {
       state.players.forEach((serverPlayer) => {
         const player = this.playerManager.players.get(serverPlayer.id);
 
-        // Don't update position if player is sitting (to prevent jitter)
-        if (player && player.isSitting) {
-          // Keep the sitting player locked in position
+        // Don't update position if player is sitting or lying (to prevent jitter)
+        if (player && (player.isSitting || player.isLying)) {
+          // Keep the sitting/lying player locked in position
           return;
         }
 
@@ -187,9 +187,14 @@ export class NetworkManager {
           serverPlayer.rotation
         );
 
-        // Update sitting state if it changed on server
-        if (player && serverPlayer.isSitting !== player.isSitting) {
-          player.isSitting = serverPlayer.isSitting;
+        // Update sitting/lying state if it changed on server
+        if (player) {
+          if (serverPlayer.isSitting !== player.isSitting) {
+            player.isSitting = serverPlayer.isSitting;
+          }
+          if (serverPlayer.isLying !== player.isLying) {
+            player.isLying = serverPlayer.isLying;
+          }
         }
       });
     });
@@ -337,6 +342,20 @@ export class NetworkManager {
     this.socket.on("playerStandUp", (data) => {
       if (this.interactionManager) {
         this.interactionManager.handleOtherPlayerStandUp(data);
+      }
+    });
+
+    // Handle player lying down
+    this.socket.on("playerLie", (data) => {
+      if (this.interactionManager) {
+        this.interactionManager.handleOtherPlayerLie(data);
+      }
+    });
+
+    // Handle player getting up
+    this.socket.on("playerGetUp", (data) => {
+      if (this.interactionManager) {
+        this.interactionManager.handleOtherPlayerGetUp(data);
       }
     });
   }

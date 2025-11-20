@@ -285,8 +285,8 @@ export class PlayerManager {
         return; // Skip other updates during spawn
       }
 
-      // Skip position updates if player is sitting
-      if (!player.isSitting) {
+      // Skip position updates if player is sitting or lying
+      if (!player.isSitting && !player.isLying) {
         // Smooth position interpolation
         player.mesh.position.lerp(player.targetPosition, lerpFactor);
 
