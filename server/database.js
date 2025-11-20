@@ -149,6 +149,38 @@ pool.on("error", (err) => {
  */
 export async function initializeDatabase() {
   try {
+    // Create users table
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS users (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        username VARCHAR(50) UNIQUE NOT NULL,
+        password_hash TEXT NOT NULL,
+        display_name VARCHAR(50) NOT NULL,
+        skin_index INTEGER DEFAULT 0,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        last_login TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    // Create sessions table
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS sessions (
+        token VARCHAR(128) PRIMARY KEY,
+        user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        expires_at TIMESTAMP NOT NULL,
+        last_active TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    // Create index on sessions for faster lookups
+    await pool.query(`
+      CREATE INDEX IF NOT EXISTS idx_sessions_user_id ON sessions(user_id)
+    `);
+    await pool.query(`
+      CREATE INDEX IF NOT EXISTS idx_sessions_expires ON sessions(expires_at)
+    `);
+
     // Create obstacles table (furniture/tables)
     await pool.query(`
       CREATE TABLE IF NOT EXISTS obstacles (
@@ -202,6 +234,10 @@ export async function initializeDatabase() {
     `);
 
     console.log("✅ Database tables initialized");
+    console.log("   - users table ready");
+    console.log("   - sessions table ready");
+    console.log("   - obstacles table ready");
+    console.log("   - food_items table ready");
   } catch (error) {
     console.error("❌ Error initializing database:", error);
   }
@@ -424,6 +460,214 @@ export async function clearAllObjects() {
   } catch (error) {
     console.error("❌ Error clearing database:", error);
     return false;
+  }
+}
+
+/**
+ * Create a new user
+ */
+export async function createUser(
+  username,
+  passwordHash,
+  displayName,
+  skinIndex = 0
+) {
+  try {
+    // Validate inputs
+    if (
+      typeof username !== "string" ||
+      username.length < 3 ||
+      username.length > 50
+    ) {
+      throw new Error("Username must be 3-50 characters");
+    }
+    if (typeof passwordHash !== "string" || passwordHash.length === 0) {
+      throw new Error("Password hash is required");
+    }
+    if (typeof displayName !== "string" || displayName.length === 0) {
+      throw new Error("Display name is required");
+    }
+
+    const result = await pool.query(
+      `INSERT INTO users (username, password_hash, display_name, skin_index)
+       VALUES ($1, $2, $3, $4)
+       RETURNING id, username, display_name, skin_index, created_at`,
+      [
+        username.toLowerCase().trim(),
+        passwordHash,
+        displayName.trim(),
+        skinIndex,
+      ]
+    );
+
+    if (result.rows.length > 0) {
+      console.log(`👤 Created user: ${username}`);
+      return result.rows[0];
+    }
+    return null;
+  } catch (error) {
+    if (error.code === "23505") {
+      // Unique constraint violation
+      throw new Error("Username already exists");
+    }
+    console.error("❌ Error creating user:", error);
+    throw error;
+  }
+}
+
+/**
+ * Find user by username
+ */
+export async function findUserByUsername(username) {
+  try {
+    if (typeof username !== "string" || username.length === 0) {
+      return null;
+    }
+
+    const result = await pool.query(
+      `SELECT id, username, password_hash, display_name, skin_index, created_at, last_login
+       FROM users
+       WHERE username = $1`,
+      [username.toLowerCase().trim()]
+    );
+
+    return result.rows.length > 0 ? result.rows[0] : null;
+  } catch (error) {
+    console.error("❌ Error finding user:", error);
+    return null;
+  }
+}
+
+/**
+ * Update user's last login time
+ */
+export async function updateLastLogin(userId) {
+  try {
+    await pool.query(
+      `UPDATE users SET last_login = CURRENT_TIMESTAMP WHERE id = $1`,
+      [userId]
+    );
+    return true;
+  } catch (error) {
+    console.error("❌ Error updating last login:", error);
+    return false;
+  }
+}
+
+/**
+ * Create a new session
+ */
+export async function createSession(token, userId, expiresInHours = 168) {
+  try {
+    // Validate inputs
+    if (typeof token !== "string" || token.length === 0) {
+      throw new Error("Session token is required");
+    }
+    if (typeof userId !== "string" || userId.length === 0) {
+      throw new Error("User ID is required");
+    }
+
+    const expiresAt = new Date();
+    expiresAt.setHours(expiresAt.getHours() + expiresInHours);
+
+    const result = await pool.query(
+      `INSERT INTO sessions (token, user_id, expires_at)
+       VALUES ($1, $2, $3)
+       RETURNING token, user_id, created_at, expires_at`,
+      [token, userId, expiresAt]
+    );
+
+    if (result.rows.length > 0) {
+      console.log(`🎫 Created session for user: ${userId}`);
+      return result.rows[0];
+    }
+    return null;
+  } catch (error) {
+    console.error("❌ Error creating session:", error);
+    throw error;
+  }
+}
+
+/**
+ * Find session by token and validate expiration
+ */
+export async function findSession(token) {
+  try {
+    if (typeof token !== "string" || token.length === 0) {
+      return null;
+    }
+
+    const result = await pool.query(
+      `SELECT s.token, s.user_id, s.expires_at, u.username, u.display_name, u.skin_index
+       FROM sessions s
+       JOIN users u ON s.user_id = u.id
+       WHERE s.token = $1 AND s.expires_at > CURRENT_TIMESTAMP`,
+      [token]
+    );
+
+    if (result.rows.length > 0) {
+      // Update last active time
+      await pool.query(
+        `UPDATE sessions SET last_active = CURRENT_TIMESTAMP WHERE token = $1`,
+        [token]
+      );
+      return result.rows[0];
+    }
+    return null;
+  } catch (error) {
+    console.error("❌ Error finding session:", error);
+    return null;
+  }
+}
+
+/**
+ * Delete a session (logout)
+ */
+export async function deleteSession(token) {
+  try {
+    if (typeof token !== "string" || token.length === 0) {
+      return false;
+    }
+
+    await pool.query(`DELETE FROM sessions WHERE token = $1`, [token]);
+    console.log(`🚪 Deleted session: ${token.substring(0, 10)}...`);
+    return true;
+  } catch (error) {
+    console.error("❌ Error deleting session:", error);
+    return false;
+  }
+}
+
+/**
+ * Delete all sessions for a user
+ */
+export async function deleteUserSessions(userId) {
+  try {
+    await pool.query(`DELETE FROM sessions WHERE user_id = $1`, [userId]);
+    console.log(`🚪 Deleted all sessions for user: ${userId}`);
+    return true;
+  } catch (error) {
+    console.error("❌ Error deleting user sessions:", error);
+    return false;
+  }
+}
+
+/**
+ * Clean up expired sessions
+ */
+export async function cleanupExpiredSessions() {
+  try {
+    const result = await pool.query(
+      `DELETE FROM sessions WHERE expires_at < CURRENT_TIMESTAMP`
+    );
+    const count = result.rowCount || 0;
+    if (count > 0) {
+      console.log(`🧹 Cleaned up ${count} expired sessions`);
+    }
+    return count;
+  } catch (error) {
+    console.error("❌ Error cleaning up sessions:", error);
+    return 0;
   }
 }
 

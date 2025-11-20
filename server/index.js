@@ -12,7 +12,14 @@ import {
   loadFoodItems,
   saveFoodItem,
   deleteFoodItem,
+  cleanupExpiredSessions,
 } from "./database.js";
+import {
+  registerUser,
+  loginUser,
+  validateSession,
+  logoutUser,
+} from "./auth.js";
 import {
   validatePlayerName,
   validateSkinIndex,
@@ -83,8 +90,91 @@ const io = new Server(httpServer, {
   },
 });
 
-// Serve static files from public directory
-app.use(express.static(join(__dirname, "../public")));
+// Middleware
+app.use(express.json()); // Parse JSON request bodies
+app.use(express.static(join(__dirname, "../public"))); // Serve static files
+
+// Authentication API endpoints
+app.post("/api/auth/register", async (req, res) => {
+  try {
+    const { username, password, displayName, skinIndex } = req.body;
+
+    const result = await registerUser(
+      username,
+      password,
+      displayName,
+      skinIndex
+    );
+
+    if (result.success) {
+      res.json({
+        success: true,
+        user: result.user,
+        sessionToken: result.sessionToken,
+      });
+    } else {
+      res.status(400).json({ success: false, error: result.error });
+    }
+  } catch (error) {
+    console.error("❌ Registration endpoint error:", error);
+    res.status(500).json({ success: false, error: "Server error" });
+  }
+});
+
+app.post("/api/auth/login", async (req, res) => {
+  try {
+    const { username, password } = req.body;
+
+    const result = await loginUser(username, password);
+
+    if (result.success) {
+      res.json({
+        success: true,
+        user: result.user,
+        sessionToken: result.sessionToken,
+      });
+    } else {
+      res.status(401).json({ success: false, error: result.error });
+    }
+  } catch (error) {
+    console.error("❌ Login endpoint error:", error);
+    res.status(500).json({ success: false, error: "Server error" });
+  }
+});
+
+app.post("/api/auth/validate", async (req, res) => {
+  try {
+    const { sessionToken } = req.body;
+
+    const result = await validateSession(sessionToken);
+
+    if (result.valid) {
+      res.json({ valid: true, user: result.user });
+    } else {
+      res.status(401).json({ valid: false, error: result.error });
+    }
+  } catch (error) {
+    console.error("❌ Validation endpoint error:", error);
+    res.status(500).json({ valid: false, error: "Server error" });
+  }
+});
+
+app.post("/api/auth/logout", async (req, res) => {
+  try {
+    const { sessionToken } = req.body;
+
+    const result = await logoutUser(sessionToken);
+
+    if (result.success) {
+      res.json({ success: true });
+    } else {
+      res.status(400).json({ success: false, error: result.error });
+    }
+  } catch (error) {
+    console.error("❌ Logout endpoint error:", error);
+    res.status(500).json({ success: false, error: "Server error" });
+  }
+});
 
 // API endpoint to list available models
 import { readdir } from "fs/promises";
@@ -131,6 +221,11 @@ const rateLimiter = new RateLimiter();
 setInterval(() => {
   rateLimiter.cleanup();
 }, 60000);
+
+// Cleanup expired sessions every 30 minutes
+setInterval(async () => {
+  await cleanupExpiredSessions();
+}, 30 * 60 * 1000);
 
 // Server configuration
 const SERVER_TICK_RATE = 20; // Reduced from 30 to 20 updates per second for bandwidth
@@ -1162,99 +1257,117 @@ setInterval(gameLoop, 1000 / SERVER_TICK_RATE);
 io.on("connection", (socket) => {
   console.log(`Player connected: ${socket.id}`);
 
-  // Initialize new player with random spawn position (without customization yet)
-  const newPlayer = {
-    id: socket.id,
-    x: Math.random() * 4 - 2,
-    y: 0,
-    z: Math.random() * 4 - 2,
-    rotation: 0,
-    color: `hsl(${Math.random() * 360}, 70%, 60%)`,
-    name: "Player",
-    skinIndex: 0,
-    input: { w: false, s: false, a: false, d: false },
-    moveTarget: null, // Click-to-move target
-    path: null, // A* pathfinding waypoints
-    stuckCounter: 0, // Counter to detect if player is stuck
-    lastPosition: null, // Track position to detect stuck state
-    replanCooldown: 0, // Cooldown to prevent infinite replanning
-    collisionCounter: 0, // Counter for consecutive collision detections
-    // Default dimensions (will be updated by client after mesh loads)
-    width: PLAYER_SIZE.width,
-    height: PLAYER_SIZE.height,
-    depth: PLAYER_SIZE.depth,
-    // Interaction states
-    isSitting: false,
-    sittingOn: null,
-    seatIndex: undefined,
-    isLying: false,
-    lyingOn: null,
-    lyingIndex: undefined,
+  // Player must authenticate before playing
+  let isAuthenticated = false;
+  let userId = null;
+
+  // Handle authentication
+  socket.on("authenticate", async (data) => {
+    try {
+      const { sessionToken } = data;
+
+      if (!sessionToken) {
+        socket.emit("authError", { error: "No session token provided" });
+        return;
+      }
+
+      // Validate session
+      const result = await validateSession(sessionToken);
+
+      if (!result.valid) {
+        socket.emit("authError", { error: "Invalid or expired session" });
+        return;
+      }
+
+      // Authentication successful
+      isAuthenticated = true;
+      userId = result.user.id;
+
+      // Initialize new player with authenticated user data
+      const newPlayer = {
+        id: socket.id,
+        userId: result.user.id,
+        username: result.user.username,
+        name: result.user.displayName,
+        skinIndex: result.user.skinIndex,
+        x: Math.random() * 4 - 2,
+        y: 0,
+        z: Math.random() * 4 - 2,
+        rotation: 0,
+        color: `hsl(${Math.random() * 360}, 70%, 60%)`,
+        input: { w: false, s: false, a: false, d: false },
+        moveTarget: null,
+        path: null,
+        stuckCounter: 0,
+        lastPosition: null,
+        replanCooldown: 0,
+        collisionCounter: 0,
+        width: PLAYER_SIZE.width,
+        height: PLAYER_SIZE.height,
+        depth: PLAYER_SIZE.depth,
+        isSitting: false,
+        sittingOn: null,
+        seatIndex: undefined,
+        isLying: false,
+        lyingOn: null,
+        lyingIndex: undefined,
+      };
+
+      gameState.players.set(socket.id, newPlayer);
+
+      // Send initial game state
+      socket.emit("authenticated", {
+        playerId: socket.id,
+        user: result.user,
+      });
+
+      socket.emit("init", {
+        playerId: socket.id,
+        players: Array.from(gameState.players.values()),
+        obstacles: gameState.obstacles,
+        foodItems: gameState.foodItems,
+      });
+
+      // Notify other players
+      io.emit("playerJoined", newPlayer);
+
+      console.log(
+        `✅ ${result.user.displayName} (@${result.user.username}) authenticated and joined`
+      );
+    } catch (error) {
+      console.error("❌ Authentication error:", error);
+      socket.emit("authError", { error: "Authentication failed" });
+    }
+  });
+
+  // Helper function to check authentication
+  const requireAuth = (callback) => {
+    return (...args) => {
+      if (!isAuthenticated) {
+        socket.emit("authError", { error: "Not authenticated" });
+        return;
+      }
+      callback(...args);
+    };
   };
 
-  gameState.players.set(socket.id, newPlayer);
-
-  // Handle player customization
-  socket.on("playerCustomization", (data) => {
-    const player = gameState.players.get(socket.id);
-    if (!player) return;
-
-    // Validate and sanitize player name
-    const nameValidation = validatePlayerName(data.name);
-    player.name = nameValidation.sanitized;
-
-    if (!nameValidation.valid) {
-      console.warn(
-        `⚠️ Player ${socket.id} name validation failed: ${nameValidation.error}`
-      );
-      socket.emit("validationError", {
-        field: "name",
-        error: nameValidation.error,
-      });
-    }
-
-    // Validate skin index
-    const skinValidation = validateSkinIndex(data.skinIndex);
-    player.skinIndex = skinValidation.sanitized;
-
-    if (!skinValidation.valid) {
-      console.warn(
-        `⚠️ Player ${socket.id} skin validation failed: ${skinValidation.error}`
-      );
-      socket.emit("validationError", {
-        field: "skinIndex",
-        error: skinValidation.error,
-      });
-    }
-
-    // Now send initial game state
-    socket.emit("init", {
-      playerId: socket.id,
-      players: Array.from(gameState.players.values()),
-      obstacles: gameState.obstacles,
-      foodItems: gameState.foodItems,
-    });
-
-    // Notify other players
-    io.emit("playerJoined", player);
-
-    console.log(`👨‍🍳 ${player.name} (${socket.id}) joined the kitchen!`);
-  });
-
   // Handle player dimensions update from client
-  socket.on("updatePlayerDimensions", (data) => {
-    const player = gameState.players.get(socket.id);
-    if (player && data) {
-      player.width = data.width || PLAYER_SIZE.width;
-      player.height = data.height || PLAYER_SIZE.height;
-      player.depth = data.depth || PLAYER_SIZE.depth;
-      console.log(
-        `📦 Updated player ${socket.id} dimensions: ${player.width.toFixed(
-          2
-        )}×${player.height.toFixed(2)}×${player.depth.toFixed(2)}`
-      );
-    }
-  });
+  socket.on(
+    "updatePlayerDimensions",
+    requireAuth((data) => {
+      const player = gameState.players.get(socket.id);
+      if (player && data) {
+        player.width = data.width || PLAYER_SIZE.width;
+        player.height = data.height || PLAYER_SIZE.height;
+        player.depth = data.depth || PLAYER_SIZE.depth;
+        console.log(
+          `📦 Updated player ${socket.id} dimensions: ${player.width.toFixed(
+            2
+          )}×${player.height.toFixed(2)}×${player.depth.toFixed(2)}`
+        );
+      }
+    })
+  );
 
   // Handle player input updates
   socket.on("input", (inputState) => {

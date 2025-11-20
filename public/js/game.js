@@ -75,23 +75,71 @@ class Game {
   /**
    * Initialize welcome screen
    */
-  initWelcomeScreen() {
-    const savedName = localStorage.getItem("supercooked_playerName");
-    const savedSkin = localStorage.getItem("supercooked_playerSkin");
-
-    if (savedName && savedSkin !== null) {
-      this.playerName = savedName;
-      this.playerSkin = parseInt(savedSkin);
-      document.getElementById("welcome-modal").classList.add("hidden");
-      this.init();
-    } else {
-      this.initForPreview();
-      this.setupWelcomeModal();
+  async initWelcomeScreen() {
+    // Check authentication first
+    const isAuthenticated = await this.checkAuthentication();
+    if (!isAuthenticated) {
+      return; // Will redirect to login
     }
+
+    // User is authenticated, continue with game
+    document.getElementById("welcome-modal").classList.add("hidden");
+    this.init();
 
     document.getElementById("settings-btn").addEventListener("click", () => {
       this.showSettings();
     });
+  }
+
+  /**
+   * Check authentication before starting game
+   */
+  async checkAuthentication() {
+    const sessionToken = localStorage.getItem("sessionToken");
+
+    if (!sessionToken) {
+      // No session token, redirect to login
+      console.log("⚠️ No session token, redirecting to login");
+      window.location.href = "/auth.html";
+      return false;
+    }
+
+    try {
+      // Validate session with server
+      const response = await fetch("/api/auth/validate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ sessionToken }),
+      });
+
+      const data = await response.json();
+
+      if (data.valid) {
+        // Session is valid, load user data
+        const user = data.user;
+        this.playerName = user.displayName;
+        this.playerSkin = user.skinIndex;
+        this.userId = user.id;
+        this.username = user.username;
+        this.sessionToken = sessionToken;
+        console.log(
+          `✅ Authenticated as ${user.displayName} (@${user.username})`
+        );
+        return true;
+      } else {
+        // Invalid session, clear and redirect to login
+        console.log("⚠️ Invalid session, redirecting to login");
+        localStorage.removeItem("sessionToken");
+        localStorage.removeItem("user");
+        window.location.href = "/auth.html";
+        return false;
+      }
+    } catch (error) {
+      console.error("❌ Authentication check failed:", error);
+      // On error, redirect to login
+      window.location.href = "/auth.html";
+      return false;
+    }
   }
 
   /**
@@ -313,6 +361,31 @@ class Game {
         closeModal();
       } else {
         alert("Please enter a name!");
+      }
+    };
+
+    // Logout button
+    document.getElementById("logout-btn").onclick = async () => {
+      if (confirm("Are you sure you want to logout?")) {
+        const sessionToken = localStorage.getItem("sessionToken");
+
+        // Call logout API
+        try {
+          await fetch("/api/auth/logout", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ sessionToken }),
+          });
+        } catch (error) {
+          console.error("❌ Logout error:", error);
+        }
+
+        // Clear local storage
+        localStorage.removeItem("sessionToken");
+        localStorage.removeItem("user");
+
+        // Redirect to login
+        window.location.href = "/auth.html";
       }
     };
 

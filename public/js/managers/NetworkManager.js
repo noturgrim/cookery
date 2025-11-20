@@ -61,13 +61,33 @@ export class NetworkManager {
   setupSocket() {
     this.socket = io();
 
-    // Send player customization on connection
+    // Authenticate on connection
     this.socket.on("connect", () => {
-      // Send initial data without dimensions (will update after mesh loads)
-      this.socket.emit("playerCustomization", {
-        name: this.playerName,
-        skinIndex: this.playerSkin,
-      });
+      const sessionToken = localStorage.getItem("sessionToken");
+      if (!sessionToken) {
+        console.error("❌ No session token found");
+        window.location.href = "/auth.html";
+        return;
+      }
+
+      // Send authentication
+      this.socket.emit("authenticate", { sessionToken });
+    });
+
+    // Handle authentication response
+    this.socket.on("authenticated", (data) => {
+      console.log("✅ Authenticated with game server");
+      this.playerId = data.playerId;
+      console.log(`🎮 Player ID: ${this.playerId}`);
+    });
+
+    // Handle authentication errors
+    this.socket.on("authError", (data) => {
+      console.error("❌ Authentication error:", data.error);
+      alert(`Authentication failed: ${data.error}\nPlease log in again.`);
+      localStorage.removeItem("sessionToken");
+      localStorage.removeItem("user");
+      window.location.href = "/auth.html";
     });
 
     // Initialize game state
