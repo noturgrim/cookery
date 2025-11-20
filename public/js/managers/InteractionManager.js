@@ -356,12 +356,12 @@ export class InteractionManager {
       furnitureName.includes("couch")
     ) {
       seatHeightMultiplier = 0.3;
-      forwardOffset = -0.15;
+      forwardOffset = -0.52;
     } else if (furnitureName.includes("bench")) {
-      seatHeightMultiplier = 0.4;
+      seatHeightMultiplier = 0.01;
       forwardOffset = 0;
     } else if (furnitureName.includes("chair")) {
-      seatHeightMultiplier = 0.35;
+      seatHeightMultiplier = 0.2;
       forwardOffset = 0;
     }
 
