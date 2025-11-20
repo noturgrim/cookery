@@ -120,9 +120,18 @@ const validateDatabaseTypes = {
 const poolConfig = process.env.DATABASE_URL
   ? {
       connectionString: process.env.DATABASE_URL,
-      ssl: {
-        rejectUnauthorized: false, // Required for Render.com and most cloud databases
-      },
+      ssl:
+        process.env.DB_SSL_DISABLED === "true"
+          ? false // Completely disable SSL (local dev only)
+          : {
+              rejectUnauthorized:
+                process.env.DB_SSL_REJECT_UNAUTHORIZED !== "false",
+              // Only set to false if you trust your cloud provider and can't get valid certs
+              // Better: Use CA certificate for production
+              ...(process.env.DB_SSL_CA && {
+                ca: process.env.DB_SSL_CA, // Path to CA certificate
+              }),
+            },
     }
   : {
       // Fallback to individual params if DATABASE_URL not provided (local development)
@@ -131,6 +140,8 @@ const poolConfig = process.env.DATABASE_URL
       database: process.env.DB_NAME || "supercooked",
       password: process.env.DB_PASSWORD || "postgres",
       port: process.env.DB_PORT || 5432,
+      // Local development usually doesn't need SSL
+      ssl: false,
     };
 
 const pool = new Pool(poolConfig);
