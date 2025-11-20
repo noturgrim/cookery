@@ -270,7 +270,6 @@ class Game {
   showSettings() {
     const modal = document.getElementById("settings-modal");
     modal.classList.add("active");
-    modal.classList.remove("pointer-events-none");
     modal.style.display = "flex";
 
     // Populate current values
@@ -281,7 +280,6 @@ class Game {
 
     const closeModal = () => {
       modal.classList.remove("active");
-      modal.classList.add("pointer-events-none");
       modal.style.display = "none";
     };
 

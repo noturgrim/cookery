@@ -73,10 +73,6 @@ export class InputManager {
       this.toggleSpawnMenu();
     }
 
-    if (e.code === "KeyC") {
-      this.sceneManager.toggleCollisionBoxes(this.networkManager.playerManager);
-    }
-
     if (
       (e.code === "Delete" || e.code === "Backspace") &&
       this.editMode &&
@@ -286,9 +282,6 @@ export class InputManager {
     this.mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
     this.mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
 
-    // Update collision boxes if they're visible
-    this.sceneManager.updateCollisionBoxes();
-
     // Handle camera panning (right-click drag)
     if (this.isPanning) {
       const deltaX = event.clientX - this.lastPanPosition.x;
@@ -425,9 +418,6 @@ export class InputManager {
           2
         )}, ${this.selectedObstacle.position.z.toFixed(2)})`
       );
-
-      // Update collision box position if it exists
-      this.sceneManager.updateCollisionBoxes();
 
       // Log the code snippet for easy copy-paste (furniture only)
       if (!isFood) {
@@ -629,11 +619,22 @@ export class InputManager {
     const menu = document.getElementById("spawn-menu");
     const isActive = menu.classList.toggle("active");
 
-    // Enable/disable pointer events on the menu overlay
+    // Show/hide the menu
     if (isActive) {
-      menu.classList.remove("pointer-events-none");
+      menu.style.display = "flex";
+
+      // Setup background click to close (only once)
+      if (!menu.dataset.clickHandlerAdded) {
+        menu.addEventListener("click", (e) => {
+          if (e.target === menu) {
+            menu.classList.remove("active");
+            menu.style.display = "none";
+          }
+        });
+        menu.dataset.clickHandlerAdded = "true";
+      }
     } else {
-      menu.classList.add("pointer-events-none");
+      menu.style.display = "none";
     }
 
     // Load available models if not already loaded
@@ -783,9 +784,6 @@ export class InputManager {
         this.highlightObject(furniture);
       }
 
-      // Add collision box if enabled
-      this.sceneManager.addCollisionBoxForObject(furniture);
-
       // Send to server for database persistence (only send serializable data)
       this.networkManager.spawnObstacle({
         id: furniture.userData.id,
@@ -828,9 +826,6 @@ export class InputManager {
       if (this.editMode) {
         this.highlightObject(foodModel);
       }
-
-      // Add collision box if enabled
-      this.sceneManager.addCollisionBoxForObject(foodModel);
 
       // Send to server for database persistence
       this.networkManager.spawnFood({
@@ -877,9 +872,6 @@ export class InputManager {
 
     const objectId = object.userData.id;
     const objectType = object.userData.type;
-
-    // Remove collision box if exists
-    this.sceneManager.removeCollisionBoxForObject(object);
 
     // Remove from scene
     this.sceneManager.scene.remove(object);

@@ -58,41 +58,106 @@
       }
 
       #controls-info {
-        background: rgba(0, 0, 0, 0.7);
+        background: rgba(0, 0, 0, 0.85);
         color: white;
-        padding: 15px 20px;
-        border-radius: 10px;
-        font-size: 14px;
-        max-width: 300px;
-        backdrop-filter: blur(10px);
+        padding: 10px 14px;
+        border-radius: 8px;
+        font-size: 13px;
+        max-width: 280px;
+        backdrop-filter: blur(12px);
+        border: 1px solid rgba(76, 175, 80, 0.3);
+        pointer-events: auto;
+        transition: all 0.3s ease;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+      }
+
+      #controls-info.minimized {
+        padding: 8px 12px;
+      }
+
+      #controls-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 8px;
+      }
+
+      #controls-info.minimized #controls-header {
+        margin-bottom: 0;
       }
 
       #controls-info h3 {
-        margin-bottom: 10px;
         color: #4caf50;
-        font-size: 18px;
+        font-size: 16px;
+        font-weight: 600;
+        margin: 0;
+      }
+
+      #controls-toggle {
+        background: rgba(76, 175, 80, 0.2);
+        border: 1px solid rgba(76, 175, 80, 0.4);
+        color: #4caf50;
+        width: 24px;
+        height: 24px;
+        border-radius: 4px;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 14px;
+        transition: all 0.2s ease;
+        flex-shrink: 0;
+      }
+
+      #controls-toggle:hover {
+        background: rgba(76, 175, 80, 0.3);
+        border-color: #4caf50;
+        transform: scale(1.05);
+      }
+
+      #controls-content {
+        max-height: 500px;
+        opacity: 1;
+        overflow: hidden;
+        transition: all 0.3s ease;
+      }
+
+      #controls-info.minimized #controls-content {
+        max-height: 0;
+        opacity: 0;
       }
 
       #controls-info ul {
         list-style: none;
+        margin: 0;
       }
 
       #controls-info li {
-        margin: 5px 0;
+        margin: 4px 0;
         display: flex;
         align-items: center;
+        line-height: 1.4;
+      }
+
+      #controls-info li:last-child {
+        font-size: 11px;
+        margin-top: 6px;
+        opacity: 0.75;
+        line-height: 1.3;
       }
 
       .key {
-        background: #333;
+        background: rgba(51, 51, 51, 0.9);
         color: #fff;
-        padding: 3px 8px;
-        border-radius: 4px;
-        font-weight: bold;
-        margin-right: 10px;
-        min-width: 30px;
+        padding: 2px 6px;
+        border-radius: 3px;
+        font-weight: 600;
+        margin-right: 8px;
+        min-width: 26px;
         text-align: center;
         border: 1px solid #555;
+        font-size: 12px;
+        flex-shrink: 0;
       }
 
       #connection-status {
@@ -312,7 +377,7 @@
     <!-- Settings Modal (Compact) -->
     <div
       id="settings-modal"
-      class="fixed inset-0 bg-black/80 backdrop-blur-sm z-[3000] hidden items-center justify-center p-4 pointer-events-none"
+      class="fixed inset-0 bg-black/80 backdrop-blur-sm z-[3000] hidden items-center justify-center p-4"
     >
       <div
         class="bg-gradient-to-br from-gray-900 to-gray-800 rounded-xl shadow-2xl border-2 border-purple-500/50 w-full max-w-md flex flex-col pointer-events-auto"
@@ -322,7 +387,6 @@
           class="flex items-center justify-between px-4 py-3 border-b border-purple-500/30"
         >
           <div class="flex items-center gap-2">
-            <span class="text-2xl">⚙️</span>
             <h2 class="text-xl font-bold text-purple-400">Settings</h2>
           </div>
           <button
@@ -374,19 +438,51 @@
 
     <div id="ui-overlay">
       <div id="controls-info">
-        <h3>Controls</h3>
-        <ul>
-          <li><span class="key">🖱️</span> Left Click to Move</li>
-          <li><span class="key">🎡</span> Mouse Wheel to Zoom</li>
-          <li><span class="key">E</span> Edit Mode</li>
-          <li><span class="key">B</span> Spawn Menu</li>
-          <li><span class="key">C</span> Collision Boxes</li>
-          <li style="font-size: 12px; margin-top: 8px; opacity: 0.8">
-            Edit Mode: Q/R to rotate selected object
-          </li>
-        </ul>
+        <div id="controls-header">
+          <h3>Controls</h3>
+          <button
+            id="controls-toggle"
+            aria-label="Toggle controls visibility"
+            tabindex="0"
+            title="Minimize/Expand controls"
+          >
+            −
+          </button>
+        </div>
+        <div id="controls-content">
+          <ul>
+            <li><span class="key">🖱️</span> Move</li>
+            <li><span class="key">🎡</span> Zoom</li>
+            <li><span class="key">E</span> Edit Mode</li>
+            <li><span class="key">B</span> Spawn</li>
+            <li>Edit: Q/R rotate selected</li>
+          </ul>
+        </div>
       </div>
     </div>
+
+    <script>
+      // Controls toggle functionality
+      (() => {
+        const controlsInfo = document.getElementById("controls-info");
+        const toggleBtn = document.getElementById("controls-toggle");
+
+        const handleToggle = () => {
+          controlsInfo.classList.toggle("minimized");
+          toggleBtn.textContent = controlsInfo.classList.contains("minimized")
+            ? "+"
+            : "−";
+        };
+
+        toggleBtn.addEventListener("click", handleToggle);
+        toggleBtn.addEventListener("keydown", (e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            handleToggle();
+          }
+        });
+      })();
+    </script>
 
     <div id="connection-status">
       <span class="status-dot"></span>
@@ -401,7 +497,7 @@
     <!-- Spawn Menu (Compact) -->
     <div
       id="spawn-menu"
-      class="fixed inset-0 bg-black/80 backdrop-blur-sm z-[2000] hidden items-center justify-center p-3 pointer-events-none"
+      class="fixed inset-0 bg-black/80 backdrop-blur-sm z-[2000] hidden items-center justify-center p-3"
     >
       <div
         class="bg-gradient-to-br from-gray-900 to-gray-800 rounded-xl shadow-2xl border-2 border-yellow-500/50 w-full max-w-4xl max-h-[85vh] flex flex-col pointer-events-auto"
@@ -415,7 +511,7 @@
             <h2 class="text-xl font-bold text-yellow-400">Spawn Objects</h2>
           </div>
           <button
-            onclick="const menu = document.getElementById('spawn-menu'); menu.classList.remove('active'); menu.classList.add('pointer-events-none');"
+            onclick="const menu = document.getElementById('spawn-menu'); menu.classList.remove('active'); menu.style.display = 'none';"
             class="w-8 h-8 rounded-full bg-red-500 hover:bg-red-600 text-white text-xl font-bold transition-all hover:scale-110 flex items-center justify-center"
           >
             ×

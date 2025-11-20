@@ -81,7 +81,7 @@ export class NetworkManager {
       data.obstacles.forEach(async (obstacle) => {
         const obj = await this.sceneManager.createObstacle(obstacle);
         if (obj) {
-          this.sceneManager.addCollisionBoxForObject(obj);
+          // Object created successfully
         }
       });
 
@@ -97,7 +97,7 @@ export class NetworkManager {
             foodItem.id // Pass existing ID for persistence
           );
           if (foodModel) {
-            this.sceneManager.addCollisionBoxForObject(foodModel);
+            // Food model created successfully
           }
         });
         console.log(
@@ -168,10 +168,6 @@ export class NetworkManager {
       if (this.inputManager && this.inputManager.editMode && obstacle) {
         this.inputManager.highlightObject(obstacle);
       }
-      // Add collision box if enabled
-      if (obstacle) {
-        this.sceneManager.addCollisionBoxForObject(obstacle);
-      }
       console.log(`✨ Obstacle ${obstacleData.id} spawned by another player`);
     });
 
@@ -206,9 +202,6 @@ export class NetworkManager {
         this.inputManager.highlightObject(foodModel);
       }
       // Add collision box if enabled
-      if (foodModel) {
-        this.sceneManager.addCollisionBoxForObject(foodModel);
-      }
       console.log(`✨ Food ${foodData.id} spawned by another player`);
     });
 
