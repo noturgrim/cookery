@@ -59,10 +59,16 @@ export class NetworkManager {
    * Update platform size
    */
   updatePlatformSize(platformSize) {
-    if (!this.socket) return;
+    if (!this.socket) {
+      console.error("❌ Cannot update platform size: socket not connected");
+      return;
+    }
+
+    const size = parseInt(platformSize);
+    console.log(`📤 Sending platform size update to server: ${size}x${size}`);
 
     this.socket.emit("updatePlatformSize", {
-      platformSize: parseInt(platformSize),
+      platformSize: size,
     });
   }
 
@@ -347,10 +353,14 @@ export class NetworkManager {
 
     // Handle platform size updates
     this.socket.on("platformSizeUpdate", (data) => {
+      console.log(`📥 Received platform size update from server:`, data);
       if (data.platformSize && this.sceneManager) {
+        console.log(
+          `🔄 Updating scene floor to ${data.platformSize}x${data.platformSize}`
+        );
         this.sceneManager.updatePlatformSize(data.platformSize);
         console.log(
-          `🟦 Platform size updated: ${data.platformSize}x${data.platformSize}`
+          `✅ Platform size updated: ${data.platformSize}x${data.platformSize}`
         );
       }
     });

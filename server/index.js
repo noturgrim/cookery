@@ -340,10 +340,15 @@ const getObstacleAABB = (obstacle) => {
 };
 
 const validatePlayerMovement = (player, newX, newZ, debug = false) => {
-  // Check world bounds
-  const WORLD_BOUNDS = 20;
-  if (Math.abs(newX) > WORLD_BOUNDS || Math.abs(newZ) > WORLD_BOUNDS) {
-    if (debug) console.log(`   ❌ World bounds exceeded`);
+  // Check world bounds (use dynamic validation rules)
+  if (
+    Math.abs(newX) > VALIDATION_RULES.WORLD_BOUNDS ||
+    Math.abs(newZ) > VALIDATION_RULES.WORLD_BOUNDS
+  ) {
+    if (debug)
+      console.log(
+        `   ❌ World bounds exceeded (bounds: ±${VALIDATION_RULES.WORLD_BOUNDS})`
+      );
     return false;
   }
 
@@ -512,9 +517,11 @@ class AStarPathfinder {
 
   // Check if a grid position is walkable
   isWalkable(x, z) {
-    // Check world bounds
-    const WORLD_BOUNDS = 20;
-    if (Math.abs(x) > WORLD_BOUNDS || Math.abs(z) > WORLD_BOUNDS) {
+    // Check world bounds (use dynamic validation rules)
+    if (
+      Math.abs(x) > VALIDATION_RULES.WORLD_BOUNDS ||
+      Math.abs(z) > VALIDATION_RULES.WORLD_BOUNDS
+    ) {
       return false;
     }
 
@@ -2049,7 +2056,11 @@ io.on("connection", (socket) => {
       );
       if (!coordsValidation.valid) {
         console.warn(
-          `⚠️ Move target out of bounds for ${socket.id}: (${target.x}, ${target.z})`
+          `⚠️ Move target out of bounds for ${socket.id}: (${target.x.toFixed(
+            2
+          )}, ${target.z.toFixed(2)}) - Current bounds: ±${
+            VALIDATION_RULES.WORLD_BOUNDS
+          }`
         );
         return;
       }
@@ -2592,18 +2603,27 @@ io.on("connection", (socket) => {
         return;
       }
 
+      console.log(`📥 Received platform size update request: ${platformSize}`);
+
       // Update in database
       const success = await updateWorldSettings(platformSize);
 
       if (success) {
         // Update validation bounds based on new platform size
-        updateWorldBounds(platformSize);
+        const boundsUpdated = updateWorldBounds(platformSize);
+        console.log(`✅ Bounds update result: ${boundsUpdated}`);
+        console.log(
+          `📏 Current WORLD_BOUNDS: ±${VALIDATION_RULES.WORLD_BOUNDS}`
+        );
 
         // Broadcast to all clients (including sender for confirmation)
         io.emit("platformSizeUpdate", { platformSize });
         console.log(
           `🟦 Platform size updated: ${platformSize}x${platformSize}`
         );
+        console.log(`🌍 Broadcasting to all clients...`);
+      } else {
+        console.error(`❌ Failed to save platform size to database`);
       }
     } catch (error) {
       console.error("❌ Error handling platform size update:", error);
