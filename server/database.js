@@ -1,6 +1,120 @@
 import pkg from "pg";
 const { Pool } = pkg;
 
+/**
+ * Validate data types before database operations
+ * Prevents type confusion and ensures data integrity
+ */
+const validateDatabaseTypes = {
+  /**
+   * Validate obstacle data types
+   */
+  obstacle: (obstacle) => {
+    // Required fields type checks
+    if (typeof obstacle.id !== "string" || obstacle.id.length === 0) {
+      throw new Error(
+        `Invalid obstacle.id type: expected non-empty string, got ${typeof obstacle.id}`
+      );
+    }
+    if (typeof obstacle.name !== "string") {
+      throw new Error(
+        `Invalid obstacle.name type: expected string, got ${typeof obstacle.name}`
+      );
+    }
+    if (typeof obstacle.type !== "string") {
+      throw new Error(
+        `Invalid obstacle.type type: expected string, got ${typeof obstacle.type}`
+      );
+    }
+
+    // Numeric fields type checks
+    const numericFields = [
+      "x",
+      "y",
+      "z",
+      "width",
+      "height",
+      "depth",
+      "scale",
+      "rotation",
+    ];
+    for (const field of numericFields) {
+      const value = obstacle[field];
+      if (typeof value !== "number" || !isFinite(value)) {
+        throw new Error(
+          `Invalid obstacle.${field} type: expected finite number, got ${typeof value} (${value})`
+        );
+      }
+    }
+
+    // Boolean field type check
+    if (typeof obstacle.isPassthrough !== "boolean") {
+      throw new Error(
+        `Invalid obstacle.isPassthrough type: expected boolean, got ${typeof obstacle.isPassthrough}`
+      );
+    }
+
+    // Optional string field
+    if (
+      obstacle.model !== null &&
+      obstacle.model !== undefined &&
+      typeof obstacle.model !== "string"
+    ) {
+      throw new Error(
+        `Invalid obstacle.model type: expected string or null, got ${typeof obstacle.model}`
+      );
+    }
+
+    return true;
+  },
+
+  /**
+   * Validate food item data types
+   */
+  foodItem: (foodItem) => {
+    // Required fields type checks
+    if (typeof foodItem.id !== "string" || foodItem.id.length === 0) {
+      throw new Error(
+        `Invalid foodItem.id type: expected non-empty string, got ${typeof foodItem.id}`
+      );
+    }
+    if (typeof foodItem.name !== "string") {
+      throw new Error(
+        `Invalid foodItem.name type: expected string, got ${typeof foodItem.name}`
+      );
+    }
+
+    // Numeric fields type checks
+    const numericFields = ["x", "y", "z", "scale", "width", "height", "depth"];
+    for (const field of numericFields) {
+      const value = foodItem[field];
+      if (typeof value !== "number" || !isFinite(value)) {
+        throw new Error(
+          `Invalid foodItem.${field} type: expected finite number, got ${typeof value} (${value})`
+        );
+      }
+    }
+
+    return true;
+  },
+
+  /**
+   * Validate ID for delete operations
+   */
+  id: (id) => {
+    if (typeof id !== "string" || id.length === 0) {
+      throw new Error(
+        `Invalid id type: expected non-empty string, got ${typeof id}`
+      );
+    }
+    // Check for SQL injection patterns (defense in depth)
+    if (/['";\\-]/.test(id)) {
+      throw new Error(`Invalid id format: contains dangerous characters`);
+    }
+    return true;
+  },
+};
+
 // PostgreSQL connection pool
 // Use DATABASE_URL if provided (for cloud deployments), otherwise use individual params
 const poolConfig = process.env.DATABASE_URL
@@ -127,6 +241,9 @@ export async function loadObstacles() {
  */
 export async function saveObstacle(obstacle) {
   try {
+    // Validate data types before database operation
+    validateDatabaseTypes.obstacle(obstacle);
+
     const result = await pool.query(
       `
       INSERT INTO obstacles (id, name, type, x, y, z, width, height, depth, model, scale, rotation, is_passthrough, updated_at)
@@ -188,6 +305,9 @@ export async function saveObstacle(obstacle) {
  */
 export async function deleteObstacle(id) {
   try {
+    // Validate ID type before database operation
+    validateDatabaseTypes.id(id);
+
     await pool.query("DELETE FROM obstacles WHERE id = $1", [id]);
     console.log(`🗑️ Deleted obstacle: ${id}`);
     return true;
@@ -227,6 +347,9 @@ export async function loadFoodItems() {
  */
 export async function saveFoodItem(foodItem) {
   try {
+    // Validate data types before database operation
+    validateDatabaseTypes.foodItem(foodItem);
+
     const result = await pool.query(
       `
       INSERT INTO food_items (id, name, x, y, z, scale, width, height, depth, updated_at)
@@ -277,6 +400,9 @@ export async function saveFoodItem(foodItem) {
  */
 export async function deleteFoodItem(id) {
   try {
+    // Validate ID type before database operation
+    validateDatabaseTypes.id(id);
+
     await pool.query("DELETE FROM food_items WHERE id = $1", [id]);
     console.log(`🗑️ Deleted food item: ${id}`);
     return true;
