@@ -82,6 +82,41 @@ export class NetworkManager {
       // Create all existing players
       data.players.forEach((player) => {
         this.playerManager.createPlayer(player);
+
+        // If player is sitting, set up their sitting state after creation
+        if (player.isSitting && this.interactionManager) {
+          // Wait a bit for the player to be fully created
+          setTimeout(() => {
+            const createdPlayer = this.playerManager.players.get(player.id);
+            if (createdPlayer && createdPlayer.mesh) {
+              // Mark as sitting
+              createdPlayer.isSitting = true;
+              createdPlayer.sittingOn = player.sittingOn;
+              createdPlayer.seatIndex = player.seatIndex;
+              createdPlayer.isMoving = false;
+
+              // Set position (already set from server data, but ensure it's locked)
+              createdPlayer.targetPosition.set(player.x, player.y, player.z);
+              createdPlayer.mesh.position.set(player.x, player.y, player.z);
+              createdPlayer.mesh.rotation.y = player.rotation;
+              createdPlayer.targetRotation = player.rotation;
+
+              // Play sit animation
+              this.playerManager.animationController.playAnimationClip(
+                player.id,
+                "sit",
+                null,
+                true // Loop
+              );
+
+              console.log(
+                `👀 Loaded sitting player ${player.id} on ${
+                  player.sittingOn
+                } (seat ${player.seatIndex + 1})`
+              );
+            }
+          }, 100); // Small delay to ensure player is fully initialized
+        }
       });
 
       // Create all obstacles

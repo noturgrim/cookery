@@ -1322,6 +1322,8 @@ io.on("connection", (socket) => {
     if (player) {
       // Mark player as sitting
       player.isSitting = true;
+      player.sittingOn = data.furnitureId;
+      player.seatIndex = data.seatIndex !== undefined ? data.seatIndex : 0;
       player.moveTarget = null; // Clear any movement target
       player.path = null; // Clear path
 
@@ -1335,7 +1337,9 @@ io.on("connection", (socket) => {
     // Broadcast to all players
     io.emit("playerSit", data);
     console.log(
-      `🪑 Player ${data.playerId} sat on furniture ${data.furnitureId}`
+      `🪑 Player ${data.playerId} sat on furniture ${data.furnitureId} (seat ${
+        data.seatIndex !== undefined ? data.seatIndex + 1 : 1
+      })`
     );
   });
 
@@ -1345,6 +1349,8 @@ io.on("connection", (socket) => {
     if (player) {
       // Mark player as no longer sitting
       player.isSitting = false;
+      player.sittingOn = null;
+      player.seatIndex = undefined;
 
       // Update position to standing position
       player.x = data.position.x;
