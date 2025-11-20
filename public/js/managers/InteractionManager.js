@@ -375,17 +375,25 @@ export class InteractionManager {
     const player = this.playerManager.players.get(playerId);
 
     if (player && player.mesh) {
+      // Mark player as sitting
+      player.isSitting = true;
+      player.isMoving = false;
+
+      // Set position and rotation
       player.mesh.position.set(position.x, position.y, position.z);
       player.targetPosition.set(position.x, position.y, position.z);
       player.mesh.rotation.y = rotation;
+      player.targetRotation = rotation;
 
-      // Play sit animation for other player
+      // Play sit animation for other player (loop it)
       this.playerManager.animationController.playAnimationClip(
         playerId,
         "sit",
         null,
-        true
+        true // Loop the animation
       );
+
+      console.log(`👀 Player ${playerId} is now sitting on ${furnitureId}`);
     }
   }
 
@@ -393,9 +401,25 @@ export class InteractionManager {
    * Handle other player standing up (from network)
    */
   handleOtherPlayerStandUp(data) {
-    const { playerId } = data;
+    const { playerId, position } = data;
+    const player = this.playerManager.players.get(playerId);
 
-    this.playerManager.animationController.stopCurrentAnimation(playerId);
+    if (player) {
+      // Mark player as no longer sitting
+      player.isSitting = false;
+
+      // Update position if provided
+      if (position) {
+        player.mesh.position.set(position.x, position.y, position.z);
+        player.targetPosition.set(position.x, position.y, position.z);
+      }
+
+      // Stop sit animation and reset to idle
+      this.playerManager.animationController.stopCurrentAnimation(playerId);
+      this.playerManager.animationController.resetToIdle(playerId);
+
+      console.log(`👀 Player ${playerId} stood up`);
+    }
   }
 
   /**

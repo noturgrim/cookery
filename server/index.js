@@ -997,6 +997,7 @@ const gameLoop = () => {
       color: p.color,
       name: p.name,
       skinIndex: p.skinIndex,
+      isSitting: p.isSitting || false, // Include sitting state
     })),
   };
 

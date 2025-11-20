@@ -136,6 +136,14 @@ export class NetworkManager {
     // Handle game state updates
     this.socket.on("gameState", (state) => {
       state.players.forEach((serverPlayer) => {
+        const player = this.playerManager.players.get(serverPlayer.id);
+
+        // Don't update position if player is sitting (to prevent jitter)
+        if (player && player.isSitting) {
+          // Keep the sitting player locked in position
+          return;
+        }
+
         this.playerManager.updatePlayerTarget(
           serverPlayer.id,
           serverPlayer.x,
@@ -143,6 +151,11 @@ export class NetworkManager {
           serverPlayer.z,
           serverPlayer.rotation
         );
+
+        // Update sitting state if it changed on server
+        if (player && serverPlayer.isSitting !== player.isSitting) {
+          player.isSitting = serverPlayer.isSitting;
+        }
       });
     });
 
