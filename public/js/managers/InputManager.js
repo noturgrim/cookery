@@ -179,12 +179,12 @@ export class InputManager {
       );
     }
 
-    console.log(
-      `🔄 Rotated ${this.selectedObstacle.userData.id} to ${(
-        (this.selectedObstacle.rotation.y * 180) /
-        Math.PI
-      ).toFixed(0)}°`
-    );
+    // console.log(
+    //   `🔄 Rotated ${this.selectedObstacle.userData.id} to ${(
+    //     (this.selectedObstacle.rotation.y * 180) /
+    //     Math.PI
+    //   ).toFixed(0)}°`
+    // );
   }
 
   /**
@@ -220,11 +220,11 @@ export class InputManager {
       );
     }
 
-    console.log(
-      `⬆️ Moved ${
-        this.selectedObstacle.userData.id
-      } to Y: ${this.selectedObstacle.position.y.toFixed(2)}`
-    );
+    // console.log(
+    //   `⬆️ Moved ${
+    //     this.selectedObstacle.userData.id
+    //   } to Y: ${this.selectedObstacle.position.y.toFixed(2)}`
+    // );
   }
 
   /**
@@ -271,11 +271,11 @@ export class InputManager {
       isPassthrough
     );
 
-    console.log(
-      `🚪 ${this.selectedObstacle.userData.id} passthrough: ${
-        isPassthrough ? "ON (walkable)" : "OFF (solid)"
-      }`
-    );
+    // console.log(
+    //   `🚪 ${this.selectedObstacle.userData.id} passthrough: ${
+    //     isPassthrough ? "ON (walkable)" : "OFF (solid)"
+    //   }`
+    // );
 
     // Force render
     this.sceneManager.render();
@@ -331,11 +331,11 @@ export class InputManager {
         // Visual feedback at object position
         this.uiManager.createMoveMarker(objPos.x, objPos.z);
 
-        console.log(
-          `🎯 Moving to interact with: ${
-            clickedObject.userData.id
-          } at (${objPos.x.toFixed(2)}, ${objPos.z.toFixed(2)})`
-        );
+        // console.log(
+        //   `🎯 Moving to interact with: ${
+        //     clickedObject.userData.id
+        //   } at (${objPos.x.toFixed(2)}, ${objPos.z.toFixed(2)})`
+        // );
         return;
       }
     }
@@ -620,33 +620,6 @@ export class InputManager {
     // Force render to show changes
     this.sceneManager.render();
 
-    // Log all current positions when entering edit mode
-    if (this.editMode) {
-      console.log("\n📍 Current Layout (copy to server/index.js):");
-      console.log("obstacles: [");
-      this.sceneManager.obstacles.forEach((obstacle) => {
-        // Skip obstacles without position data
-        if (!obstacle.position || !obstacle.userData) {
-          console.warn(
-            "⚠️ Skipping obstacle without position or userData:",
-            obstacle
-          );
-          return;
-        }
-
-        console.log(`  {`);
-        console.log(`    id: "${obstacle.userData.id}",`);
-        console.log(`    x: ${obstacle.position.x.toFixed(2)},`);
-        console.log(`    y: ${obstacle.position.y.toFixed(2)},`);
-        console.log(`    z: ${obstacle.position.z.toFixed(2)},`);
-        console.log(`    width: ${obstacle.userData.width},`);
-        console.log(`    height: ${obstacle.userData.height},`);
-        console.log(`    depth: ${obstacle.userData.depth},`);
-        console.log(`  },`);
-      });
-      console.log("];\n");
-    }
-
     this.uiManager.updateEditModeUI(this.editMode);
   }
 
@@ -768,7 +741,7 @@ export class InputManager {
    * Perform player action
    */
   performAction(action) {
-    console.log(`🎬 Performing action: ${action}`);
+    // console.log(`🎬 Performing action: ${action}`);
 
     // Send action to network manager to broadcast to other players
     if (this.networkManager && this.networkManager.playerManager) {
@@ -816,9 +789,9 @@ export class InputManager {
       const furnitureResponse = await fetch("/api/models/furniture");
       if (furnitureResponse.ok) {
         this.furnitureModels = await furnitureResponse.json();
-        console.log(
-          `📦 Loaded ${this.furnitureModels.length} furniture models`
-        );
+        // console.log(
+        //   `📦 Loaded ${this.furnitureModels.length} furniture models`
+        // );
       } else {
         console.error("Failed to load furniture models");
         this.furnitureModels = [];
@@ -828,7 +801,7 @@ export class InputManager {
       const foodResponse = await fetch("/api/models/food");
       if (foodResponse.ok) {
         this.foodModels = await foodResponse.json();
-        console.log(`🍔 Loaded ${this.foodModels.length} food models`);
+        // console.log(`🍔 Loaded ${this.foodModels.length} food models`);
       } else {
         console.error("Failed to load food models");
         this.foodModels = [];
@@ -964,11 +937,11 @@ export class InputManager {
         rotation: furniture.userData.rotation,
       });
 
-      console.log(
-        `✨ Spawned furniture: ${modelName} at scale 4 size:(${bbox.width.toFixed(
-          2
-        )}x${bbox.height.toFixed(2)}x${bbox.depth.toFixed(2)})`
-      );
+      // console.log(
+      //   `✨ Spawned furniture: ${modelName} at scale 4 size:(${bbox.width.toFixed(
+      //     2
+      //   )}x${bbox.height.toFixed(2)}x${bbox.depth.toFixed(2)})`
+      // );
     } catch (error) {
       console.error(`Failed to spawn furniture ${modelName}:`, error);
     }
@@ -1004,7 +977,7 @@ export class InputManager {
         depth: foodModel.userData.depth,
       });
 
-      console.log(`✨ Spawned food: ${foodName} at scale 1.5`);
+      // console.log(`✨ Spawned food: ${foodName} at scale 1.5`);
     }
   }
 
@@ -1019,12 +992,12 @@ export class InputManager {
       btn.textContent = "🗑️ Delete Mode (ON)";
       btn.className =
         "w-full py-2 px-4 rounded-lg bg-green-500/30 hover:bg-green-500/40 border-2 border-green-500 text-white font-bold text-sm transition-all hover:scale-105 active:scale-95";
-      console.log("🗑️ Delete Mode ON - Click objects to delete them");
+      // console.log("🗑️ Delete Mode ON - Click objects to delete them");
     } else {
       btn.textContent = "🗑️ Delete Mode (OFF)";
       btn.className =
         "w-full py-2 px-4 rounded-lg bg-red-500/20 hover:bg-red-500/30 border-2 border-red-500 text-white font-bold text-sm transition-all hover:scale-105 active:scale-95";
-      console.log("✅ Delete Mode OFF");
+      // console.log("✅ Delete Mode OFF");
     }
   }
 
@@ -1054,7 +1027,7 @@ export class InputManager {
       this.networkManager.deleteObstacle(objectId);
     }
 
-    console.log(`🗑️ Deleted: ${objectId}`);
+    // console.log(`🗑️ Deleted: ${objectId}`);
   }
 
   /**
