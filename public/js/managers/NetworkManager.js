@@ -343,6 +343,12 @@ export class NetworkManager {
         if (isPassthrough !== undefined) {
           obstacle.userData.isPassthrough = isPassthrough;
         }
+
+        // Update lamp light position if this is a lamp
+        if (this.sceneManager.lightingManager) {
+          this.sceneManager.lightingManager.updateLightPosition(obstacle);
+        }
+
         console.log(
           `📦 Obstacle ${id} updated by another player${
             isPassthrough !== undefined
@@ -356,11 +362,22 @@ export class NetworkManager {
     // Handle new obstacle spawned by other players
     this.socket.on("obstacleSpawned", async (obstacleData) => {
       const obstacle = await this.sceneManager.createObstacle(obstacleData);
+
       // Apply highlight if edit mode is active
       if (this.inputManager && this.inputManager.editMode && obstacle) {
         this.inputManager.highlightObject(obstacle);
       }
+
       console.log(`✨ Obstacle ${obstacleData.id} spawned by another player`);
+
+      // Log if it's a lamp (light should have been auto-added by createObstacle)
+      if (
+        obstacle &&
+        this.sceneManager.lightingManager &&
+        this.sceneManager.lightingManager.isLampObject(obstacle)
+      ) {
+        console.log(`💡 Lamp light auto-added for: ${obstacleData.id}`);
+      }
     });
 
     // Handle spawn confirmation from server (when we spawn something)
@@ -424,6 +441,11 @@ export class NetworkManager {
         (obs) => obs.userData.id === id
       );
       if (obstacle) {
+        // Remove lamp light if this is a lamp
+        if (this.sceneManager.lightingManager) {
+          this.sceneManager.lightingManager.removeLight(id);
+        }
+
         this.sceneManager.scene.remove(obstacle);
         const index = this.sceneManager.obstacles.indexOf(obstacle);
         if (index > -1) {
