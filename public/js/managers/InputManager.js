@@ -174,6 +174,16 @@ export class InputManager {
         e.preventDefault();
         this.togglePassthrough();
       }
+
+      // Opacity controls ([ and ] keys) - for walls/objects
+      if (e.code === "BracketLeft") {
+        e.preventDefault();
+        this.adjustOpacity(-0.1); // Decrease opacity (more transparent)
+      }
+      if (e.code === "BracketRight") {
+        e.preventDefault();
+        this.adjustOpacity(0.1); // Increase opacity (more opaque)
+      }
     }
   }
 
@@ -340,6 +350,51 @@ export class InputManager {
     //     isPassthrough ? "ON (walkable)" : "OFF (solid)"
     //   }`
     // );
+
+    // Force render
+    this.sceneManager.render();
+  }
+
+  /**
+   * Adjust opacity of selected object (for walls to see through them)
+   */
+  adjustOpacity(delta) {
+    if (!this.selectedObstacle) return;
+
+    // Initialize opacity if not set
+    if (this.selectedObstacle.userData.opacity === undefined) {
+      this.selectedObstacle.userData.opacity = 1.0;
+    }
+
+    // Adjust opacity (clamp between 0.1 and 1.0)
+    this.selectedObstacle.userData.opacity = Math.max(
+      0.1,
+      Math.min(1.0, this.selectedObstacle.userData.opacity + delta)
+    );
+
+    const newOpacity = this.selectedObstacle.userData.opacity;
+
+    // Apply opacity to all materials in the object
+    this.selectedObstacle.traverse((child) => {
+      if (child.isMesh && child.material) {
+        // Enable transparency
+        child.material.transparent = true;
+        child.material.opacity = newOpacity;
+        child.material.needsUpdate = true;
+      }
+    });
+
+    console.log(
+      `👁️ ${this.selectedObstacle.userData.id} opacity: ${(
+        newOpacity * 100
+      ).toFixed(0)}%`
+    );
+
+    // Send update to server (we'll need to add opacity to the update)
+    this.networkManager.updateObstacleOpacity(
+      this.selectedObstacle.userData.id,
+      newOpacity
+    );
 
     // Force render
     this.sceneManager.render();
@@ -563,7 +618,7 @@ export class InputManager {
         }`
       );
       console.log(
-        `   Controls: Q/R = rotate, W/S = height, P = toggle passthrough, Delete = remove`
+        `   Controls: Q/R = rotate, W/S = height, P = passthrough, [/] = opacity, Delete = remove`
       );
     }
   }

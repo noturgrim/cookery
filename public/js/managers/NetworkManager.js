@@ -374,7 +374,7 @@ export class NetworkManager {
 
     // Handle obstacle updates
     this.socket.on("obstacleUpdated", (data) => {
-      const { id, x, y, z, rotation, isPassthrough } = data;
+      const { id, x, y, z, rotation, isPassthrough, opacity } = data;
       const obstacle = this.sceneManager.obstacles.find(
         (obs) => obs.userData.id === id
       );
@@ -385,6 +385,16 @@ export class NetworkManager {
         }
         if (isPassthrough !== undefined) {
           obstacle.userData.isPassthrough = isPassthrough;
+        }
+        if (opacity !== undefined) {
+          obstacle.userData.opacity = opacity;
+          obstacle.traverse((child) => {
+            if (child.isMesh && child.material) {
+              child.material.transparent = true;
+              child.material.opacity = opacity;
+              child.material.needsUpdate = true;
+            }
+          });
         }
 
         // Update lamp light position if this is a lamp
@@ -397,7 +407,32 @@ export class NetworkManager {
             isPassthrough !== undefined
               ? ` [PASSTHROUGH: ${isPassthrough}]`
               : ""
+          }${
+            opacity !== undefined
+              ? ` [OPACITY: ${(opacity * 100).toFixed(0)}%]`
+              : ""
           }`
+        );
+      }
+    });
+
+    // Handle opacity-only updates
+    this.socket.on("obstacleOpacityUpdated", (data) => {
+      const { id, opacity } = data;
+      const obstacle = this.sceneManager.obstacles.find(
+        (obs) => obs.userData.id === id
+      );
+      if (obstacle) {
+        obstacle.userData.opacity = opacity;
+        obstacle.traverse((child) => {
+          if (child.isMesh && child.material) {
+            child.material.transparent = true;
+            child.material.opacity = opacity;
+            child.material.needsUpdate = true;
+          }
+        });
+        console.log(
+          `👁️ Obstacle ${id} opacity: ${(opacity * 100).toFixed(0)}%`
         );
       }
     });
@@ -644,13 +679,33 @@ export class NetworkManager {
   /**
    * Update obstacle position, rotation, and passthrough status on server
    */
-  updateObstacle(id, x, y, z, rotation = 0, isPassthrough = undefined) {
+  updateObstacle(
+    id,
+    x,
+    y,
+    z,
+    rotation = 0,
+    isPassthrough = undefined,
+    opacity = undefined
+  ) {
     if (this.socket) {
       const data = { id, x, y, z, rotation };
       if (isPassthrough !== undefined) {
         data.isPassthrough = isPassthrough;
       }
+      if (opacity !== undefined) {
+        data.opacity = opacity;
+      }
       this.socket.emit("updateObstacle", data);
+    }
+  }
+
+  /**
+   * Update only the opacity of an obstacle
+   */
+  updateObstacleOpacity(id, opacity) {
+    if (this.socket) {
+      this.socket.emit("updateObstacleOpacity", { id, opacity });
     }
   }
 

@@ -1651,6 +1651,13 @@ io.on("connection", (socket) => {
         obstacle.isPassthrough = Boolean(data.isPassthrough);
       }
 
+      if (data.opacity !== undefined) {
+        const opacity = parseFloat(data.opacity);
+        if (!isNaN(opacity) && opacity >= 0.1 && opacity <= 1.0) {
+          obstacle.opacity = opacity;
+        }
+      }
+
       // Save to database
       await saveObstacle(obstacle);
 
@@ -1662,6 +1669,7 @@ io.on("connection", (socket) => {
         z: obstacle.z,
         rotation: obstacle.rotation,
         isPassthrough: obstacle.isPassthrough,
+        opacity: obstacle.opacity,
       });
 
       // Recreate pathfinder with updated obstacles
@@ -1676,6 +1684,47 @@ io.on("connection", (socket) => {
       );
     } catch (error) {
       console.error(`❌ Error updating obstacle:`, error);
+    }
+  });
+
+  // Handle obstacle opacity updates (lightweight update for walls/transparency)
+  socket.on("updateObstacleOpacity", async (data) => {
+    try {
+      // Rate limiting (use UPDATE_OBSTACLE limit)
+      if (!rateLimiter.checkLimit(socket.id, "UPDATE_OBSTACLE")) {
+        return;
+      }
+
+      // Validate ID
+      const idValidation = validateId(data.id);
+      if (!idValidation.valid) return;
+
+      // Find the obstacle
+      const obstacle = gameState.obstacles.find(
+        (obs) => obs.id === idValidation.sanitized
+      );
+      if (!obstacle) return;
+
+      // Validate and set opacity
+      const opacity = parseFloat(data.opacity);
+      if (!isNaN(opacity) && opacity >= 0.1 && opacity <= 1.0) {
+        obstacle.opacity = opacity;
+
+        // Save to database
+        await saveObstacle(obstacle);
+
+        // Broadcast opacity update to all clients
+        io.emit("obstacleOpacityUpdated", {
+          id: obstacle.id,
+          opacity: obstacle.opacity,
+        });
+
+        console.log(
+          `👁️ Obstacle ${obstacle.id} opacity: ${(opacity * 100).toFixed(0)}%`
+        );
+      }
+    } catch (error) {
+      console.error(`❌ Error updating obstacle opacity:`, error);
     }
   });
 

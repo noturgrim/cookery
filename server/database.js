@@ -245,6 +245,12 @@ export async function initializeDatabase() {
       ADD COLUMN IF NOT EXISTS is_passthrough BOOLEAN DEFAULT false
     `);
 
+    // Add opacity column to obstacles table if it doesn't exist
+    await pool.query(`
+      ALTER TABLE obstacles 
+      ADD COLUMN IF NOT EXISTS opacity FLOAT DEFAULT 1.0
+    `);
+
     // Create world_time table (single row for global time state)
     await pool.query(`
       CREATE TABLE IF NOT EXISTS world_time (
@@ -316,6 +322,7 @@ export async function loadObstacles() {
       scale: parseFloat(row.scale),
       rotation: parseFloat(row.rotation),
       isPassthrough: row.is_passthrough || false,
+      opacity: parseFloat(row.opacity) || 1.0,
     }));
   } catch (error) {
     console.error("❌ Error loading obstacles:", error);
@@ -333,8 +340,8 @@ export async function saveObstacle(obstacle) {
 
     const result = await pool.query(
       `
-      INSERT INTO obstacles (id, name, type, x, y, z, width, height, depth, model, scale, rotation, is_passthrough, updated_at)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, CURRENT_TIMESTAMP)
+      INSERT INTO obstacles (id, name, type, x, y, z, width, height, depth, model, scale, rotation, is_passthrough, opacity, updated_at)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, CURRENT_TIMESTAMP)
       ON CONFLICT (id) 
       DO UPDATE SET 
         x = $4, 
@@ -347,6 +354,7 @@ export async function saveObstacle(obstacle) {
         scale = $11,
         rotation = $12,
         is_passthrough = $13,
+        opacity = $14,
         updated_at = CURRENT_TIMESTAMP
       RETURNING id
     `,
@@ -364,6 +372,7 @@ export async function saveObstacle(obstacle) {
         obstacle.scale || 1.0,
         obstacle.rotation || 0.0,
         obstacle.isPassthrough || false,
+        obstacle.opacity || 1.0,
       ]
     );
 

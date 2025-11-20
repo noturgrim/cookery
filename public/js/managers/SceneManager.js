@@ -341,7 +341,24 @@ export class SceneManager {
       scale: obstacleData.scale || 1,
       rotation: obstacleData.rotation || 0,
       isPassthrough: obstacleData.isPassthrough || false, // Doorways/archways can be walked through
+      opacity: obstacleData.opacity !== undefined ? obstacleData.opacity : 1.0, // Store opacity
     };
+
+    // Apply opacity to all materials if less than 1.0
+    if (obstacleData.opacity !== undefined && obstacleData.opacity < 1.0) {
+      obstacle.traverse((child) => {
+        if (child.isMesh && child.material) {
+          child.material.transparent = true;
+          child.material.opacity = obstacleData.opacity;
+          child.material.needsUpdate = true;
+        }
+      });
+      console.log(
+        `👁️ Applied opacity ${(obstacleData.opacity * 100).toFixed(0)}% to ${
+          obstacleData.id
+        }`
+      );
+    }
 
     this.scene.add(obstacle);
     this.obstacles.push(obstacle);
