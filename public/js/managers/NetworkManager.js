@@ -99,6 +99,24 @@ export class NetworkManager {
       // Clear existing players
       this.playerManager.clear();
 
+      // Initialize world time from server
+      if (
+        data.worldTime &&
+        this.sceneManager &&
+        this.sceneManager.dayNightCycle
+      ) {
+        try {
+          this.sceneManager.dayNightCycle.syncFromServer(data.worldTime);
+          // Enable sync now that we're authenticated
+          this.sceneManager.dayNightCycle.enableSync();
+          console.log(
+            `🕒 World time synced: ${data.worldTime.currentTime.toFixed(2)}h`
+          );
+        } catch (error) {
+          console.warn("⚠️ Failed to sync world time:", error);
+        }
+      }
+
       // Sync all furniture collision boxes to server after a delay (wait for scene to load)
       setTimeout(() => {
         this.syncAllFurnitureCollisions();
@@ -290,6 +308,13 @@ export class NetworkManager {
           }
         }
       });
+    });
+
+    // Handle world time updates from server
+    this.socket.on("worldTimeUpdate", (data) => {
+      if (this.sceneManager.dayNightCycle) {
+        this.sceneManager.dayNightCycle.syncFromServer(data);
+      }
     });
 
     // Handle path updates

@@ -14,6 +14,8 @@ import pool, {
   saveFoodItem,
   deleteFoodItem,
   cleanupExpiredSessions,
+  getWorldTime,
+  updateWorldTime,
 } from "./database.js";
 import {
   registerUser,
@@ -205,6 +207,47 @@ app.get("/api/models/food", async (req, res) => {
   } catch (error) {
     console.error("Error reading food directory:", error);
     res.status(500).json({ error: "Failed to load food models" });
+  }
+});
+
+// World Time API endpoints
+app.get("/api/world-time", async (req, res) => {
+  try {
+    const worldTime = await getWorldTime();
+    res.json(worldTime);
+  } catch (error) {
+    console.error("❌ Error getting world time:", error);
+    res.status(500).json({ error: "Failed to get world time" });
+  }
+});
+
+app.post("/api/world-time", async (req, res) => {
+  try {
+    const { currentTime, timeSpeed, isPaused } = req.body;
+
+    // Validate inputs
+    if (typeof currentTime !== "number" || !isFinite(currentTime)) {
+      return res.status(400).json({ error: "Invalid currentTime" });
+    }
+    if (typeof timeSpeed !== "number" || !isFinite(timeSpeed)) {
+      return res.status(400).json({ error: "Invalid timeSpeed" });
+    }
+    if (typeof isPaused !== "boolean") {
+      return res.status(400).json({ error: "Invalid isPaused" });
+    }
+
+    const success = await updateWorldTime(currentTime, timeSpeed, isPaused);
+
+    if (success) {
+      // Broadcast time update to all connected clients
+      io.emit("worldTimeUpdate", { currentTime, timeSpeed, isPaused });
+      res.json({ success: true });
+    } else {
+      res.status(500).json({ error: "Failed to update world time" });
+    }
+  } catch (error) {
+    console.error("❌ Error updating world time:", error);
+    res.status(500).json({ error: "Failed to update world time" });
   }
 });
 
@@ -1352,11 +1395,28 @@ io.on("connection", (socket) => {
         user: result.user,
       });
 
+      // Get current world time from database (with fallback)
+      let worldTime;
+      try {
+        worldTime = await getWorldTime();
+      } catch (error) {
+        console.warn(
+          "⚠️ Failed to get world time, using defaults:",
+          error.message
+        );
+        worldTime = {
+          currentTime: 12.0,
+          timeSpeed: 0.1,
+          isPaused: false,
+        };
+      }
+
       socket.emit("init", {
         playerId: socket.id,
         players: Array.from(gameState.players.values()),
         obstacles: gameState.obstacles,
         foodItems: gameState.foodItems,
+        worldTime: worldTime, // Send world time to new player
       });
 
       // Notify other players
@@ -2443,6 +2503,42 @@ io.on("connection", (socket) => {
       `📦 Synced ${syncedCount} furniture collision boxes from client ${socket.id}`
     );
   });
+
+  // Handle world time updates from admin/any player
+  socket.on(
+    "updateWorldTime",
+    requireAuth(async (data) => {
+      try {
+        const { currentTime, timeSpeed, isPaused } = data;
+
+        // Validate inputs
+        if (typeof currentTime !== "number" || !isFinite(currentTime)) {
+          return;
+        }
+        if (typeof timeSpeed !== "number" || !isFinite(timeSpeed)) {
+          return;
+        }
+        if (typeof isPaused !== "boolean") {
+          return;
+        }
+
+        // Update in database
+        const success = await updateWorldTime(currentTime, timeSpeed, isPaused);
+
+        if (success) {
+          // Broadcast to all clients (including sender for confirmation)
+          io.emit("worldTimeUpdate", { currentTime, timeSpeed, isPaused });
+          console.log(
+            `🕒 World time updated: ${currentTime.toFixed(
+              2
+            )}h speed:${timeSpeed}x paused:${isPaused}`
+          );
+        }
+      } catch (error) {
+        console.error("❌ Error handling world time update:", error);
+      }
+    })
+  );
 
   // Handle disconnection
   socket.on("disconnect", () => {

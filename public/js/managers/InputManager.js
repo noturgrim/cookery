@@ -37,6 +37,9 @@ export class InputManager {
     this.isPanning = false;
     this.lastPanPosition = { x: 0, y: 0 };
     this.cameraOffset = { x: 0, z: 0 };
+
+    // Day-Night UI reference (will be set externally)
+    this.dayNightUI = null;
   }
 
   /**
@@ -81,9 +84,14 @@ export class InputManager {
       this.toggleSpawnMenu();
     }
 
-    // Toggle collision boxes with C key (when not in action wheel)
+    // Toggle collision boxes with V key (when not in action wheel)
     if (e.code === "KeyV" && !this.actionWheelActive) {
       this.toggleCollisionBoxes();
+    }
+
+    // Toggle day-night UI with N key
+    if (e.code === "KeyN") {
+      this.toggleDayNightUI();
     }
 
     if (
@@ -1097,6 +1105,20 @@ export class InputManager {
         `${isOn ? "✅" : "❌"} Collision Boxes: ${
           isOn ? "ON" : "OFF"
         } (Press V to toggle)`
+      );
+    }
+  }
+
+  /**
+   * Toggle day-night UI
+   */
+  toggleDayNightUI() {
+    if (this.dayNightUI) {
+      const isVisible = this.dayNightUI.toggle();
+      console.log(
+        `${isVisible ? "🌅" : "❌"} Day-Night UI: ${
+          isVisible ? "OPEN" : "CLOSED"
+        } (Press N to toggle)`
       );
     }
   }

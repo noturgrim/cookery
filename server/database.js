@@ -245,11 +245,31 @@ export async function initializeDatabase() {
       ADD COLUMN IF NOT EXISTS is_passthrough BOOLEAN DEFAULT false
     `);
 
+    // Create world_time table (single row for global time state)
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS world_time (
+        id INTEGER PRIMARY KEY DEFAULT 1,
+        game_time FLOAT NOT NULL DEFAULT 12.0,
+        time_speed FLOAT NOT NULL DEFAULT 0.1,
+        is_paused BOOLEAN DEFAULT false,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        CONSTRAINT single_row_check CHECK (id = 1)
+      )
+    `);
+
+    // Insert default world time if not exists
+    await pool.query(`
+      INSERT INTO world_time (id, game_time, time_speed, is_paused)
+      VALUES (1, 12.0, 0.1, false)
+      ON CONFLICT (id) DO NOTHING
+    `);
+
     console.log("✅ Database tables initialized");
     console.log("   - users table ready");
     console.log("   - sessions table ready");
     console.log("   - obstacles table ready");
     console.log("   - food_items table ready");
+    console.log("   - world_time table ready");
   } catch (error) {
     console.error("❌ Error initializing database:", error);
   }
@@ -680,6 +700,75 @@ export async function cleanupExpiredSessions() {
   } catch (error) {
     console.error("❌ Error cleaning up sessions:", error);
     return 0;
+  }
+}
+
+/**
+ * Get world time state
+ */
+export async function getWorldTime() {
+  try {
+    const result = await pool.query(
+      `SELECT game_time, time_speed, is_paused, updated_at FROM world_time WHERE id = 1`
+    );
+
+    if (result.rows.length > 0) {
+      return {
+        currentTime: parseFloat(result.rows[0].game_time),
+        timeSpeed: parseFloat(result.rows[0].time_speed),
+        isPaused: result.rows[0].is_paused,
+        updatedAt: result.rows[0].updated_at,
+      };
+    }
+
+    // Return default if not found
+    return {
+      currentTime: 12.0,
+      timeSpeed: 0.1,
+      isPaused: false,
+      updatedAt: new Date(),
+    };
+  } catch (error) {
+    console.error("❌ Error getting world time:", error);
+    return {
+      currentTime: 12.0,
+      timeSpeed: 0.1,
+      isPaused: false,
+      updatedAt: new Date(),
+    };
+  }
+}
+
+/**
+ * Update world time state
+ */
+export async function updateWorldTime(currentTime, timeSpeed, isPaused) {
+  try {
+    // Validate inputs
+    if (typeof currentTime !== "number" || !isFinite(currentTime)) {
+      throw new Error("Invalid currentTime: must be a finite number");
+    }
+    if (typeof timeSpeed !== "number" || !isFinite(timeSpeed)) {
+      throw new Error("Invalid timeSpeed: must be a finite number");
+    }
+    if (typeof isPaused !== "boolean") {
+      throw new Error("Invalid isPaused: must be a boolean");
+    }
+
+    // Normalize time to 0-24 range
+    const normalizedTime = ((currentTime % 24) + 24) % 24;
+
+    await pool.query(
+      `UPDATE world_time 
+       SET game_time = $1, time_speed = $2, is_paused = $3, updated_at = CURRENT_TIMESTAMP
+       WHERE id = 1`,
+      [normalizedTime, timeSpeed, isPaused]
+    );
+
+    return true;
+  } catch (error) {
+    console.error("❌ Error updating world time:", error.message);
+    return false;
   }
 }
 

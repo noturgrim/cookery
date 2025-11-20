@@ -1,5 +1,6 @@
 import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js";
 import { GLTFLoader } from "https://unpkg.com/three@0.160.0/examples/jsm/loaders/GLTFLoader.js";
+import { DayNightCycle } from "./DayNightCycle.js";
 
 /**
  * Scene Manager
@@ -33,6 +34,13 @@ export class SceneManager {
     // Collision box visualization
     this.collisionBoxes = [];
     this.showCollisionBoxes = false;
+
+    // Lights (stored for day-night cycle)
+    this.ambientLight = null;
+    this.directionalLight = null;
+
+    // Day-Night Cycle
+    this.dayNightCycle = null;
   }
 
   /**
@@ -84,6 +92,7 @@ export class SceneManager {
   setupScene() {
     // Create scene
     this.scene = new THREE.Scene();
+    // Initial background color (will be controlled by day-night cycle)
     this.scene.background = new THREE.Color(0x87ceeb); // Sky blue
 
     // Orthographic Camera Setup for Isometric View
@@ -123,23 +132,31 @@ export class SceneManager {
    */
   setupLights() {
     // Ambient light for overall illumination
-    const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
-    this.scene.add(ambientLight);
+    this.ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+    this.scene.add(this.ambientLight);
 
     // Directional light for shadows
-    const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
-    directionalLight.position.set(10, 20, 10);
-    directionalLight.castShadow = true;
+    this.directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+    this.directionalLight.position.set(10, 20, 10);
+    this.directionalLight.castShadow = true;
 
     // Configure shadow properties
-    directionalLight.shadow.camera.left = -30;
-    directionalLight.shadow.camera.right = 30;
-    directionalLight.shadow.camera.top = 30;
-    directionalLight.shadow.camera.bottom = -30;
-    directionalLight.shadow.mapSize.width = 1024;
-    directionalLight.shadow.mapSize.height = 1024;
+    this.directionalLight.shadow.camera.left = -30;
+    this.directionalLight.shadow.camera.right = 30;
+    this.directionalLight.shadow.camera.top = 30;
+    this.directionalLight.shadow.camera.bottom = -30;
+    this.directionalLight.shadow.mapSize.width = 1024;
+    this.directionalLight.shadow.mapSize.height = 1024;
 
-    this.scene.add(directionalLight);
+    this.scene.add(this.directionalLight);
+
+    // Initialize day-night cycle after lights are set up (networkManager will be set later)
+    this.dayNightCycle = new DayNightCycle(
+      this.scene,
+      this.ambientLight,
+      this.directionalLight,
+      null // NetworkManager will be set later in game.js
+    );
   }
 
   /**
@@ -437,6 +454,12 @@ export class SceneManager {
    */
   render() {
     if (this.scene && this.renderer && this.camera) {
+      // Update day-night cycle
+      if (this.dayNightCycle) {
+        const delta = this.clock.getDelta();
+        this.dayNightCycle.update(delta);
+      }
+
       this.renderer.render(this.scene, this.camera);
     }
   }

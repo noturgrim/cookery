@@ -6,6 +6,8 @@ import { UIManager } from "./managers/UIManager.js";
 import { InputManager } from "./managers/InputManager.js";
 import { NetworkManager } from "./managers/NetworkManager.js";
 import { InteractionManager } from "./managers/InteractionManager.js";
+import { DayNightUI } from "./managers/DayNightUI.js";
+import { TimeDisplay } from "./managers/TimeDisplay.js";
 
 /**
  * Main Game Class
@@ -159,6 +161,10 @@ class Game {
 
     // Initialize player manager
     this.playerManager = new PlayerManager(this.sceneManager, this.uiManager);
+
+    // Day-Night UI will be initialized after input manager is ready
+    this.dayNightUI = null;
+    this.timeDisplay = null;
 
     // Start rendering loop
     this.animate();
@@ -547,6 +553,20 @@ class Game {
 
     // Set input manager reference in network manager for edit mode sync
     this.networkManager.setInputManager(this.inputManager);
+
+    // Initialize Day-Night UI now that input manager is ready
+    if (this.sceneManager.dayNightCycle) {
+      this.dayNightUI = new DayNightUI(this.sceneManager.dayNightCycle);
+      this.inputManager.dayNightUI = this.dayNightUI;
+
+      // Initialize minimal time display
+      this.timeDisplay = new TimeDisplay(this.sceneManager.dayNightCycle);
+
+      // Connect network manager to day-night cycle for syncing
+      this.sceneManager.dayNightCycle.setNetworkManager(this.networkManager);
+
+      console.log("🌅 Day-Night Cycle initialized! Press N to open controls");
+    }
 
     // Initialize interaction manager
     this.interactionManager = new InteractionManager(
