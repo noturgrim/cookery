@@ -24,6 +24,7 @@
 
     <link rel="stylesheet" href="/css/styles.css" />
     <link rel="stylesheet" href="/css/emote-wheel.css" />
+    <link rel="stylesheet" href="/css/action-wheel.css" />
     <link rel="stylesheet" href="/css/spawn-menu.css" />
 
     <style>
@@ -346,6 +347,57 @@
       </div>
     </div>
 
+    <!-- Action Wheel -->
+    <div id="action-wheel-container">
+      <div id="action-wheel">
+        <div class="action-wheel-center">Hold C<br />Select Action</div>
+
+        <div class="action-option" data-action="jump">
+          <span>🦘</span>
+          <span class="action-option-label">Jump</span>
+        </div>
+
+        <div class="action-option" data-action="wave">
+          <span>👋</span>
+          <span class="action-option-label">Wave</span>
+        </div>
+
+        <div class="action-option" data-action="kick">
+          <span>🦵</span>
+          <span class="action-option-label">Kick</span>
+        </div>
+
+        <div class="action-option" data-action="yes">
+          <span>✅</span>
+          <span class="action-option-label">Yes</span>
+        </div>
+
+        <div class="action-option" data-action="crouch">
+          <span>⬇️</span>
+          <span class="action-option-label">Pickup</span>
+        </div>
+
+        <div class="action-option" data-action="spin">
+          <span>🏃</span>
+          <span class="action-option-label">Sprint</span>
+        </div>
+
+        <div class="action-option" data-action="no">
+          <span>❌</span>
+          <span class="action-option-label">No</span>
+        </div>
+
+        <div class="action-option" data-action="point">
+          <span>☝️</span>
+          <span class="action-option-label">Point</span>
+        </div>
+      </div>
+
+      <div id="action-help">
+        Hold <strong>C</strong> and hover to select • Release to perform
+      </div>
+    </div>
+
     <!-- Audio Unlock Notice -->
     <div
       id="audio-unlock-notice"
@@ -455,6 +507,8 @@
             <li><span class="key">🎡</span> Zoom</li>
             <li><span class="key">E</span> Edit Mode</li>
             <li><span class="key">B</span> Spawn</li>
+            <li><span class="key">C</span> Actions</li>
+            <li><span class="key">T</span> Emotes</li>
             <li>Edit: Q/R rotate selected</li>
           </ul>
         </div>

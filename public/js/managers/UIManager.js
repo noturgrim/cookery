@@ -270,6 +270,107 @@ export class UIManager {
   }
 
   /**
+   * Show action indicator above player
+   */
+  showActionIndicator(playerMesh, actionName, camera) {
+    if (!playerMesh) return;
+
+    // Get text labels and emojis for actions
+    const actionLabels = {
+      jump: "🦘 Jump!",
+      kick: "🦵 Kick!",
+      wave: "👋 Wave!",
+      yes: "✅ Yes!",
+      no: "❌ No!",
+      crouch: "⬇️ Pickup!",
+      spin: "🏃 Sprint!",
+      point: "☝️ Point!",
+      sit: "🪑 Sit!",
+    };
+
+    const label = actionLabels[actionName] || actionName.toUpperCase();
+
+    // Create indicator element
+    const indicator = document.createElement("div");
+    indicator.className = "action-indicator";
+    indicator.textContent = label;
+    indicator.style.position = "absolute";
+    indicator.style.zIndex = "1000";
+    indicator.style.pointerEvents = "none";
+    indicator.style.whiteSpace = "nowrap";
+    indicator.style.transition = "opacity 0.3s";
+
+    document.body.appendChild(indicator);
+
+    // Track existing indicators for this player for cleanup
+    if (!this.playerActionIndicators) {
+      this.playerActionIndicators = new Map();
+    }
+
+    if (!this.playerActionIndicators.has(playerMesh)) {
+      this.playerActionIndicators.set(playerMesh, []);
+    }
+
+    const indicators = this.playerActionIndicators.get(playerMesh);
+    indicators.push(indicator);
+
+    // Animation state
+    let progress = 0;
+    const duration = 2.0; // 2 seconds total
+    const floatSpeed = 50; // pixels per second upward
+
+    // Position above player (update every frame)
+    const updatePosition = () => {
+      if (!playerMesh || !indicator.parentElement) return;
+
+      progress += 0.016; // ~60fps
+      const t = progress / duration;
+
+      // Calculate base position
+      const vector = playerMesh.position.clone();
+      vector.y += 3;
+      vector.project(camera);
+
+      const x = (vector.x * 0.5 + 0.5) * window.innerWidth;
+      const y = (vector.y * -0.5 + 0.5) * window.innerHeight;
+
+      // Float upward
+      const floatOffset = progress * floatSpeed;
+      indicator.style.left = x - indicator.offsetWidth / 2 + "px";
+      indicator.style.top = y - floatOffset + "px";
+
+      // Fade out in last 30% of duration
+      if (t > 0.7) {
+        indicator.style.opacity = 1 - (t - 0.7) / 0.3;
+      }
+
+      if (t < 1) {
+        requestAnimationFrame(updatePosition);
+      }
+    };
+    updatePosition();
+
+    // Remove after duration
+    setTimeout(() => {
+      indicator.style.opacity = "0";
+      setTimeout(() => {
+        if (indicator.parentElement) {
+          indicator.remove();
+        }
+
+        // Clean up from tracking
+        const idx = indicators.indexOf(indicator);
+        if (idx > -1) {
+          indicators.splice(idx, 1);
+        }
+        if (indicators.length === 0) {
+          this.playerActionIndicators.delete(playerMesh);
+        }
+      }, 300);
+    }, duration * 1000);
+  }
+
+  /**
    * Update edit mode UI
    */
   updateEditModeUI(isEditMode) {

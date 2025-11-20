@@ -1291,6 +1291,19 @@ io.on("connection", (socket) => {
     console.log(`🎵 Player ${playerId} played emote: ${emote}`);
   });
 
+  // Handle player actions
+  socket.on("playerAction", (data) => {
+    const { playerId, action } = data;
+
+    // Broadcast to all players (including sender for consistency)
+    io.emit("playerAction", {
+      playerId: playerId,
+      action: action,
+    });
+
+    console.log(`🎬 Player ${playerId} performed action: ${action}`);
+  });
+
   // Handle disconnection
   socket.on("disconnect", () => {
     console.log(`Player disconnected: ${socket.id}`);

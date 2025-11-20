@@ -105,8 +105,9 @@ export class CharacterManager {
       characterModel.scale.set(1.2, 1.2, 1.2);
       group.add(characterModel);
 
-      // Store character model reference
+      // Store character model reference and animations
       group.userData.characterModel = characterModel;
+      group.userData.animations = modelData.animations;
     } else {
       // Fallback: Use primitive shapes
       this.createPrimitiveCharacter(group, playerData.color);

@@ -14,9 +14,22 @@ export class AnimationController {
    * @param {string} playerId - Unique player identifier
    * @param {THREE.Object3D} characterModel - The character 3D model
    * @param {THREE.AnimationMixer} mixer - Three.js animation mixer
+   * @param {Array} animations - GLTF animation clips
    */
-  initializeAnimation(playerId, characterModel, mixer) {
+  initializeAnimation(playerId, characterModel, mixer, animations = []) {
     const limbs = this.findLimbs(characterModel);
+
+    // Store animation clips
+    const animationClips = {};
+    if (animations && animations.length > 0) {
+      animations.forEach((clip) => {
+        animationClips[clip.name.toLowerCase()] = clip;
+      });
+      console.log(
+        `🎬 Available animations for player ${playerId}:`,
+        Object.keys(animationClips)
+      );
+    }
 
     // Store original positions and rotations for each limb
     const originalTransforms = {
@@ -66,6 +79,8 @@ export class AnimationController {
       originalTransforms: originalTransforms,
       walkCycle: 0,
       previousWalkCycle: 0,
+      animationClips: animationClips,
+      currentAction: null,
     });
 
     console.log(`🎬 Animation initialized for player ${playerId}:`, {
@@ -372,6 +387,73 @@ export class AnimationController {
    */
   removePlayer(playerId) {
     this.mixers.delete(playerId);
+  }
+
+  /**
+   * Play an animation clip by name
+   * @param {string} playerId - Player identifier
+   * @param {string} animationName - Name of the animation to play
+   * @param {number} duration - Duration to play (optional, plays full clip if not specified)
+   * @param {boolean} loop - Whether to loop the animation
+   * @returns {boolean} Whether animation was found and played
+   */
+  playAnimationClip(playerId, animationName, duration = null, loop = false) {
+    const animData = this.mixers.get(playerId);
+    if (!animData || !animData.mixer) return false;
+
+    const clipName = animationName.toLowerCase();
+    const clip = animData.animationClips[clipName];
+
+    if (!clip) {
+      console.warn(
+        `Animation "${animationName}" not found for player ${playerId}`
+      );
+      return false;
+    }
+
+    // Stop current action if any
+    if (animData.currentAction) {
+      animData.currentAction.stop();
+    }
+
+    // Create and play new action
+    const action = animData.mixer.clipAction(clip);
+    action.reset();
+    action.setLoop(
+      loop ? THREE.LoopRepeat : THREE.LoopOnce,
+      loop ? Infinity : 1
+    );
+    action.clampWhenFinished = true;
+    action.play();
+
+    animData.currentAction = action;
+
+    // Auto-stop after duration if specified
+    if (duration && !loop) {
+      setTimeout(() => {
+        if (animData.currentAction === action) {
+          action.stop();
+          animData.currentAction = null;
+        }
+      }, duration);
+    }
+
+    console.log(
+      `▶️ Playing animation "${animationName}" for player ${playerId}`
+    );
+    return true;
+  }
+
+  /**
+   * Stop current animation for a player
+   * @param {string} playerId - Player identifier
+   */
+  stopCurrentAnimation(playerId) {
+    const animData = this.mixers.get(playerId);
+    if (animData && animData.currentAction) {
+      animData.currentAction.stop();
+      animData.currentAction = null;
+    }
   }
 
   /**

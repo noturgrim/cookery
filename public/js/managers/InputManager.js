@@ -28,6 +28,10 @@ export class InputManager {
     this.emoteWheelActive = false;
     this.selectedEmote = null;
 
+    // Action wheel state
+    this.actionWheelActive = false;
+    this.selectedAction = null;
+
     // Camera panning state
     this.isPanning = false;
     this.lastPanPosition = { x: 0, y: 0 };
@@ -59,6 +63,9 @@ export class InputManager {
 
     // Emote wheel
     this.setupEmoteWheel();
+
+    // Action wheel
+    this.setupActionWheel();
   }
 
   /**
@@ -610,6 +617,75 @@ export class InputManager {
         }
       });
     });
+  }
+
+  /**
+   * Setup action wheel
+   */
+  setupActionWheel() {
+    const container = document.getElementById("action-wheel-container");
+    const actionOptions = document.querySelectorAll(".action-option");
+
+    // Show wheel when C is pressed
+    window.addEventListener("keydown", (e) => {
+      if ((e.key === "c" || e.key === "C") && !this.actionWheelActive) {
+        e.preventDefault();
+        this.actionWheelActive = true;
+        container.classList.add("active");
+      }
+    });
+
+    // Hide wheel and perform action when C is released
+    window.addEventListener("keyup", (e) => {
+      if ((e.key === "c" || e.key === "C") && this.actionWheelActive) {
+        e.preventDefault();
+        this.actionWheelActive = false;
+        container.classList.remove("active");
+
+        // Perform selected action
+        if (this.selectedAction) {
+          this.performAction(this.selectedAction);
+          this.selectedAction = null;
+        }
+
+        // Clear highlights
+        actionOptions.forEach((opt) => opt.classList.remove("highlighted"));
+      }
+    });
+
+    // Highlight actions on hover
+    actionOptions.forEach((option) => {
+      option.addEventListener("mouseenter", () => {
+        if (this.actionWheelActive) {
+          actionOptions.forEach((opt) => opt.classList.remove("highlighted"));
+          option.classList.add("highlighted");
+          this.selectedAction = option.dataset.action;
+        }
+      });
+
+      // Click to select
+      option.addEventListener("click", (e) => {
+        if (this.actionWheelActive) {
+          e.stopPropagation();
+          this.performAction(option.dataset.action);
+          this.actionWheelActive = false;
+          container.classList.remove("active");
+          actionOptions.forEach((opt) => opt.classList.remove("highlighted"));
+        }
+      });
+    });
+  }
+
+  /**
+   * Perform player action
+   */
+  performAction(action) {
+    console.log(`🎬 Performing action: ${action}`);
+
+    // Send action to network manager to broadcast to other players
+    if (this.networkManager && this.networkManager.playerManager) {
+      this.networkManager.performPlayerAction(action);
+    }
   }
 
   /**

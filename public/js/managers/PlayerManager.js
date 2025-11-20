@@ -54,10 +54,12 @@ export class PlayerManager {
     const characterModel = group.userData.characterModel;
     if (characterModel) {
       const mixer = new THREE.AnimationMixer(characterModel);
+      const animations = group.userData.animations || [];
       this.animationController.initializeAnimation(
         playerData.id,
         characterModel,
-        mixer
+        mixer,
+        animations
       );
     }
 
