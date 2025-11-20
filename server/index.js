@@ -167,6 +167,16 @@ const validatePlayerMovement = (player, newX, newZ, debug = false) => {
 
   // Check collision with all obstacles (furniture)
   for (const obstacle of gameState.obstacles) {
+    // Skip passthrough objects (doorways, archways, etc.)
+    if (obstacle.isPassthrough) {
+      if (debug) {
+        console.log(
+          `   ⏭️  Skipping passthrough object: ${obstacle.id || obstacle.model}`
+        );
+      }
+      continue;
+    }
+
     const obstacleAABB = getObstacleAABB(obstacle);
     if (checkAABBCollision(playerAABB, obstacleAABB)) {
       if (debug) {
@@ -257,6 +267,9 @@ class AStarPathfinder {
 
     // Check obstacles
     for (const obstacle of this.obstacles) {
+      // Skip passthrough objects (doorways, archways, etc.)
+      if (obstacle.isPassthrough) continue;
+
       const dx = pos.x - obstacle.x;
       const dz = pos.z - obstacle.z;
       const distance = Math.sqrt(dx * dx + dz * dz);
@@ -305,6 +318,9 @@ class AStarPathfinder {
 
     // Check collision with all obstacles
     for (const obstacle of this.obstacles) {
+      // Skip passthrough objects (doorways, archways, etc.)
+      if (obstacle.isPassthrough) continue;
+
       const obstacleAABB = getObstacleAABB(obstacle);
       if (checkAABBCollision(testAABB, obstacleAABB)) {
         return false; // Not walkable
@@ -1160,7 +1176,7 @@ io.on("connection", (socket) => {
 
   // Handle obstacle updates from clients
   socket.on("updateObstacle", async (data) => {
-    const { id, x, y, z, rotation } = data;
+    const { id, x, y, z, rotation, isPassthrough } = data;
 
     // Find and update the obstacle
     const obstacle = gameState.obstacles.find((obs) => obs.id === id);
@@ -1171,18 +1187,23 @@ io.on("connection", (socket) => {
       if (rotation !== undefined) {
         obstacle.rotation = rotation;
       }
+      if (isPassthrough !== undefined) {
+        obstacle.isPassthrough = isPassthrough;
+      }
 
       // Save to database
       await saveObstacle(obstacle);
 
       // Broadcast update to all clients
-      io.emit("obstacleUpdated", { id, x, y, z, rotation });
+      io.emit("obstacleUpdated", { id, x, y, z, rotation, isPassthrough });
 
       // Recreate pathfinder with updated obstacles
       pathfinder.obstacles = gameState.obstacles;
 
       console.log(
-        `📦 Obstacle ${id} moved to (${x.toFixed(2)}, ${z.toFixed(2)})`
+        `📦 Obstacle ${id} moved to (${x.toFixed(2)}, ${z.toFixed(2)}) ${
+          isPassthrough ? "[PASSTHROUGH]" : ""
+        }`
       );
     }
   });
@@ -1202,6 +1223,7 @@ io.on("connection", (socket) => {
       model: data.model || null,
       scale: data.scale || 1.0,
       rotation: data.rotation || 0.0,
+      isPassthrough: data.isPassthrough || false,
     };
 
     // Add to game state

@@ -115,6 +115,12 @@ export class InputManager {
         e.preventDefault();
         this.moveSelectedObjectVertically(-0.1); // Move down
       }
+
+      // Toggle passthrough mode (P key) - for doorways/archways
+      if (e.code === "KeyP") {
+        e.preventDefault();
+        this.togglePassthrough();
+      }
     }
   }
 
@@ -218,6 +224,60 @@ export class InputManager {
         this.selectedObstacle.userData.id
       } to Y: ${this.selectedObstacle.position.y.toFixed(2)}`
     );
+  }
+
+  /**
+   * Toggle passthrough mode for selected object (for doorways/archways)
+   */
+  togglePassthrough() {
+    if (!this.selectedObstacle) return;
+
+    // Only allow passthrough for furniture, not food items
+    if (this.selectedObstacle.userData.type === "food") {
+      console.log("⚠️ Cannot set passthrough on food items");
+      return;
+    }
+
+    // Toggle the passthrough property
+    this.selectedObstacle.userData.isPassthrough =
+      !this.selectedObstacle.userData.isPassthrough;
+
+    const isPassthrough = this.selectedObstacle.userData.isPassthrough;
+
+    // Update the visual highlight color to indicate passthrough status
+    if (isPassthrough) {
+      // Green tint for passthrough objects
+      this.selectedObstacle.traverse((child) => {
+        if (child.isMesh && child.material) {
+          if (!child.material.emissive) {
+            child.material.emissive = new THREE.Color();
+          }
+          child.material.emissive.setHex(0x00ff00); // Green
+        }
+      });
+    } else {
+      // Orange tint for solid objects (regular highlight)
+      this.highlightObject(this.selectedObstacle);
+    }
+
+    // Send update to server
+    this.networkManager.updateObstacle(
+      this.selectedObstacle.userData.id,
+      this.selectedObstacle.position.x,
+      this.selectedObstacle.position.y,
+      this.selectedObstacle.position.z,
+      this.selectedObstacle.rotation.y,
+      isPassthrough
+    );
+
+    console.log(
+      `🚪 ${this.selectedObstacle.userData.id} passthrough: ${
+        isPassthrough ? "ON (walkable)" : "OFF (solid)"
+      }`
+    );
+
+    // Force render
+    this.sceneManager.render();
   }
 
   /**
@@ -393,8 +453,16 @@ export class InputManager {
       const point = intersects[0].point;
       this.dragOffset.copy(point).sub(this.selectedObstacle.position);
 
+      // Show object info including passthrough status
+      const isPassthrough =
+        this.selectedObstacle.userData.isPassthrough || false;
       console.log(
-        `📦 Selected: ${this.selectedObstacle.userData.id || "object"}`
+        `📦 Selected: ${this.selectedObstacle.userData.id || "object"} ${
+          isPassthrough ? "[PASSTHROUGH]" : ""
+        }`
+      );
+      console.log(
+        `   Controls: Q/R = rotate, W/S = height, P = toggle passthrough, Delete = remove`
       );
     }
   }

@@ -256,6 +256,7 @@ export class SceneManager {
       width: bbox ? bbox.width : obstacleData.width,
       height: bbox ? bbox.height : obstacleData.height,
       depth: bbox ? bbox.depth : obstacleData.depth,
+      isPassthrough: obstacleData.isPassthrough || false, // Doorways/archways can be walked through
     };
 
     this.scene.add(obstacle);

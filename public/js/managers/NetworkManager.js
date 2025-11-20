@@ -255,7 +255,7 @@ export class NetworkManager {
 
     // Handle obstacle updates
     this.socket.on("obstacleUpdated", (data) => {
-      const { id, x, y, z, rotation } = data;
+      const { id, x, y, z, rotation, isPassthrough } = data;
       const obstacle = this.sceneManager.obstacles.find(
         (obs) => obs.userData.id === id
       );
@@ -264,7 +264,16 @@ export class NetworkManager {
         if (rotation !== undefined) {
           obstacle.rotation.y = rotation;
         }
-        console.log(`📦 Obstacle ${id} updated by another player`);
+        if (isPassthrough !== undefined) {
+          obstacle.userData.isPassthrough = isPassthrough;
+        }
+        console.log(
+          `📦 Obstacle ${id} updated by another player${
+            isPassthrough !== undefined
+              ? ` [PASSTHROUGH: ${isPassthrough}]`
+              : ""
+          }`
+        );
       }
     });
 
@@ -417,11 +426,15 @@ export class NetworkManager {
   }
 
   /**
-   * Update obstacle position and rotation on server
+   * Update obstacle position, rotation, and passthrough status on server
    */
-  updateObstacle(id, x, y, z, rotation = 0) {
+  updateObstacle(id, x, y, z, rotation = 0, isPassthrough = undefined) {
     if (this.socket) {
-      this.socket.emit("updateObstacle", { id, x, y, z, rotation });
+      const data = { id, x, y, z, rotation };
+      if (isPassthrough !== undefined) {
+        data.isPassthrough = isPassthrough;
+      }
+      this.socket.emit("updateObstacle", data);
     }
   }
 
