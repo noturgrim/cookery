@@ -141,20 +141,49 @@
   right: 20px;
   width: 50px;
   height: 50px;
-  background: rgba(0, 0, 0, 0.7);
-  border: none;
-  border-radius: 50%;
+  background: linear-gradient(
+    135deg,
+    rgba(0, 0, 0, 0.9),
+    rgba(30, 30, 30, 0.9)
+  );
+  border: 1px solid rgba(147, 51, 234, 0.3);
+  border-radius: 12px;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 24px;
-  transition: all 0.3s;
-  backdrop-filter: blur(10px);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  backdrop-filter: blur(16px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
   z-index: 101;
 }
 
 #settings-btn:hover {
-  background: rgba(0, 0, 0, 0.9);
-  transform: rotate(90deg);
+  background: linear-gradient(
+    135deg,
+    rgba(147, 51, 234, 0.2),
+    rgba(168, 85, 247, 0.2)
+  );
+  border-color: rgba(147, 51, 234, 0.6);
+  transform: translateY(-2px) rotate(90deg);
+  box-shadow: 0 6px 20px rgba(147, 51, 234, 0.3);
+}
+
+#settings-btn:active {
+  transform: translateY(0) rotate(90deg);
+}
+
+#settings-btn svg {
+  width: 24px;
+  height: 24px;
+  stroke: #a78bfa;
+  fill: none;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  transition: all 0.3s;
+}
+
+#settings-btn:hover svg {
+  stroke: #c4b5fd;
 }

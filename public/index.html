@@ -164,13 +164,32 @@
       #connection-status {
         position: absolute;
         top: 20px;
-        right: 80px;
-        background: rgba(0, 0, 0, 0.7);
+        right: 85px;
+        background: linear-gradient(
+          135deg,
+          rgba(0, 0, 0, 0.9),
+          rgba(20, 20, 20, 0.9)
+        );
         color: white;
-        padding: 10px 15px;
-        border-radius: 8px;
+        padding: 8px 14px;
+        border-radius: 12px;
         font-size: 12px;
-        backdrop-filter: blur(10px);
+        font-weight: 500;
+        backdrop-filter: blur(16px);
+        border: 1px solid rgba(76, 175, 80, 0.3);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        transition: all 0.3s ease;
+        pointer-events: auto;
+        z-index: 101;
+      }
+
+      #connection-status:hover {
+        border-color: rgba(76, 175, 80, 0.5);
+        transform: translateY(-1px);
+        box-shadow: 0 6px 16px rgba(0, 0, 0, 0.5);
       }
 
       .status-dot {
@@ -179,17 +198,48 @@
         height: 8px;
         border-radius: 50%;
         background: #4caf50;
-        margin-right: 5px;
-        animation: pulse 2s infinite;
+        box-shadow: 0 0 8px #4caf50, 0 0 16px rgba(76, 175, 80, 0.5);
+        animation: pulse 2s ease-in-out infinite;
+        position: relative;
+      }
+
+      .status-dot::before {
+        content: "";
+        position: absolute;
+        inset: -4px;
+        border-radius: 50%;
+        background: radial-gradient(
+          circle,
+          rgba(76, 175, 80, 0.3) 0%,
+          transparent 70%
+        );
+        animation: pulse-ring 2s ease-in-out infinite;
       }
 
       @keyframes pulse {
         0%,
         100% {
           opacity: 1;
+          transform: scale(1);
         }
         50% {
-          opacity: 0.5;
+          opacity: 0.6;
+          transform: scale(0.95);
+        }
+      }
+
+      @keyframes pulse-ring {
+        0% {
+          transform: scale(0.95);
+          opacity: 0.7;
+        }
+        50% {
+          transform: scale(1.2);
+          opacity: 0;
+        }
+        100% {
+          transform: scale(0.95);
+          opacity: 0;
         }
       }
 
@@ -423,38 +473,74 @@
 
     <!-- Settings Button -->
     <button id="settings-btn" title="Settings (Change Name/Character)">
-      ⚙️
+      <svg viewBox="0 0 24 24">
+        <path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z" />
+        <path
+          d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1Z"
+        />
+      </svg>
     </button>
 
     <!-- Settings Modal (Compact) -->
     <div
       id="settings-modal"
-      class="fixed inset-0 bg-black/80 backdrop-blur-sm z-[3000] hidden items-center justify-center p-4"
+      class="fixed inset-0 bg-black/85 backdrop-blur-md z-[3000] hidden items-center justify-center p-4"
     >
       <div
-        class="bg-gradient-to-br from-gray-900 to-gray-800 rounded-xl shadow-2xl border-2 border-purple-500/50 w-full max-w-md flex flex-col pointer-events-auto"
+        class="bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 rounded-2xl shadow-2xl border border-purple-500/40 w-full max-w-md flex flex-col pointer-events-auto overflow-hidden"
+        style="backdrop-filter: blur(20px)"
       >
         <!-- Header -->
         <div
-          class="flex items-center justify-between px-4 py-3 border-b border-purple-500/30"
+          class="flex items-center justify-between px-5 py-3.5 border-b border-purple-500/20 bg-gradient-to-r from-purple-900/20 to-pink-900/20"
         >
-          <div class="flex items-center gap-2">
-            <h2 class="text-xl font-bold text-purple-400">Settings</h2>
+          <div class="flex items-center gap-3">
+            <svg
+              viewBox="0 0 24 24"
+              class="w-6 h-6 text-purple-400"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z" />
+              <path
+                d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1Z"
+              />
+            </svg>
+            <h2 class="text-lg font-bold text-purple-400 tracking-wide">
+              Settings
+            </h2>
           </div>
           <button
             id="settings-close-btn"
-            class="w-8 h-8 rounded-full bg-red-500 hover:bg-red-600 text-white text-xl font-bold transition-all hover:scale-110 flex items-center justify-center"
+            class="w-8 h-8 rounded-lg bg-red-500/20 hover:bg-red-500 border border-red-500/40 hover:border-red-500 text-white text-lg font-bold transition-all duration-200 hover:scale-105 active:scale-95 flex items-center justify-center"
           >
             ×
           </button>
         </div>
 
         <!-- Content -->
-        <div class="p-4 space-y-4">
+        <div class="p-5 space-y-4">
           <!-- Name Input -->
           <div>
-            <label class="block text-white text-sm font-bold mb-2">
-              👤 Your Name
+            <label
+              class="flex items-center gap-2 text-white text-sm font-semibold mb-2"
+            >
+              <svg
+                viewBox="0 0 24 24"
+                class="w-4 h-4"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2" />
+                <circle cx="12" cy="7" r="4" />
+              </svg>
+              Your Name
             </label>
             <input
               type="text"
@@ -462,35 +548,78 @@
               placeholder="Enter your chef name..."
               maxlength="20"
               autocomplete="off"
-              class="w-full py-2 px-3 rounded-lg bg-gray-800/50 border-2 border-gray-600 text-white placeholder-gray-400 focus:border-purple-500 focus:outline-none transition-all"
+              class="w-full py-2.5 px-4 rounded-xl bg-gray-800/40 border border-gray-600/40 text-white placeholder-gray-400 focus:border-purple-500/60 focus:bg-gray-800/60 focus:outline-none transition-all duration-200"
             />
           </div>
 
           <!-- Character Selector -->
           <div>
-            <label class="block text-white text-sm font-bold mb-2">
+            <label
+              class="flex items-center gap-2 text-white text-sm font-semibold mb-2"
+            >
+              <svg
+                viewBox="0 0 24 24"
+                class="w-4 h-4"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+                <circle cx="9" cy="7" r="4" />
+                <path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" />
+              </svg>
               Choose Character
             </label>
             <div
               id="settings-skin-selector"
-              class="grid grid-cols-4 gap-2 max-h-64 overflow-y-auto p-2 bg-gray-800/30 rounded-lg"
+              class="grid grid-cols-4 gap-2 max-h-60 overflow-y-auto p-2.5 bg-gray-800/20 rounded-xl border border-gray-700/30"
             ></div>
           </div>
 
           <!-- Save Button -->
           <button
             id="settings-save-btn"
-            class="w-full py-3 px-4 rounded-lg bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white font-bold text-base transition-all hover:scale-105 active:scale-95 shadow-lg"
+            class="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white font-semibold text-base transition-all duration-200 hover:scale-[1.02] active:scale-[0.98] shadow-lg flex items-center justify-center gap-2"
           >
+            <svg
+              viewBox="0 0 24 24"
+              class="w-4 h-4"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <path
+                d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"
+              />
+              <polyline points="17 21 17 13 7 13 7 21" />
+              <polyline points="7 3 7 8 15 8" />
+            </svg>
             Save Changes
           </button>
 
           <!-- Logout Button -->
           <button
             id="logout-btn"
-            class="w-full py-3 px-4 rounded-lg bg-gradient-to-r from-red-600 to-orange-600 hover:from-red-700 hover:to-orange-700 text-white font-bold text-base transition-all hover:scale-105 active:scale-95 shadow-lg"
+            class="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-red-600 to-orange-600 hover:from-red-700 hover:to-orange-700 text-white font-semibold text-base transition-all duration-200 hover:scale-[1.02] active:scale-[0.98] shadow-lg flex items-center justify-center gap-2"
           >
-            🚪 Logout
+            <svg
+              viewBox="0 0 24 24"
+              class="w-4 h-4"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+              <polyline points="16 17 21 12 16 7" />
+              <line x1="21" y1="12" x2="9" y2="12" />
+            </svg>
+            Logout
           </button>
         </div>
       </div>
@@ -560,62 +689,112 @@
     <!-- Spawn Menu (Compact) -->
     <div
       id="spawn-menu"
-      class="fixed inset-0 bg-black/80 backdrop-blur-sm z-[2000] hidden items-center justify-center p-3"
+      class="fixed inset-0 bg-black/85 backdrop-blur-md z-[2000] hidden items-center justify-center p-4"
     >
       <div
-        class="bg-gradient-to-br from-gray-900 to-gray-800 rounded-xl shadow-2xl border-2 border-yellow-500/50 w-full max-w-4xl max-h-[85vh] flex flex-col pointer-events-auto"
+        class="bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 rounded-2xl shadow-2xl border border-yellow-500/40 w-full max-w-4xl max-h-[88vh] flex flex-col pointer-events-auto overflow-hidden"
+        style="backdrop-filter: blur(20px)"
       >
         <!-- Header -->
         <div
-          class="flex items-center justify-between px-4 py-3 border-b border-yellow-500/30"
+          class="flex items-center justify-between px-5 py-3.5 border-b border-yellow-500/20 bg-gradient-to-r from-yellow-900/20 to-orange-900/20"
         >
-          <div class="flex items-center gap-2">
-            <span class="text-2xl">🎨</span>
-            <h2 class="text-xl font-bold text-yellow-400">Spawn Objects</h2>
+          <div class="flex items-center gap-3">
+            <svg
+              viewBox="0 0 24 24"
+              class="w-6 h-6 text-yellow-400"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <path
+                d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"
+              />
+            </svg>
+            <h2 class="text-lg font-bold text-yellow-400 tracking-wide">
+              Spawn Menu
+            </h2>
           </div>
           <button
             onclick="const menu = document.getElementById('spawn-menu'); menu.classList.remove('active'); menu.style.display = 'none';"
-            class="w-8 h-8 rounded-full bg-red-500 hover:bg-red-600 text-white text-xl font-bold transition-all hover:scale-110 flex items-center justify-center"
+            class="w-8 h-8 rounded-lg bg-red-500/20 hover:bg-red-500 border border-red-500/40 hover:border-red-500 text-white text-lg font-bold transition-all duration-200 hover:scale-105 active:scale-95 flex items-center justify-center"
           >
             ×
           </button>
         </div>
 
         <!-- Content -->
-        <div class="flex-1 overflow-y-auto p-4 space-y-3">
+        <div class="flex-1 overflow-y-auto p-5 space-y-3">
           <!-- Delete Mode Button -->
           <button
             id="delete-mode-btn"
-            class="w-full py-2 px-4 rounded-lg bg-red-500/20 hover:bg-red-500/30 border-2 border-red-500 text-white font-bold text-sm transition-all hover:scale-105 active:scale-95"
+            class="w-full py-2.5 px-4 rounded-xl bg-red-500/10 hover:bg-red-500/20 border border-red-500/40 hover:border-red-500 text-white font-semibold text-sm transition-all duration-200 hover:scale-[1.02] active:scale-[0.98] flex items-center justify-center gap-2"
           >
-            🗑️ Delete Mode (OFF)
+            <svg
+              viewBox="0 0 24 24"
+              class="w-4 h-4"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <path
+                d="M3 6h18M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"
+              />
+            </svg>
+            <span>Delete Mode (OFF)</span>
           </button>
 
           <!-- Search Bar -->
           <div class="relative">
+            <svg
+              viewBox="0 0 24 24"
+              class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <circle cx="11" cy="11" r="8" />
+              <path d="m21 21-4.35-4.35" />
+            </svg>
             <input
               type="text"
               id="model-search"
               placeholder="Search models..."
-              class="w-full py-2 px-3 pl-10 rounded-lg bg-gray-800/50 border-2 border-gray-600 text-white text-sm placeholder-gray-400 focus:border-yellow-500 focus:outline-none transition-all"
+              class="w-full py-2.5 px-4 pl-10 rounded-xl bg-gray-800/40 border border-gray-600/40 text-white text-sm placeholder-gray-400 focus:border-yellow-500/60 focus:bg-gray-800/60 focus:outline-none transition-all duration-200"
             />
-            <span class="absolute left-3 top-1/2 -translate-y-1/2 text-lg"
-              >🔍</span
-            >
           </div>
 
           <!-- Furniture Category -->
           <div class="spawn-category">
             <button
               onclick="this.nextElementSibling.classList.toggle('hidden')"
-              class="w-full flex items-center justify-between p-3 rounded-lg bg-gradient-to-r from-yellow-600/20 to-orange-600/20 border-2 border-yellow-500/30 hover:border-yellow-500/50 transition-all group"
+              class="w-full flex items-center justify-between p-3.5 rounded-xl bg-gradient-to-r from-yellow-600/15 to-orange-600/15 border border-yellow-500/30 hover:border-yellow-500/60 hover:from-yellow-600/25 hover:to-orange-600/25 transition-all duration-200 group"
             >
-              <div class="flex items-center gap-2">
-                <span class="text-2xl">🪑</span>
-                <h3 class="text-lg font-bold text-yellow-300">Furniture</h3>
+              <div class="flex items-center gap-3">
+                <svg
+                  viewBox="0 0 24 24"
+                  class="w-5 h-5 text-yellow-400"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
+                  <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+                  <polyline points="9 22 9 12 15 12 15 22" />
+                </svg>
+                <h3 class="text-base font-semibold text-yellow-300">
+                  Furniture
+                </h3>
                 <span
                   id="furniture-count"
-                  class="text-xs text-gray-400 bg-gray-800/50 px-2 py-0.5 rounded-full"
+                  class="text-xs text-gray-400 bg-gray-800/70 px-2 py-0.5 rounded-full font-medium"
                 ></span>
               </div>
               <svg
@@ -642,14 +821,26 @@
           <div class="spawn-category">
             <button
               onclick="this.nextElementSibling.classList.toggle('hidden')"
-              class="w-full flex items-center justify-between p-3 rounded-lg bg-gradient-to-r from-green-600/20 to-lime-600/20 border-2 border-green-500/30 hover:border-green-500/50 transition-all group"
+              class="w-full flex items-center justify-between p-3.5 rounded-xl bg-gradient-to-r from-green-600/15 to-lime-600/15 border border-green-500/30 hover:border-green-500/60 hover:from-green-600/25 hover:to-lime-600/25 transition-all duration-200 group"
             >
-              <div class="flex items-center gap-2">
-                <span class="text-2xl">🍔</span>
-                <h3 class="text-lg font-bold text-green-300">Food</h3>
+              <div class="flex items-center gap-3">
+                <svg
+                  viewBox="0 0 24 24"
+                  class="w-5 h-5 text-green-400"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
+                  <path
+                    d="M18 8h1a4 4 0 0 1 0 8h-1M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8zM6 1v3M10 1v3M14 1v3"
+                  />
+                </svg>
+                <h3 class="text-base font-semibold text-green-300">Food</h3>
                 <span
                   id="food-count"
-                  class="text-xs text-gray-400 bg-gray-800/50 px-2 py-0.5 rounded-full"
+                  class="text-xs text-gray-400 bg-gray-800/70 px-2 py-0.5 rounded-full font-medium"
                 ></span>
               </div>
               <svg

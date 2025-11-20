@@ -325,8 +325,31 @@ class Game {
     // Populate current values
     document.getElementById("settings-player-name").value = this.playerName;
 
-    // Setup skin selector in settings
-    this.setupSettingsSkinSelector();
+    // Setup skin selector only if not already initialized
+    const skinSelector = document.getElementById("settings-skin-selector");
+    if (skinSelector.children.length === 0) {
+      this.setupSettingsSkinSelector();
+    } else {
+      // Just update the selected skin visually
+      document
+        .querySelectorAll("#settings-skin-selector > div")
+        .forEach((option) => {
+          const skinId = parseInt(option.dataset.skinId);
+          if (skinId === this.playerSkin) {
+            option.classList.add(
+              "!border-purple-500",
+              "!border-4",
+              "bg-purple-500/20"
+            );
+          } else {
+            option.classList.remove(
+              "!border-purple-500",
+              "!border-4",
+              "bg-purple-500/20"
+            );
+          }
+        });
+    }
 
     const closeModal = () => {
       modal.classList.remove("active");
