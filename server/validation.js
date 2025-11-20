@@ -20,7 +20,7 @@ export const VALIDATION_RULES = {
 
   // Object constraints
   OBSTACLE_NAME_MAX_LENGTH: 50,
-  OBSTACLE_MIN_DIMENSION: 0.1,
+  OBSTACLE_MIN_DIMENSION: 0.001, // Lowered to allow thin objects like rugs
   OBSTACLE_MAX_DIMENSION: 50.0, // Increased for large furniture models
   OBSTACLE_MIN_SCALE: 0.1,
   OBSTACLE_MAX_SCALE: 10.0,
