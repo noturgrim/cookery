@@ -4,157 +4,46 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Supercooked - Login</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"
+      rel="stylesheet"
+    />
     <style>
-      @import "tailwindcss";
-
       body {
-        margin: 0;
-        padding: 0;
-        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
-          "Helvetica Neue", Arial, sans-serif;
+        font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI",
+          Roboto, sans-serif;
+      }
+
+      .gradient-bg {
         background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        min-height: 100vh;
-        display: flex;
-        justify-content: center;
-        align-items: center;
+        position: relative;
+        overflow: hidden;
       }
 
-      .auth-container {
-        background: white;
-        border-radius: 16px;
-        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
-        padding: 40px;
-        width: 100%;
-        max-width: 400px;
-        margin: 20px;
+      .gradient-bg::before {
+        content: "";
+        position: absolute;
+        top: -50%;
+        left: -50%;
+        width: 200%;
+        height: 200%;
+        background: radial-gradient(
+          circle,
+          rgba(255, 255, 255, 0.1) 0%,
+          transparent 70%
+        );
+        animation: pulse-bg 15s ease-in-out infinite;
       }
 
-      .auth-header {
-        text-align: center;
-        margin-bottom: 30px;
-      }
-
-      .auth-title {
-        font-size: 32px;
-        font-weight: 700;
-        color: #2d3748;
-        margin: 0 0 8px 0;
-      }
-
-      .auth-subtitle {
-        font-size: 16px;
-        color: #718096;
-        margin: 0;
-      }
-
-      .form-group {
-        margin-bottom: 20px;
-      }
-
-      .form-label {
-        display: block;
-        font-size: 14px;
-        font-weight: 600;
-        color: #4a5568;
-        margin-bottom: 8px;
-      }
-
-      .form-input {
-        width: 100%;
-        padding: 12px 16px;
-        border: 2px solid #e2e8f0;
-        border-radius: 8px;
-        font-size: 16px;
-        transition: all 0.2s;
-        box-sizing: border-box;
-      }
-
-      .form-input:focus {
-        outline: none;
-        border-color: #667eea;
-        box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
-      }
-
-      .form-button {
-        width: 100%;
-        padding: 14px;
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        color: white;
-        border: none;
-        border-radius: 8px;
-        font-size: 16px;
-        font-weight: 600;
-        cursor: pointer;
-        transition: transform 0.2s, box-shadow 0.2s;
-      }
-
-      .form-button:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 10px 20px rgba(102, 126, 234, 0.3);
-      }
-
-      .form-button:active {
-        transform: translateY(0);
-      }
-
-      .form-button:disabled {
-        opacity: 0.6;
-        cursor: not-allowed;
-        transform: none;
-      }
-
-      .form-switch {
-        text-align: center;
-        margin-top: 20px;
-        font-size: 14px;
-        color: #718096;
-      }
-
-      .form-switch-link {
-        color: #667eea;
-        text-decoration: none;
-        font-weight: 600;
-        cursor: pointer;
-      }
-
-      .form-switch-link:hover {
-        text-decoration: underline;
-      }
-
-      .error-message {
-        background: #fed7d7;
-        color: #c53030;
-        padding: 12px 16px;
-        border-radius: 8px;
-        margin-bottom: 20px;
-        font-size: 14px;
-        text-align: center;
-      }
-
-      .success-message {
-        background: #c6f6d5;
-        color: #2f855a;
-        padding: 12px 16px;
-        border-radius: 8px;
-        margin-bottom: 20px;
-        font-size: 14px;
-        text-align: center;
-      }
-
-      .hidden {
-        display: none;
-      }
-
-      .loading {
-        display: inline-block;
-        width: 16px;
-        height: 16px;
-        border: 3px solid rgba(255, 255, 255, 0.3);
-        border-radius: 50%;
-        border-top-color: white;
-        animation: spin 0.6s linear infinite;
-        vertical-align: middle;
-        margin-left: 8px;
+      @keyframes pulse-bg {
+        0%,
+        100% {
+          transform: translate(0, 0) scale(1);
+        }
+        50% {
+          transform: translate(-10%, -10%) scale(1.1);
+        }
       }
 
       @keyframes spin {
@@ -162,143 +51,232 @@
           transform: rotate(360deg);
         }
       }
+
+      .animate-spin {
+        animation: spin 0.6s linear infinite;
+      }
+
+      @keyframes slideIn {
+        from {
+          opacity: 0;
+          transform: translateY(20px);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+
+      .animate-slide-in {
+        animation: slideIn 0.4s ease-out;
+      }
     </style>
   </head>
-  <body>
-    <div class="auth-container">
-      <div class="auth-header">
-        <h1 class="auth-title">🍳 Supercooked</h1>
-        <p class="auth-subtitle" id="auth-subtitle">
-          Sign in to start cooking!
-        </p>
+  <body class="gradient-bg min-h-screen flex items-center justify-center p-4">
+    <!-- Background decorative elements -->
+    <div class="fixed inset-0 overflow-hidden pointer-events-none">
+      <div
+        class="absolute top-1/4 -left-20 w-72 h-72 bg-purple-500 rounded-full mix-blend-multiply filter blur-xl opacity-20 animate-pulse"
+      ></div>
+      <div
+        class="absolute top-1/3 -right-20 w-72 h-72 bg-pink-500 rounded-full mix-blend-multiply filter blur-xl opacity-20 animate-pulse"
+        style="animation-delay: 2s"
+      ></div>
+      <div
+        class="absolute -bottom-20 left-1/3 w-72 h-72 bg-indigo-500 rounded-full mix-blend-multiply filter blur-xl opacity-20 animate-pulse"
+        style="animation-delay: 4s"
+      ></div>
+    </div>
+
+    <!-- Auth Container -->
+    <div class="relative w-full max-w-md animate-slide-in">
+      <!-- Card -->
+      <div
+        class="bg-gradient-to-br from-gray-900 to-gray-800 rounded-2xl shadow-2xl border-2 border-purple-500/50 overflow-hidden backdrop-blur-sm"
+      >
+        <!-- Header -->
+        <div
+          class="bg-gradient-to-r from-purple-600 to-pink-600 p-8 text-center"
+        >
+          <div class="text-6xl mb-3">🍳</div>
+          <h1 class="text-3xl font-bold text-white mb-2">Supercooked</h1>
+          <p class="text-purple-100 text-sm font-medium" id="auth-subtitle">
+            Sign in to start cooking!
+          </p>
+        </div>
+
+        <!-- Content -->
+        <div class="p-6 space-y-4">
+          <!-- Messages -->
+          <div
+            id="error-message"
+            class="hidden bg-red-500/20 border-2 border-red-500 text-red-200 px-4 py-3 rounded-lg text-sm text-center animate-slide-in"
+          ></div>
+          <div
+            id="success-message"
+            class="hidden bg-green-500/20 border-2 border-green-500 text-green-200 px-4 py-3 rounded-lg text-sm text-center animate-slide-in"
+          ></div>
+
+          <!-- Login Form -->
+          <form id="login-form" class="space-y-4">
+            <div>
+              <label
+                class="block text-white text-sm font-semibold mb-2"
+                for="login-username"
+              >
+                Username
+              </label>
+              <input
+                type="text"
+                id="login-username"
+                class="w-full px-4 py-3 bg-gray-800/50 border-2 border-gray-600 rounded-lg text-white placeholder-gray-400 focus:border-purple-500 focus:ring-2 focus:ring-purple-500/50 focus:outline-none transition-all"
+                placeholder="Enter your username"
+                required
+                autocomplete="username"
+              />
+            </div>
+
+            <div>
+              <label
+                class="block text-white text-sm font-semibold mb-2"
+                for="login-password"
+              >
+                Password
+              </label>
+              <input
+                type="password"
+                id="login-password"
+                class="w-full px-4 py-3 bg-gray-800/50 border-2 border-gray-600 rounded-lg text-white placeholder-gray-400 focus:border-purple-500 focus:ring-2 focus:ring-purple-500/50 focus:outline-none transition-all"
+                placeholder="Enter your password"
+                required
+                autocomplete="current-password"
+              />
+            </div>
+
+            <button
+              type="submit"
+              id="login-button"
+              class="w-full py-3 px-4 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white font-bold rounded-lg transition-all duration-200 hover:scale-105 active:scale-95 shadow-lg hover:shadow-xl"
+            >
+              Sign In
+            </button>
+
+            <div class="text-center pt-2">
+              <span class="text-gray-400 text-sm">Don't have an account? </span>
+              <a
+                class="text-purple-400 hover:text-purple-300 font-semibold text-sm cursor-pointer transition-colors"
+                id="show-register"
+              >
+                Create one
+              </a>
+            </div>
+          </form>
+
+          <!-- Register Form -->
+          <form id="register-form" class="space-y-4 hidden">
+            <div>
+              <label
+                class="block text-white text-sm font-semibold mb-2"
+                for="register-username"
+              >
+                Username
+              </label>
+              <input
+                type="text"
+                id="register-username"
+                class="w-full px-4 py-3 bg-gray-800/50 border-2 border-gray-600 rounded-lg text-white placeholder-gray-400 focus:border-purple-500 focus:ring-2 focus:ring-purple-500/50 focus:outline-none transition-all"
+                placeholder="Choose a username"
+                required
+                autocomplete="username"
+                minlength="3"
+                maxlength="50"
+              />
+              <p class="text-gray-400 text-xs mt-1">
+                3-50 characters, letters, numbers, - and _ only
+              </p>
+            </div>
+
+            <div>
+              <label
+                class="block text-white text-sm font-semibold mb-2"
+                for="register-display-name"
+              >
+                Display Name
+              </label>
+              <input
+                type="text"
+                id="register-display-name"
+                class="w-full px-4 py-3 bg-gray-800/50 border-2 border-gray-600 rounded-lg text-white placeholder-gray-400 focus:border-purple-500 focus:ring-2 focus:ring-purple-500/50 focus:outline-none transition-all"
+                placeholder="Your chef name"
+                required
+                maxlength="50"
+              />
+            </div>
+
+            <div>
+              <label
+                class="block text-white text-sm font-semibold mb-2"
+                for="register-password"
+              >
+                Password
+              </label>
+              <input
+                type="password"
+                id="register-password"
+                class="w-full px-4 py-3 bg-gray-800/50 border-2 border-gray-600 rounded-lg text-white placeholder-gray-400 focus:border-purple-500 focus:ring-2 focus:ring-purple-500/50 focus:outline-none transition-all"
+                placeholder="Create a password"
+                required
+                autocomplete="new-password"
+                minlength="6"
+              />
+              <p class="text-gray-400 text-xs mt-1">At least 6 characters</p>
+            </div>
+
+            <div>
+              <label
+                class="block text-white text-sm font-semibold mb-2"
+                for="register-password-confirm"
+              >
+                Confirm Password
+              </label>
+              <input
+                type="password"
+                id="register-password-confirm"
+                class="w-full px-4 py-3 bg-gray-800/50 border-2 border-gray-600 rounded-lg text-white placeholder-gray-400 focus:border-purple-500 focus:ring-2 focus:ring-purple-500/50 focus:outline-none transition-all"
+                placeholder="Confirm your password"
+                required
+                autocomplete="new-password"
+                minlength="6"
+              />
+            </div>
+
+            <button
+              type="submit"
+              id="register-button"
+              class="w-full py-3 px-4 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white font-bold rounded-lg transition-all duration-200 hover:scale-105 active:scale-95 shadow-lg hover:shadow-xl"
+            >
+              Create Account
+            </button>
+
+            <div class="text-center pt-2">
+              <span class="text-gray-400 text-sm"
+                >Already have an account?
+              </span>
+              <a
+                class="text-purple-400 hover:text-purple-300 font-semibold text-sm cursor-pointer transition-colors"
+                id="show-login"
+              >
+                Sign in
+              </a>
+            </div>
+          </form>
+        </div>
       </div>
 
-      <div id="error-message" class="error-message hidden"></div>
-      <div id="success-message" class="success-message hidden"></div>
-
-      <!-- Login Form -->
-      <form id="login-form">
-        <div class="form-group">
-          <label class="form-label" for="login-username">Username</label>
-          <input
-            type="text"
-            id="login-username"
-            class="form-input"
-            placeholder="Enter your username"
-            required
-            autocomplete="username"
-          />
-        </div>
-
-        <div class="form-group">
-          <label class="form-label" for="login-password">Password</label>
-          <input
-            type="password"
-            id="login-password"
-            class="form-input"
-            placeholder="Enter your password"
-            required
-            autocomplete="current-password"
-          />
-        </div>
-
-        <button type="submit" class="form-button" id="login-button">
-          Sign In
-        </button>
-
-        <div class="form-switch">
-          Don't have an account?
-          <a class="form-switch-link" id="show-register">Create one</a>
-        </div>
-      </form>
-
-      <!-- Register Form -->
-      <form id="register-form" class="hidden">
-        <div class="form-group">
-          <label class="form-label" for="register-username">Username</label>
-          <input
-            type="text"
-            id="register-username"
-            class="form-input"
-            placeholder="Choose a username"
-            required
-            autocomplete="username"
-            minlength="3"
-            maxlength="50"
-          />
-          <small
-            style="
-              color: #718096;
-              font-size: 12px;
-              display: block;
-              margin-top: 4px;
-            "
-          >
-            3-50 characters, letters, numbers, - and _ only
-          </small>
-        </div>
-
-        <div class="form-group">
-          <label class="form-label" for="register-display-name"
-            >Display Name</label
-          >
-          <input
-            type="text"
-            id="register-display-name"
-            class="form-input"
-            placeholder="Your chef name"
-            required
-            maxlength="50"
-          />
-        </div>
-
-        <div class="form-group">
-          <label class="form-label" for="register-password">Password</label>
-          <input
-            type="password"
-            id="register-password"
-            class="form-input"
-            placeholder="Create a password"
-            required
-            autocomplete="new-password"
-            minlength="6"
-          />
-          <small
-            style="
-              color: #718096;
-              font-size: 12px;
-              display: block;
-              margin-top: 4px;
-            "
-          >
-            At least 6 characters
-          </small>
-        </div>
-
-        <div class="form-group">
-          <label class="form-label" for="register-password-confirm"
-            >Confirm Password</label
-          >
-          <input
-            type="password"
-            id="register-password-confirm"
-            class="form-input"
-            placeholder="Confirm your password"
-            required
-            autocomplete="new-password"
-            minlength="6"
-          />
-        </div>
-
-        <button type="submit" class="form-button" id="register-button">
-          Create Account
-        </button>
-
-        <div class="form-switch">
-          Already have an account?
-          <a class="form-switch-link" id="show-login">Sign in</a>
-        </div>
-      </form>
+      <!-- Footer -->
+      <div class="text-center mt-6 text-white/80 text-sm">
+        <p>🔒 Your data is secure and encrypted</p>
+      </div>
     </div>
 
     <script type="module">
@@ -350,7 +328,8 @@
         const loginButton = document.getElementById("login-button");
 
         loginButton.disabled = true;
-        loginButton.innerHTML = 'Signing In<span class="loading"></span>';
+        loginButton.innerHTML =
+          '<span class="flex items-center justify-center">Signing In<span class="ml-2 w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></span></span>';
 
         try {
           const response = await fetch("/api/auth/login", {
@@ -366,7 +345,7 @@
             localStorage.setItem("sessionToken", data.sessionToken);
             localStorage.setItem("user", JSON.stringify(data.user));
 
-            showSuccess("Login successful! Redirecting...");
+            showSuccess("✅ Login successful! Redirecting...");
             setTimeout(() => {
               window.location.href = "/";
             }, 1000);
@@ -401,13 +380,13 @@
 
         // Validate passwords match
         if (password !== passwordConfirm) {
-          showError("Passwords do not match");
+          showError("❌ Passwords do not match");
           return;
         }
 
         registerButton.disabled = true;
         registerButton.innerHTML =
-          'Creating Account<span class="loading"></span>';
+          '<span class="flex items-center justify-center">Creating Account<span class="ml-2 w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></span></span>';
 
         try {
           const response = await fetch("/api/auth/register", {
@@ -428,7 +407,7 @@
             localStorage.setItem("sessionToken", data.sessionToken);
             localStorage.setItem("user", JSON.stringify(data.user));
 
-            showSuccess("Account created! Redirecting...");
+            showSuccess("✅ Account created! Redirecting...");
             setTimeout(() => {
               window.location.href = "/";
             }, 1000);
