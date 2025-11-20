@@ -50,6 +50,7 @@ export async function initializeDatabase() {
         model VARCHAR(255),
         scale FLOAT DEFAULT 1.0,
         rotation FLOAT DEFAULT 0.0,
+        is_passthrough BOOLEAN DEFAULT false,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
@@ -80,6 +81,12 @@ export async function initializeDatabase() {
       ADD COLUMN IF NOT EXISTS depth FLOAT DEFAULT 1.0
     `);
 
+    // Add is_passthrough column to obstacles table if it doesn't exist
+    await pool.query(`
+      ALTER TABLE obstacles 
+      ADD COLUMN IF NOT EXISTS is_passthrough BOOLEAN DEFAULT false
+    `);
+
     console.log("✅ Database tables initialized");
   } catch (error) {
     console.error("❌ Error initializing database:", error);
@@ -107,6 +114,7 @@ export async function loadObstacles() {
       model: row.model,
       scale: parseFloat(row.scale),
       rotation: parseFloat(row.rotation),
+      isPassthrough: row.is_passthrough || false,
     }));
   } catch (error) {
     console.error("❌ Error loading obstacles:", error);
@@ -119,10 +127,10 @@ export async function loadObstacles() {
  */
 export async function saveObstacle(obstacle) {
   try {
-    await pool.query(
+    const result = await pool.query(
       `
-      INSERT INTO obstacles (id, name, type, x, y, z, width, height, depth, model, scale, rotation, updated_at)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, CURRENT_TIMESTAMP)
+      INSERT INTO obstacles (id, name, type, x, y, z, width, height, depth, model, scale, rotation, is_passthrough, updated_at)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, CURRENT_TIMESTAMP)
       ON CONFLICT (id) 
       DO UPDATE SET 
         x = $4, 
@@ -134,7 +142,9 @@ export async function saveObstacle(obstacle) {
         model = $10,
         scale = $11,
         rotation = $12,
+        is_passthrough = $13,
         updated_at = CURRENT_TIMESTAMP
+      RETURNING id
     `,
       [
         obstacle.id,
@@ -149,13 +159,26 @@ export async function saveObstacle(obstacle) {
         obstacle.model || null,
         obstacle.scale || 1.0,
         obstacle.rotation || 0.0,
+        obstacle.isPassthrough || false,
       ]
     );
 
-    console.log(`💾 Saved obstacle: ${obstacle.id}`);
-    return true;
+    if (result.rows.length > 0) {
+      console.log(
+        `💾 Saved obstacle: ${obstacle.id} ${
+          obstacle.isPassthrough ? "[PASSTHROUGH]" : ""
+        }`
+      );
+      return true;
+    } else {
+      console.error(
+        `❌ Failed to save obstacle: ${obstacle.id} - no rows returned`
+      );
+      return false;
+    }
   } catch (error) {
-    console.error("❌ Error saving obstacle:", error);
+    console.error(`❌ Error saving obstacle ${obstacle.id}:`, error.message);
+    console.error(`   Data:`, JSON.stringify(obstacle, null, 2));
     return false;
   }
 }
@@ -204,7 +227,7 @@ export async function loadFoodItems() {
  */
 export async function saveFoodItem(foodItem) {
   try {
-    await pool.query(
+    const result = await pool.query(
       `
       INSERT INTO food_items (id, name, x, y, z, scale, width, height, depth, updated_at)
       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, CURRENT_TIMESTAMP)
@@ -218,6 +241,7 @@ export async function saveFoodItem(foodItem) {
         height = $8,
         depth = $9,
         updated_at = CURRENT_TIMESTAMP
+      RETURNING id
     `,
       [
         foodItem.id,
@@ -232,10 +256,18 @@ export async function saveFoodItem(foodItem) {
       ]
     );
 
-    console.log(`💾 Saved food item: ${foodItem.id}`);
-    return true;
+    if (result.rows.length > 0) {
+      console.log(`💾 Saved food item: ${foodItem.id}`);
+      return true;
+    } else {
+      console.error(
+        `❌ Failed to save food item: ${foodItem.id} - no rows returned`
+      );
+      return false;
+    }
   } catch (error) {
-    console.error("❌ Error saving food item:", error);
+    console.error(`❌ Error saving food item ${foodItem.id}:`, error.message);
+    console.error(`   Data:`, JSON.stringify(foodItem, null, 2));
     return false;
   }
 }

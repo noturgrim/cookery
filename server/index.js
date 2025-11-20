@@ -1210,35 +1210,62 @@ io.on("connection", (socket) => {
 
   // Handle spawning new obstacles
   socket.on("spawnObstacle", async (data) => {
-    const newObstacle = {
-      id: data.id,
-      name: data.name,
-      type: data.type || "furniture",
-      x: data.x,
-      y: data.y,
-      z: data.z,
-      width: data.width,
-      height: data.height,
-      depth: data.depth,
-      model: data.model || null,
-      scale: data.scale || 1.0,
-      rotation: data.rotation || 0.0,
-      isPassthrough: data.isPassthrough || false,
-    };
+    try {
+      const newObstacle = {
+        id: data.id,
+        name: data.name,
+        type: data.type || "furniture",
+        x: data.x,
+        y: data.y,
+        z: data.z,
+        width: data.width,
+        height: data.height,
+        depth: data.depth,
+        model: data.model || null,
+        scale: data.scale || 1.0,
+        rotation: data.rotation || 0.0,
+        isPassthrough: data.isPassthrough || false,
+      };
 
-    // Add to game state
-    gameState.obstacles.push(newObstacle);
+      // Check if obstacle already exists (prevent duplicates)
+      const existingIndex = gameState.obstacles.findIndex(
+        (obs) => obs.id === newObstacle.id
+      );
+      if (existingIndex !== -1) {
+        console.warn(
+          `⚠️ Obstacle ${newObstacle.id} already exists, updating instead`
+        );
+        // Update existing obstacle
+        gameState.obstacles[existingIndex] = newObstacle;
+      } else {
+        // Add to game state
+        gameState.obstacles.push(newObstacle);
+      }
 
-    // Save to database
-    await saveObstacle(newObstacle);
+      // Save to database (async but don't block)
+      const saveSuccess = await saveObstacle(newObstacle);
 
-    // Recreate pathfinder with new obstacles
-    pathfinder.obstacles = gameState.obstacles;
+      // Recreate pathfinder with new obstacles
+      pathfinder.obstacles = gameState.obstacles;
 
-    // Broadcast to all OTHER clients (spawner already has it)
-    socket.broadcast.emit("obstacleSpawned", newObstacle);
+      // Broadcast to all OTHER clients (spawner already has it)
+      socket.broadcast.emit("obstacleSpawned", newObstacle);
 
-    console.log(`✨ Spawned obstacle: ${newObstacle.id}`);
+      // Send confirmation to spawner
+      socket.emit("spawnConfirmed", {
+        id: newObstacle.id,
+        success: saveSuccess,
+      });
+
+      console.log(
+        `✨ Spawned obstacle: ${newObstacle.id} ${
+          newObstacle.isPassthrough ? "[PASSTHROUGH]" : ""
+        } - DB: ${saveSuccess ? "✅" : "❌"}`
+      );
+    } catch (error) {
+      console.error(`❌ Error spawning obstacle:`, error);
+      socket.emit("spawnError", { id: data.id, error: error.message });
+    }
   });
 
   // Handle deleting obstacles
@@ -1265,71 +1292,117 @@ io.on("connection", (socket) => {
 
   // Handle spawning food items
   socket.on("spawnFood", async (data) => {
-    const newFood = {
-      id: data.id,
-      name: data.name,
-      x: data.x,
-      y: data.y,
-      z: data.z,
-      scale: data.scale || 1.0,
-      width: data.width || 1.0,
-      height: data.height || 1.0,
-      depth: data.depth || 1.0,
-    };
+    try {
+      const newFood = {
+        id: data.id,
+        name: data.name,
+        x: data.x,
+        y: data.y,
+        z: data.z,
+        scale: data.scale || 1.0,
+        width: data.width || 1.0,
+        height: data.height || 1.0,
+        depth: data.depth || 1.0,
+      };
 
-    // Add to game state
-    gameState.foodItems.push(newFood);
+      // Check if food item already exists (prevent duplicates)
+      const existingIndex = gameState.foodItems.findIndex(
+        (food) => food.id === newFood.id
+      );
+      if (existingIndex !== -1) {
+        console.warn(`⚠️ Food ${newFood.id} already exists, updating instead`);
+        // Update existing food item
+        gameState.foodItems[existingIndex] = newFood;
+      } else {
+        // Add to game state
+        gameState.foodItems.push(newFood);
+      }
 
-    // Save to database
-    await saveFoodItem(newFood);
+      // Save to database (async but don't block)
+      const saveSuccess = await saveFoodItem(newFood);
 
-    // Broadcast to all OTHER clients (spawner already has it)
-    socket.broadcast.emit("foodSpawned", newFood);
+      // Broadcast to all OTHER clients (spawner already has it)
+      socket.broadcast.emit("foodSpawned", newFood);
 
-    console.log(
-      `✨ Spawned food: ${newFood.id} (${newFood.width.toFixed(
-        2
-      )}x${newFood.height.toFixed(2)}x${newFood.depth.toFixed(2)})`
-    );
+      // Send confirmation to spawner
+      socket.emit("spawnConfirmed", { id: newFood.id, success: saveSuccess });
+
+      console.log(
+        `✨ Spawned food: ${newFood.id} (${newFood.width.toFixed(
+          2
+        )}x${newFood.height.toFixed(2)}x${newFood.depth.toFixed(2)}) - DB: ${
+          saveSuccess ? "✅" : "❌"
+        }`
+      );
+    } catch (error) {
+      console.error(`❌ Error spawning food:`, error);
+      socket.emit("spawnError", { id: data.id, error: error.message });
+    }
   });
 
   // Handle updating food items
   socket.on("updateFood", async (data) => {
-    const { id, x, y, z } = data;
+    try {
+      const { id, x, y, z } = data;
 
-    // Find and update the food item
-    const foodItem = gameState.foodItems.find((food) => food.id === id);
-    if (foodItem) {
-      foodItem.x = x;
-      foodItem.y = y;
-      foodItem.z = z;
+      // Find and update the food item
+      const foodItem = gameState.foodItems.find((food) => food.id === id);
+      if (foodItem) {
+        foodItem.x = x;
+        foodItem.y = y;
+        foodItem.z = z;
 
-      // Save to database
-      await saveFoodItem(foodItem);
+        // Save to database
+        const saveSuccess = await saveFoodItem(foodItem);
 
-      // Broadcast update to all clients
-      io.emit("foodUpdated", { id, x, y, z });
+        if (!saveSuccess) {
+          console.error(`❌ Failed to save food update for ${id}`);
+        }
 
-      console.log(`🍔 Food ${id} moved to (${x.toFixed(2)}, ${z.toFixed(2)})`);
+        // Broadcast update to all clients
+        io.emit("foodUpdated", { id, x, y, z });
+
+        console.log(
+          `🍔 Food ${id} moved to (${x.toFixed(2)}, ${z.toFixed(2)}) - DB: ${
+            saveSuccess ? "✅" : "❌"
+          }`
+        );
+      } else {
+        console.warn(`⚠️ Food ${id} not found in game state`);
+      }
+    } catch (error) {
+      console.error(`❌ Error updating food:`, error);
     }
   });
 
   // Handle deleting food items
   socket.on("deleteFood", async (data) => {
-    const { id } = data;
+    try {
+      const { id } = data;
 
-    // Remove from game state
-    const index = gameState.foodItems.findIndex((food) => food.id === id);
-    if (index > -1) {
-      gameState.foodItems.splice(index, 1);
+      // Remove from game state
+      const index = gameState.foodItems.findIndex((food) => food.id === id);
+      if (index > -1) {
+        gameState.foodItems.splice(index, 1);
 
-      // Delete from database
-      await deleteFoodItem(id);
+        // Delete from database
+        const deleteSuccess = await deleteFoodItem(id);
 
-      // Broadcast to all OTHER clients (deleter already removed it)
-      socket.broadcast.emit("foodDeleted", { id });
+        if (!deleteSuccess) {
+          console.error(`❌ Failed to delete food ${id} from database`);
+        }
 
-      console.log(`🗑️ Deleted food: ${id}`);
+        // Broadcast to all OTHER clients (deleter already removed it)
+        socket.broadcast.emit("foodDeleted", { id });
+
+        console.log(
+          `🗑️ Deleted food: ${id} - DB: ${deleteSuccess ? "✅" : "❌"}`
+        );
+      } else {
+        console.warn(`⚠️ Food ${id} not found in game state`);
+      }
+    } catch (error) {
+      console.error(`❌ Error deleting food:`, error);
     }
   });
 
