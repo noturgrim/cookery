@@ -624,38 +624,65 @@ export class InteractionManager {
     const furnitureName = this.getFurnitureName(furniture).toLowerCase();
     const lyingCapacity = this.getBedLyingCapacity(furnitureName, bbox);
 
+    // Determine which axis is the bed width (shorter dimension)
+    const useXAxis = bbox.width < bbox.depth; // TRUE if width is along X axis
+    const bedWidth = Math.min(bbox.width, bbox.depth);
+    const bedLength = Math.max(bbox.width, bbox.depth);
+
+    // Fine-tune position along bed length
+    // Positive = toward headboard, Negative = toward footboard
+    const backwardOffset = bedLength * 0.3;
+
+    const lengthOffset = new THREE.Vector3(
+      useXAxis ? 0 : backwardOffset,
+      0,
+      useXAxis ? backwardOffset : 0
+    );
+
+    // Rotate length offset to match bed rotation
+    lengthOffset.applyAxisAngle(
+      new THREE.Vector3(0, 1, 0),
+      furniture.rotation.y
+    );
+
+    lyingPosition.x += lengthOffset.x;
+    lyingPosition.z += lengthOffset.z;
+
     // If bed can fit multiple people, offset positions across bed width
     if (lyingCapacity > 1) {
-      // Use SHORTER dimension (bed width) for side-by-side positioning
-      const bedWidth = Math.min(bbox.width, bbox.depth);
       const spacing = bedWidth / lyingCapacity;
 
       // Calculate offset from center
       const totalWidth = spacing * (lyingCapacity - 1);
       const localOffset = -totalWidth / 2 + spacing * lyingIndex;
 
-      // Determine which axis is the bed width (shorter dimension)
-      // Players should be offset along the width, not the length
-      const useXAxis = bbox.width < bbox.depth; // TRUE if width is along X axis
-
-      const offset = new THREE.Vector3(
+      const widthOffset = new THREE.Vector3(
         useXAxis ? localOffset : 0,
         0,
         useXAxis ? 0 : localOffset
       );
 
-      // Rotate offset to match bed rotation
-      offset.applyAxisAngle(new THREE.Vector3(0, 1, 0), furniture.rotation.y);
+      // Rotate width offset to match bed rotation
+      widthOffset.applyAxisAngle(
+        new THREE.Vector3(0, 1, 0),
+        furniture.rotation.y
+      );
 
-      lyingPosition.x += offset.x;
-      lyingPosition.z += offset.z;
+      lyingPosition.x += widthOffset.x;
+      lyingPosition.z += widthOffset.z;
 
       console.log(
         `🛏️ Lying position ${
           lyingIndex + 1
-        }/${lyingCapacity} at offset ${localOffset.toFixed(2)}m on ${
+        }/${lyingCapacity} at width offset ${localOffset.toFixed(2)}m on ${
           useXAxis ? "X" : "Z"
-        } axis (bed width: ${bedWidth.toFixed(2)}m)`
+        } axis, backward ${Math.abs(backwardOffset).toFixed(2)}m`
+      );
+    } else {
+      console.log(
+        `🛏️ Lying at center, backward ${Math.abs(backwardOffset).toFixed(
+          2
+        )}m from headboard`
       );
     }
 
