@@ -76,6 +76,50 @@ export class InputManager {
    * Handle key down events
    */
   handleKeyDown(e) {
+    // If spawn menu is open
+    if (this.isSpawnMenuOpen()) {
+      // Check if user is typing in the search field
+      const searchInput = document.getElementById("model-search");
+      const isTypingInSearch =
+        searchInput && document.activeElement === searchInput;
+
+      // ESC always closes the menu
+      if (e.code === "Escape") {
+        e.preventDefault();
+        this.closeSpawnMenu();
+        return;
+      }
+
+      // B only closes menu if NOT typing in search field
+      if (e.code === "KeyB" && !isTypingInSearch) {
+        e.preventDefault();
+        this.closeSpawnMenu();
+        return;
+      }
+
+      // Block all other game hotkeys when menu is open (but allow typing in search)
+      if (!isTypingInSearch) {
+        return;
+      }
+      // If typing in search, let the key through for the input field
+      return;
+    }
+
+    // If settings modal is open
+    if (this.isSettingsOpen()) {
+      // ESC closes the modal
+      if (e.code === "Escape") {
+        e.preventDefault();
+        const modal = document.getElementById("settings-modal");
+        if (modal) {
+          modal.style.display = "none";
+        }
+        return;
+      }
+      // Block all game hotkeys when settings is open
+      return;
+    }
+
     if (e.code === "KeyE") {
       this.toggleEditMode();
     }
@@ -137,9 +181,14 @@ export class InputManager {
    * Handle mouse wheel for camera zoom
    */
   handleWheel(e) {
-    // Prevent page scrolling
+    // Allow scrolling in spawn menu
     if (e.target.closest("#spawn-menu")) {
-      return; // Allow scrolling in spawn menu
+      return;
+    }
+
+    // Block zoom if any menu is open
+    if (this.isAnyMenuOpen()) {
+      return;
     }
 
     e.preventDefault();
@@ -293,6 +342,11 @@ export class InputManager {
    * Handle click events
    */
   handleClick(event) {
+    // Block clicks if any menu is open
+    if (this.isAnyMenuOpen()) {
+      return;
+    }
+
     // If in edit mode, don't move player
     if (this.editMode) return;
 
@@ -373,6 +427,11 @@ export class InputManager {
    * Handle mouse move events
    */
   handleMouseMove(event) {
+    // Block mouse interactions if any menu is open
+    if (this.isAnyMenuOpen()) {
+      return;
+    }
+
     // Calculate mouse position in normalized device coordinates
     this.mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
     this.mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
@@ -434,6 +493,11 @@ export class InputManager {
    * Handle mouse down events
    */
   handleMouseDown(event) {
+    // Block mouse down if any menu is open
+    if (this.isAnyMenuOpen()) {
+      return;
+    }
+
     // Right-click to start panning
     if (event.button === 2) {
       this.isPanning = true;
@@ -494,6 +558,11 @@ export class InputManager {
    * Handle mouse up events
    */
   handleMouseUp(event) {
+    // Block mouse up if any menu is open (except for panning cleanup)
+    if (this.isAnyMenuOpen() && !this.isPanning) {
+      return;
+    }
+
     // Stop panning on right-click release
     if (event.button === 2 || this.isPanning) {
       this.isPanning = false;
@@ -780,12 +849,19 @@ export class InputManager {
       if (!menu.dataset.clickHandlerAdded) {
         menu.addEventListener("click", (e) => {
           if (e.target === menu) {
-            menu.classList.remove("active");
-            menu.style.display = "none";
+            this.closeSpawnMenu();
           }
         });
         menu.dataset.clickHandlerAdded = "true";
       }
+
+      // Focus on search input when menu opens
+      setTimeout(() => {
+        const searchInput = document.getElementById("model-search");
+        if (searchInput) {
+          searchInput.focus();
+        }
+      }, 100);
     } else {
       menu.style.display = "none";
     }
@@ -794,6 +870,40 @@ export class InputManager {
     if (this.furnitureModels.length === 0) {
       this.loadAvailableModels();
     }
+  }
+
+  /**
+   * Close spawn menu
+   */
+  closeSpawnMenu() {
+    const menu = document.getElementById("spawn-menu");
+    menu.classList.remove("active");
+    menu.style.display = "none";
+  }
+
+  /**
+   * Check if spawn menu is open
+   */
+  isSpawnMenuOpen() {
+    const menu = document.getElementById("spawn-menu");
+    return menu && menu.classList.contains("active");
+  }
+
+  /**
+   * Check if settings modal is open
+   */
+  isSettingsOpen() {
+    const modal = document.getElementById("settings-modal");
+    return (
+      modal && modal.style.display !== "none" && modal.style.display !== ""
+    );
+  }
+
+  /**
+   * Check if any modal/menu is open
+   */
+  isAnyMenuOpen() {
+    return this.isSpawnMenuOpen() || this.isSettingsOpen();
   }
 
   /**
