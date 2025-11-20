@@ -122,6 +122,48 @@ export class NetworkManager {
             }
           }, 100); // Small delay to ensure player is fully initialized
         }
+
+        // If player is lying, set up their lying state after creation
+        if (player.isLying && this.interactionManager) {
+          setTimeout(() => {
+            const createdPlayer = this.playerManager.players.get(player.id);
+            if (createdPlayer && createdPlayer.mesh) {
+              // Mark as lying
+              createdPlayer.isLying = true;
+              createdPlayer.lyingOn = player.lyingOn;
+              createdPlayer.lyingIndex = player.lyingIndex;
+              createdPlayer.isMoving = false;
+
+              // Set position
+              createdPlayer.targetPosition.set(player.x, player.y, player.z);
+              createdPlayer.mesh.position.set(player.x, player.y, player.z);
+              createdPlayer.mesh.rotation.y = player.rotation;
+              createdPlayer.targetRotation = player.rotation;
+
+              // Play lie animation
+              const hasAnimation =
+                this.playerManager.animationController.playAnimationClip(
+                  player.id,
+                  "lie",
+                  null,
+                  true // Loop
+                );
+
+              if (!hasAnimation) {
+                // Use procedural lying pose
+                this.playerManager.animationController.applyLyingPose(
+                  player.id
+                );
+              }
+
+              console.log(
+                `👀 Loaded lying player ${player.id} on ${
+                  player.lyingOn
+                } (position ${player.lyingIndex + 1})`
+              );
+            }
+          }, 100);
+        }
       });
 
       // Create all obstacles

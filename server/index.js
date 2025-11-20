@@ -1102,6 +1102,13 @@ io.on("connection", (socket) => {
     width: PLAYER_SIZE.width,
     height: PLAYER_SIZE.height,
     depth: PLAYER_SIZE.depth,
+    // Interaction states
+    isSitting: false,
+    sittingOn: null,
+    seatIndex: undefined,
+    isLying: false,
+    lyingOn: null,
+    lyingIndex: undefined,
   };
 
   gameState.players.set(socket.id, newPlayer);
@@ -1483,6 +1490,7 @@ io.on("connection", (socket) => {
       // Mark player as lying
       player.isLying = true;
       player.lyingOn = data.furnitureId;
+      player.lyingIndex = data.lyingIndex !== undefined ? data.lyingIndex : 0;
       player.moveTarget = null;
       player.path = null;
 
@@ -1524,7 +1532,9 @@ io.on("connection", (socket) => {
     // Broadcast to all players
     io.emit("playerLie", data);
     console.log(
-      `🛏️ Player ${data.playerId} lying on furniture ${data.furnitureId}`
+      `🛏️ Player ${data.playerId} lying on furniture ${
+        data.furnitureId
+      } (position ${data.lyingIndex !== undefined ? data.lyingIndex + 1 : 1})`
     );
   });
 
@@ -1535,6 +1545,7 @@ io.on("connection", (socket) => {
       // Mark player as no longer lying
       player.isLying = false;
       player.lyingOn = null;
+      player.lyingIndex = undefined;
 
       // Clear any existing paths or movement targets
       player.moveTarget = null;

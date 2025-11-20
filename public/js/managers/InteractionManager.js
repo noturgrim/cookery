@@ -563,6 +563,104 @@ export class InteractionManager {
   }
 
   /**
+   * Get lying capacity for beds based on size
+   */
+  getBedLyingCapacity(furnitureName, bbox) {
+    // Single beds: 1 person
+    if (furnitureName.includes("single") || bbox.width < 1.5) {
+      return 1;
+    }
+
+    // Large beds: calculate based on width
+    // Each person needs roughly 1 meter of space
+    if (furnitureName.includes("bed") || furnitureName.includes("bathtub")) {
+      const usableWidth = Math.max(bbox.width, bbox.depth);
+      return Math.max(1, Math.floor(usableWidth / 1.0)); // 1 meter per person
+    }
+
+    return 1; // Default
+  }
+
+  /**
+   * Find available lying position on bed
+   */
+  findAvailableLyingPosition(furniture, lyingCapacity) {
+    const occupiedPositions = new Set();
+
+    // Check all players to see which positions are occupied
+    this.playerManager.players.forEach((player, playerId) => {
+      if (
+        player.isLying &&
+        player.lyingOn === furniture.userData.id &&
+        player.lyingIndex !== undefined
+      ) {
+        occupiedPositions.add(player.lyingIndex);
+      }
+    });
+
+    console.log(
+      `🛏️ Bed ${furniture.userData.id}: ${occupiedPositions.size}/${lyingCapacity} positions occupied`
+    );
+
+    // Find first available position
+    for (let i = 0; i < lyingCapacity; i++) {
+      if (!occupiedPositions.has(i)) {
+        return i;
+      }
+    }
+
+    return null; // All positions occupied
+  }
+
+  /**
+   * Calculate lying position on bed based on position index
+   */
+  calculateLyingPosition(furniture, lyingIndex = 0) {
+    const bbox = this.sceneManager.calculateBoundingBox(furniture);
+    const lyingPosition = bbox.center.clone();
+
+    // Get bed capacity
+    const furnitureName = this.getFurnitureName(furniture).toLowerCase();
+    const lyingCapacity = this.getBedLyingCapacity(furnitureName, bbox);
+
+    // If bed can fit multiple people, offset positions
+    if (lyingCapacity > 1) {
+      const usableWidth = Math.max(bbox.width, bbox.depth);
+      const spacing = usableWidth / lyingCapacity;
+
+      // Calculate offset from center
+      const totalWidth = spacing * (lyingCapacity - 1);
+      const localOffset = -totalWidth / 2 + spacing * lyingIndex;
+
+      // Determine if bed is oriented along X or Z axis
+      const useXAxis = bbox.width >= bbox.depth;
+
+      const offset = new THREE.Vector3(
+        useXAxis ? localOffset : 0,
+        0,
+        useXAxis ? 0 : localOffset
+      );
+
+      // Rotate offset to match bed rotation
+      offset.applyAxisAngle(new THREE.Vector3(0, 1, 0), furniture.rotation.y);
+
+      lyingPosition.x += offset.x;
+      lyingPosition.z += offset.z;
+
+      console.log(
+        `🛏️ Lying position ${
+          lyingIndex + 1
+        }/${lyingCapacity} at offset ${localOffset.toFixed(2)}m`
+      );
+    }
+
+    // Adjust height - lie on top of bed surface
+    lyingPosition.y = furniture.position.y + bbox.height * 0.5;
+
+    return lyingPosition;
+  }
+
+  /**
    * Stand up from furniture
    */
   standUp() {
@@ -663,28 +761,39 @@ export class InteractionManager {
 
     console.log(`🛏️ Lying down on ${this.getFurnitureName(furniture)}`);
 
-    // Get furniture reference
+    // Calculate bed capacity and find available position
+    const bbox = this.sceneManager.calculateBoundingBox(furniture);
+    const furnitureName = this.getFurnitureName(furniture).toLowerCase();
+    const lyingCapacity = this.getBedLyingCapacity(furnitureName, bbox);
+    const lyingIndex = this.findAvailableLyingPosition(
+      furniture,
+      lyingCapacity
+    );
+
+    if (lyingIndex === null) {
+      console.log("❌ No available lying positions on this bed");
+      return;
+    }
+
+    // Set lying state
     this.isLying = true;
     this.lyingOn = furniture;
     player.isLying = true;
     player.lyingOn = furniture.userData.id;
+    player.lyingIndex = lyingIndex; // Track which position on the bed
 
-    // Calculate lying position (center of bed) using EXACT collision box
-    const bbox = this.sceneManager.calculateBoundingBox(furniture);
-    const lyingPosition = bbox.center.clone();
+    // Calculate lying position based on bed size and position index
+    const lyingPosition = this.calculateLyingPosition(furniture, lyingIndex);
 
     // Sync userData with live bbox
     furniture.userData.width = bbox.width;
     furniture.userData.height = bbox.height;
     furniture.userData.depth = bbox.depth;
 
-    // Adjust height - lie on top of bed surface
-    lyingPosition.y = furniture.position.y + bbox.height * 0.5;
-
     player.mesh.position.copy(lyingPosition);
     player.targetPosition.copy(lyingPosition);
 
-    // Rotate player to align with bed (usually beds are aligned with their rotation)
+    // Rotate player to align with bed
     player.mesh.rotation.y = furniture.rotation.y;
 
     // Stop any movement
@@ -713,6 +822,7 @@ export class InteractionManager {
     this.networkManager.socket.emit("playerLie", {
       playerId: this.networkManager.playerId,
       furnitureId: furniture.userData.id,
+      lyingIndex: lyingIndex, // Track position on bed
       position: {
         x: lyingPosition.x,
         y: lyingPosition.y,
@@ -750,6 +860,7 @@ export class InteractionManager {
     this.lyingOn = null;
     player.isLying = false;
     player.lyingOn = null;
+    player.lyingIndex = undefined; // Clear lying position index
 
     // Calculate a safe standing position (same logic as standUp)
     let standPosition = player.mesh.position.clone();
@@ -932,7 +1043,7 @@ export class InteractionManager {
    * Handle other player lying down (from network)
    */
   handleOtherPlayerLie(data) {
-    const { playerId, furnitureId, position, rotation } = data;
+    const { playerId, furnitureId, position, rotation, lyingIndex } = data;
     const player = this.playerManager.players.get(playerId);
 
     if (player && player.mesh) {
@@ -940,6 +1051,7 @@ export class InteractionManager {
       player.isLying = true;
       player.isMoving = false;
       player.lyingOn = furnitureId;
+      player.lyingIndex = lyingIndex !== undefined ? lyingIndex : 0;
 
       // Set position and rotation
       player.mesh.position.set(position.x, position.y, position.z);
@@ -960,7 +1072,11 @@ export class InteractionManager {
         this.playerManager.animationController.applyLyingPose(playerId);
       }
 
-      console.log(`👀 Player ${playerId} is now lying on ${furnitureId}`);
+      console.log(
+        `👀 Player ${playerId} is now lying on ${furnitureId} (position ${
+          lyingIndex + 1
+        })`
+      );
     }
   }
 
@@ -972,6 +1088,8 @@ export class InteractionManager {
     const player = this.playerManager.players.get(playerId);
 
     if (player) {
+      // Clear lying position index
+      player.lyingIndex = undefined;
       // Mark player as no longer lying
       player.isLying = false;
       player.lyingOn = null;
