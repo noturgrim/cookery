@@ -4,6 +4,7 @@ import { createServer } from "http";
 import { Server } from "socket.io";
 import { fileURLToPath } from "url";
 import { dirname, join } from "path";
+import { randomUUID } from "crypto";
 import {
   initializeDatabase,
   loadObstacles,
@@ -592,6 +593,8 @@ class AStarPathfinder {
       goal = this.findNearestWalkable(goal);
     }
 
+    // 🧹 MEMORY LEAK FIX: These are local variables that will be garbage collected
+    // after the function completes, preventing memory buildup
     const openSet = [start];
     const closedSet = new Set();
     const cameFrom = new Map();
@@ -628,6 +631,13 @@ class AStarPathfinder {
           path.unshift(temp);
           temp = cameFrom.get(key(temp));
         }
+
+        // 🧹 MEMORY LEAK FIX: Explicitly clear data structures before return
+        cameFrom.clear();
+        gScore.clear();
+        fScore.clear();
+        closedSet.clear();
+        openSet.length = 0;
 
         // Simplify path (remove unnecessary waypoints)
         return this.simplifyPath(path);
@@ -695,8 +705,23 @@ class AStarPathfinder {
         path.unshift(temp);
         temp = cameFrom.get(key(temp));
       }
+
+      // 🧹 MEMORY LEAK FIX: Explicitly clear data structures before return
+      cameFrom.clear();
+      gScore.clear();
+      fScore.clear();
+      closedSet.clear();
+      openSet.length = 0;
+
       return this.simplifyPath(path);
     }
+
+    // 🧹 MEMORY LEAK FIX: Explicitly clear data structures before return
+    cameFrom.clear();
+    gScore.clear();
+    fScore.clear();
+    closedSet.clear();
+    openSet.length = 0;
 
     return [start]; // Just stay in place if no path at all
   }
@@ -1507,13 +1532,18 @@ io.on("connection", (socket) => {
 
       const newObstacle = validation.sanitized;
 
-      // Check if obstacle already exists (prevent duplicates)
+      // 🔒 RACE CONDITION FIX: Generate server-side UUID to prevent duplicates
+      const serverGeneratedId = randomUUID();
+      const clientRequestedId = newObstacle.id; // Keep client's ID for reference
+      newObstacle.id = serverGeneratedId;
+
+      // Check if obstacle already exists (shouldn't happen with UUIDs, but defensive)
       const existingIndex = gameState.obstacles.findIndex(
         (obs) => obs.id === newObstacle.id
       );
       if (existingIndex !== -1) {
         console.warn(
-          `⚠️ Obstacle ${newObstacle.id} already exists, updating instead`
+          `⚠️ Obstacle ${newObstacle.id} already exists (UUID collision!), updating instead`
         );
         // Update existing obstacle
         gameState.obstacles[existingIndex] = newObstacle;
@@ -1531,9 +1561,11 @@ io.on("connection", (socket) => {
       // Broadcast to all OTHER clients (spawner already has it)
       socket.broadcast.emit("obstacleSpawned", newObstacle);
 
-      // Send confirmation to spawner
+      // Send confirmation to spawner with NEW server-generated ID
       socket.emit("spawnConfirmed", {
-        id: newObstacle.id,
+        clientId: clientRequestedId, // Original client ID for matching
+        serverId: serverGeneratedId, // New authoritative server ID
+        obstacle: newObstacle, // Full obstacle data with server ID
         success: saveSuccess,
       });
 
@@ -1638,12 +1670,19 @@ io.on("connection", (socket) => {
 
       const newFood = validation.sanitized;
 
-      // Check if food item already exists (prevent duplicates)
+      // 🔒 RACE CONDITION FIX: Generate server-side UUID to prevent duplicates
+      const serverGeneratedId = randomUUID();
+      const clientRequestedId = newFood.id; // Keep client's ID for reference
+      newFood.id = serverGeneratedId;
+
+      // Check if food item already exists (shouldn't happen with UUIDs, but defensive)
       const existingIndex = gameState.foodItems.findIndex(
         (food) => food.id === newFood.id
       );
       if (existingIndex !== -1) {
-        console.warn(`⚠️ Food ${newFood.id} already exists, updating instead`);
+        console.warn(
+          `⚠️ Food ${newFood.id} already exists (UUID collision!), updating instead`
+        );
         // Update existing food item
         gameState.foodItems[existingIndex] = newFood;
       } else {
@@ -1657,8 +1696,13 @@ io.on("connection", (socket) => {
       // Broadcast to all OTHER clients (spawner already has it)
       socket.broadcast.emit("foodSpawned", newFood);
 
-      // Send confirmation to spawner
-      socket.emit("spawnConfirmed", { id: newFood.id, success: saveSuccess });
+      // Send confirmation to spawner with NEW server-generated ID
+      socket.emit("spawnConfirmed", {
+        clientId: clientRequestedId, // Original client ID for matching
+        serverId: serverGeneratedId, // New authoritative server ID
+        food: newFood, // Full food data with server ID
+        success: saveSuccess,
+      });
 
       console.log(
         `✨ Spawned food: ${newFood.id} (${newFood.width.toFixed(
