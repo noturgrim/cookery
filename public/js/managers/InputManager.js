@@ -5,10 +5,11 @@ import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.m
  * Handles all input: mouse clicks, keyboard, emote wheel, obstacle editing
  */
 export class InputManager {
-  constructor(sceneManager, uiManager, networkManager) {
+  constructor(sceneManager, uiManager, networkManager, soundManager) {
     this.sceneManager = sceneManager;
     this.uiManager = uiManager;
     this.networkManager = networkManager;
+    this.soundManager = soundManager;
 
     this.mouse = new THREE.Vector2();
     this.raycaster = new THREE.Raycaster();
@@ -321,6 +322,9 @@ export class InputManager {
       if (clickedObject.userData.id) {
         const objPos = clickedObject.position;
 
+        // Play click sound
+        this.soundManager?.play("click", { volume: 0.6 });
+
         // Send move command to object's position (server will find best interaction spot)
         this.networkManager.moveTo(objPos.x, objPos.z);
 
@@ -341,6 +345,9 @@ export class InputManager {
 
     if (intersects.length > 0) {
       const point = intersects[0].point;
+
+      // Play click sound
+      this.soundManager?.play("click", { volume: 0.6 });
 
       // Send move command to server
       this.networkManager.moveTo(point.x, point.z);

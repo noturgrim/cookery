@@ -444,7 +444,8 @@ class Game {
     this.inputManager = new InputManager(
       this.sceneManager,
       this.uiManager,
-      this.networkManager
+      this.networkManager,
+      this.soundManager
     );
     this.inputManager.setupInput();
 
@@ -491,6 +492,7 @@ class Game {
     console.log("🔊 Loading sound effects...");
 
     const tryLoadSound = async (name, basePath) => {
+      // Try formats in order: m4a (your voice format), mp3, then fallbacks
       const formats = [".m4a", ".mp3", ".ogg", ".wav"];
 
       for (const format of formats) {
