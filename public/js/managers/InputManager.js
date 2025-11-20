@@ -506,27 +506,27 @@ export class InputManager {
         );
       }
 
-      console.log(
-        `✅ Moved ${isFood ? "🍔" : "🪑"} ${
-          this.selectedObstacle.userData.id
-        } to (${this.selectedObstacle.position.x.toFixed(
-          2
-        )}, ${this.selectedObstacle.position.z.toFixed(2)})`
-      );
+      // console.log(
+      //   `✅ Moved ${isFood ? "🍔" : "🪑"} ${
+      //     this.selectedObstacle.userData.id
+      //   } to (${this.selectedObstacle.position.x.toFixed(
+      //     2
+      //   )}, ${this.selectedObstacle.position.z.toFixed(2)})`
+      // );
 
       // Log the code snippet for easy copy-paste (furniture only)
-      if (!isFood) {
-        console.log(`📋 Copy this to server/index.js:`);
-        console.log(`  {`);
-        console.log(`    id: "${this.selectedObstacle.userData.id}",`);
-        console.log(`    x: ${this.selectedObstacle.position.x.toFixed(2)},`);
-        console.log(`    y: ${this.selectedObstacle.position.y.toFixed(2)},`);
-        console.log(`    z: ${this.selectedObstacle.position.z.toFixed(2)},`);
-        console.log(`    width: ${this.selectedObstacle.userData.width},`);
-        console.log(`    height: ${this.selectedObstacle.userData.height},`);
-        console.log(`    depth: ${this.selectedObstacle.userData.depth},`);
-        console.log(`  },`);
-      }
+      // if (!isFood) {
+      //   console.log(`📋 Copy this to server/index.js:`);
+      //   console.log(`  {`);
+      //   console.log(`    id: "${this.selectedObstacle.userData.id}",`);
+      //   console.log(`    x: ${this.selectedObstacle.position.x.toFixed(2)},`);
+      //   console.log(`    y: ${this.selectedObstacle.position.y.toFixed(2)},`);
+      //   console.log(`    z: ${this.selectedObstacle.position.z.toFixed(2)},`);
+      //   console.log(`    width: ${this.selectedObstacle.userData.width},`);
+      //   console.log(`    height: ${this.selectedObstacle.userData.height},`);
+      //   console.log(`    depth: ${this.selectedObstacle.userData.depth},`);
+      //   console.log(`  },`);
+      // }
     }
 
     this.isDraggingObstacle = false;
