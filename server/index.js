@@ -2866,6 +2866,79 @@ io.on("connection", (socket) => {
     }
   });
 
+  // Pause speaker music
+  socket.on("pauseSpeakerMusic", async (data) => {
+    try {
+      // Rate limiting
+      if (!rateLimiter.checkLimit(socket.id, "ACTIONS")) {
+        return;
+      }
+
+      // Validate speaker ID
+      const idValidation = validateId(data.speakerId);
+      if (!idValidation.valid) return;
+
+      // Broadcast to ALL clients (including sender for confirmation)
+      io.emit("speakerMusicPaused", {
+        speakerId: idValidation.sanitized,
+      });
+
+      console.log(`⏸️ Speaker ${idValidation.sanitized} paused`);
+    } catch (error) {
+      console.error("❌ Error pausing speaker music:", error);
+    }
+  });
+
+  // Resume speaker music
+  socket.on("resumeSpeakerMusic", async (data) => {
+    try {
+      // Rate limiting
+      if (!rateLimiter.checkLimit(socket.id, "ACTIONS")) {
+        return;
+      }
+
+      // Validate speaker ID
+      const idValidation = validateId(data.speakerId);
+      if (!idValidation.valid) return;
+
+      // Broadcast to ALL clients (including sender for confirmation)
+      io.emit("speakerMusicResumed", {
+        speakerId: idValidation.sanitized,
+      });
+
+      console.log(`▶️ Speaker ${idValidation.sanitized} resumed`);
+    } catch (error) {
+      console.error("❌ Error resuming speaker music:", error);
+    }
+  });
+
+  // Change speaker volume
+  socket.on("changeSpeakerVolume", async (data) => {
+    try {
+      // Rate limiting
+      if (!rateLimiter.checkLimit(socket.id, "ACTIONS")) {
+        return;
+      }
+
+      // Validate speaker ID
+      const idValidation = validateId(data.speakerId);
+      if (!idValidation.valid) return;
+
+      // Validate volume (0-100)
+      const volume = Math.max(0, Math.min(100, parseInt(data.volume) || 70));
+
+      // Broadcast to ALL clients (including sender for confirmation)
+      io.emit("speakerVolumeChanged", {
+        speakerId: idValidation.sanitized,
+        volume: volume,
+      });
+
+      console.log(`🔊 Speaker ${idValidation.sanitized} volume: ${volume}%`);
+    } catch (error) {
+      console.error("❌ Error changing speaker volume:", error);
+    }
+  });
+
   // ============================================
   // SPEAKER CONNECTIONS
   // ============================================

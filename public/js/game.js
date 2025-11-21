@@ -782,6 +782,76 @@ class Game {
       });
     }
 
+    // Pause button
+    const pauseBtn = document.getElementById("music-pause-btn");
+    if (pauseBtn) {
+      pauseBtn.addEventListener("click", () => {
+        if (this.musicPlayerManager.currentSpeaker) {
+          this.musicPlayerManager.pauseSpeakerMusic(
+            this.musicPlayerManager.currentSpeaker,
+            true // Broadcast to all players
+          );
+        }
+      });
+    }
+
+    // Resume button
+    const resumeBtn = document.getElementById("music-resume-btn");
+    if (resumeBtn) {
+      resumeBtn.addEventListener("click", () => {
+        if (this.musicPlayerManager.currentSpeaker) {
+          this.musicPlayerManager.resumeSpeakerMusic(
+            this.musicPlayerManager.currentSpeaker,
+            true // Broadcast to all players
+          );
+        }
+      });
+    }
+
+    // Volume slider
+    const volumeSlider = document.getElementById("music-volume-slider");
+    const volumeValue = document.getElementById("music-volume-value");
+    if (volumeSlider) {
+      volumeSlider.addEventListener("input", (e) => {
+        const volume = parseInt(e.target.value);
+        if (volumeValue) {
+          volumeValue.textContent = `${volume}%`;
+        }
+        if (this.musicPlayerManager.currentSpeaker) {
+          this.musicPlayerManager.setSpeakerVolume(
+            this.musicPlayerManager.currentSpeaker,
+            volume,
+            true // Broadcast to all players
+          );
+        }
+      });
+    }
+
+    // Auto-play checkbox
+    const autoPlayCheckbox = document.getElementById("music-autoplay-checkbox");
+    if (autoPlayCheckbox) {
+      autoPlayCheckbox.addEventListener("change", (e) => {
+        this.musicPlayerManager.autoPlayEnabled = e.target.checked;
+        console.log(
+          `🎵 Auto-play ${e.target.checked ? "enabled" : "disabled"}`
+        );
+      });
+    }
+
+    // Pagination buttons
+    const prevBtn = document.getElementById("music-prev-page");
+    const nextBtn = document.getElementById("music-next-page");
+    if (prevBtn) {
+      prevBtn.addEventListener("click", () => {
+        this.musicPlayerManager.previousPage();
+      });
+    }
+    if (nextBtn) {
+      nextBtn.addEventListener("click", () => {
+        this.musicPlayerManager.nextPage();
+      });
+    }
+
     // Populate song list when modal opens
     const modal = document.getElementById("music-player-modal");
     if (modal) {

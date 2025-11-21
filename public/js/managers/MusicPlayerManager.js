@@ -16,8 +16,18 @@ export class MusicPlayerManager {
     // Available songs (loaded from server)
     this.availableSongs = [];
 
+    // Pagination
+    this.currentPage = 0;
+    this.songsPerPage = 10;
+
     // Currently interacting speaker
     this.currentSpeaker = null;
+
+    // Auto-play next song
+    this.autoPlayEnabled = true;
+
+    // Speaker volumes (per speaker)
+    this.speakerVolumes = new Map(); // speakerId -> volume (0-1)
 
     // Pending speakers (waiting for audio unlock)
     this.pendingSpeakers = [];
@@ -126,6 +136,26 @@ export class MusicPlayerManager {
         this.setupAudioUnlockHandler();
       }
     });
+
+    // When speaker is paused by another player
+    socket.on("speakerMusicPaused", (data) => {
+      console.log(`⏸️ Received pause for speaker ${data.speakerId}`);
+      this.pauseSpeakerMusic(data.speakerId, false);
+    });
+
+    // When speaker is resumed by another player
+    socket.on("speakerMusicResumed", (data) => {
+      console.log(`▶️ Received resume for speaker ${data.speakerId}`);
+      this.resumeSpeakerMusic(data.speakerId, false);
+    });
+
+    // When speaker volume is changed by another player
+    socket.on("speakerVolumeChanged", (data) => {
+      console.log(
+        `🔊 Received volume change for speaker ${data.speakerId}: ${data.volume}%`
+      );
+      this.setSpeakerVolume(data.speakerId, data.volume, false);
+    });
   }
 
   /**
@@ -205,9 +235,14 @@ export class MusicPlayerManager {
             volume = this.maxVolume * distanceFactor * distanceFactor; // Square falloff for more natural sound
           }
 
-          // Apply volume with master volume
+          // Get speaker's base volume (user-set volume)
+          const baseVolume =
+            speakerData.baseVolume || this.speakerVolumes.get(speakerId) || 0.7;
+
+          // Apply volume with master volume and speaker's base volume
           const finalVolume =
             volume *
+            baseVolume *
             this.soundManager.masterVolume *
             (this.soundManager.enabled ? 1 : 0);
 
@@ -279,8 +314,18 @@ export class MusicPlayerManager {
 
       // Create audio element
       const audio = new Audio(`/sounds/music/${songName}`);
-      audio.loop = true; // Loop the music
+      audio.loop = false; // Don't loop - we'll handle auto-play
       audio.volume = 0; // Start at 0, spatial audio will adjust
+
+      // Add ended event listener for auto-play
+      audio.addEventListener("ended", () => {
+        console.log(`🎵 Song ended: ${songName}`);
+        if (this.autoPlayEnabled) {
+          this.playNextSong(speakerId);
+        } else {
+          this.stopSpeakerMusic(speakerId, true);
+        }
+      });
 
       // Calculate playback position based on server time
       const clientTime = Date.now();
@@ -308,6 +353,7 @@ export class MusicPlayerManager {
         songName,
         startTime: serverTime,
         isPaused: false,
+        baseVolume: this.speakerVolumes.get(speakerId) || 0.7, // Store base volume
       });
 
       console.log(`🎵 Started music on speaker ${speakerId}: ${songName}`);
@@ -441,25 +487,48 @@ export class MusicPlayerManager {
     if (!this.currentSpeaker) return;
 
     const speakerData = this.activeSpeakers.get(this.currentSpeaker);
-    const isPlaying = !!speakerData;
+    const isPlaying = !!speakerData && !speakerData.isPaused;
+    const isPaused = !!speakerData && speakerData.isPaused;
     const currentSong = speakerData?.songName || null;
 
     // Update current song display
     const currentSongEl = document.getElementById("current-song-name");
     if (currentSongEl) {
       currentSongEl.textContent = currentSong
-        ? currentSong.replace(".mp3", "")
+        ? currentSong.replace(/\.(mp3|wav|ogg)$/i, "")
         : "No song playing";
     }
 
-    // Update play/stop button
-    const playBtn = document.getElementById("music-play-btn");
+    // Update pause/resume buttons
+    const pauseBtn = document.getElementById("music-pause-btn");
+    const resumeBtn = document.getElementById("music-resume-btn");
     const stopBtn = document.getElementById("music-stop-btn");
-    if (playBtn) {
-      playBtn.disabled = isPlaying;
+
+    if (pauseBtn) {
+      pauseBtn.style.display = isPlaying ? "flex" : "none";
+    }
+    if (resumeBtn) {
+      resumeBtn.style.display = isPaused ? "flex" : "none";
     }
     if (stopBtn) {
-      stopBtn.disabled = !isPlaying;
+      stopBtn.disabled = !speakerData;
+    }
+
+    // Update volume slider
+    const volumeSlider = document.getElementById("music-volume-slider");
+    const volumeValue = document.getElementById("music-volume-value");
+    if (volumeSlider && this.currentSpeaker) {
+      const volume = this.getSpeakerVolume(this.currentSpeaker);
+      volumeSlider.value = volume;
+      if (volumeValue) {
+        volumeValue.textContent = `${Math.round(volume)}%`;
+      }
+    }
+
+    // Update auto-play checkbox
+    const autoPlayCheckbox = document.getElementById("music-autoplay-checkbox");
+    if (autoPlayCheckbox) {
+      autoPlayCheckbox.checked = this.autoPlayEnabled;
     }
 
     // Highlight selected song in list
@@ -475,7 +544,108 @@ export class MusicPlayerManager {
   }
 
   /**
-   * Populate song list in UI
+   * Pause music on a speaker
+   * @param {string} speakerId - ID of the speaker
+   * @param {boolean} broadcast - Whether to broadcast to other clients (default: true)
+   */
+  pauseSpeakerMusic(speakerId, broadcast = true) {
+    const speakerData = this.activeSpeakers.get(speakerId);
+    if (speakerData && speakerData.audio && !speakerData.isPaused) {
+      speakerData.audio.pause();
+      speakerData.isPaused = true;
+      speakerData.pausedTime = Date.now();
+      console.log(`⏸️ Paused music on speaker ${speakerId}`);
+
+      // Broadcast to other clients
+      if (broadcast) {
+        this.networkManager.socket.emit("pauseSpeakerMusic", { speakerId });
+      }
+
+      this.updateMusicPlayerUI();
+    }
+  }
+
+  /**
+   * Resume music on a speaker
+   * @param {string} speakerId - ID of the speaker
+   * @param {boolean} broadcast - Whether to broadcast to other clients (default: true)
+   */
+  resumeSpeakerMusic(speakerId, broadcast = true) {
+    const speakerData = this.activeSpeakers.get(speakerId);
+    if (speakerData && speakerData.audio && speakerData.isPaused) {
+      speakerData.audio.play();
+      speakerData.isPaused = false;
+      console.log(`▶️ Resumed music on speaker ${speakerId}`);
+
+      // Broadcast to other clients
+      if (broadcast) {
+        this.networkManager.socket.emit("resumeSpeakerMusic", { speakerId });
+      }
+
+      this.updateMusicPlayerUI();
+    }
+  }
+
+  /**
+   * Set volume for a speaker
+   * @param {string} speakerId - ID of the speaker
+   * @param {number} volume - Volume level (0-100)
+   * @param {boolean} broadcast - Whether to broadcast to other clients (default: true)
+   */
+  setSpeakerVolume(speakerId, volume, broadcast = true) {
+    // volume is 0-100, convert to 0-1
+    const normalizedVolume = volume / 100;
+    this.speakerVolumes.set(speakerId, normalizedVolume);
+
+    // Update active speaker if playing
+    const speakerData = this.activeSpeakers.get(speakerId);
+    if (speakerData && speakerData.audio) {
+      // Store base volume, spatial audio will adjust it
+      speakerData.baseVolume = normalizedVolume;
+    }
+
+    console.log(`🔊 Set volume for speaker ${speakerId}: ${volume}%`);
+
+    // Broadcast to other clients
+    if (broadcast) {
+      this.networkManager.socket.emit("changeSpeakerVolume", {
+        speakerId,
+        volume,
+      });
+    }
+  }
+
+  /**
+   * Get volume for a speaker
+   */
+  getSpeakerVolume(speakerId) {
+    return (this.speakerVolumes.get(speakerId) || 0.7) * 100; // Default 70%
+  }
+
+  /**
+   * Play next song in queue (auto-play)
+   */
+  playNextSong(speakerId) {
+    if (!this.autoPlayEnabled || this.availableSongs.length === 0) return;
+
+    const currentData = this.activeSpeakers.get(speakerId);
+    const currentSong = currentData?.songName;
+
+    // Find current song index
+    const currentIndex = this.availableSongs.findIndex(
+      (song) => song.filename === currentSong
+    );
+
+    // Get next song (loop to start if at end)
+    const nextIndex = (currentIndex + 1) % this.availableSongs.length;
+    const nextSong = this.availableSongs[nextIndex];
+
+    console.log(`⏭️ Auto-playing next song: ${nextSong.name}`);
+    this.startSpeakerMusic(speakerId, nextSong.filename, Date.now(), true);
+  }
+
+  /**
+   * Populate song list in UI with pagination
    */
   populateSongList() {
     const container = document.getElementById("music-song-list");
@@ -483,7 +653,38 @@ export class MusicPlayerManager {
 
     container.innerHTML = "";
 
-    this.availableSongs.forEach((song) => {
+    // Calculate pagination
+    const totalPages = Math.ceil(
+      this.availableSongs.length / this.songsPerPage
+    );
+    const startIdx = this.currentPage * this.songsPerPage;
+    const endIdx = Math.min(
+      startIdx + this.songsPerPage,
+      this.availableSongs.length
+    );
+    const songsToShow = this.availableSongs.slice(startIdx, endIdx);
+
+    // Show pagination if more than one page
+    const paginationEl = document.getElementById("music-pagination");
+    if (paginationEl) {
+      if (totalPages > 1) {
+        paginationEl.style.display = "flex";
+        document.getElementById("music-page-info").textContent = `Page ${
+          this.currentPage + 1
+        } of ${totalPages}`;
+
+        const prevBtn = document.getElementById("music-prev-page");
+        const nextBtn = document.getElementById("music-next-page");
+
+        if (prevBtn) prevBtn.disabled = this.currentPage === 0;
+        if (nextBtn) nextBtn.disabled = this.currentPage === totalPages - 1;
+      } else {
+        paginationEl.style.display = "none";
+      }
+    }
+
+    // Populate songs for current page
+    songsToShow.forEach((song) => {
       const item = document.createElement("div");
       item.className = "music-song-item";
       item.dataset.song = song.filename;
@@ -502,6 +703,31 @@ export class MusicPlayerManager {
 
       container.appendChild(item);
     });
+  }
+
+  /**
+   * Go to next page
+   */
+  nextPage() {
+    const totalPages = Math.ceil(
+      this.availableSongs.length / this.songsPerPage
+    );
+    if (this.currentPage < totalPages - 1) {
+      this.currentPage++;
+      this.populateSongList();
+      this.updateMusicPlayerUI();
+    }
+  }
+
+  /**
+   * Go to previous page
+   */
+  previousPage() {
+    if (this.currentPage > 0) {
+      this.currentPage--;
+      this.populateSongList();
+      this.updateMusicPlayerUI();
+    }
   }
 
   /**
