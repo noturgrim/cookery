@@ -9,6 +9,7 @@ import { InteractionManager } from "./managers/InteractionManager.js";
 import { DayNightUI } from "./managers/DayNightUI.js";
 import { TimeDisplay } from "./managers/TimeDisplay.js";
 import { MusicPlayerManager } from "./managers/MusicPlayerManager.js";
+import { SpeakerConnectionManager } from "./managers/SpeakerConnectionManager.js";
 
 /**
  * Main Game Class
@@ -613,9 +614,17 @@ class Game {
       this.soundManager
     );
 
+    // Initialize speaker connection manager
+    this.speakerConnectionManager = new SpeakerConnectionManager(
+      this.sceneManager,
+      this.networkManager,
+      this.musicPlayerManager
+    );
+
     // Store references (needed for spatial audio and cleanup)
     this.sceneManager.playerManager = this.playerManager;
     this.sceneManager.musicPlayerManager = this.musicPlayerManager;
+    this.sceneManager.speakerConnectionManager = this.speakerConnectionManager;
 
     // Initialize interaction manager
     this.interactionManager = new InteractionManager(

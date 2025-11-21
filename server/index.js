@@ -18,6 +18,9 @@ import pool, {
   updateWorldTime,
   getWorldSettings,
   updateWorldSettings,
+  loadSpeakerConnections,
+  saveSpeakerConnection,
+  deleteSpeakerConnection,
 } from "./database.js";
 import {
   registerUser,
@@ -2860,6 +2863,77 @@ io.on("connection", (socket) => {
       );
     } catch (error) {
       console.error("❌ Error sending music sync:", error);
+    }
+  });
+
+  // ============================================
+  // SPEAKER CONNECTIONS
+  // ============================================
+
+  // Handle connecting two speakers
+  socket.on("connectSpeakers", async (data) => {
+    try {
+      // Rate limiting (use ACTION limit)
+      if (!rateLimiter.checkLimit(socket.id, "ACTIONS")) {
+        return;
+      }
+
+      const { speaker1, speaker2 } = data;
+
+      // Validate IDs
+      const id1Validation = validateId(speaker1);
+      const id2Validation = validateId(speaker2);
+      if (!id1Validation.valid || !id2Validation.valid) return;
+
+      // Save to database
+      await saveSpeakerConnection(speaker1, speaker2);
+
+      // Broadcast to OTHER clients
+      socket.broadcast.emit("speakersConnected", { speaker1, speaker2 });
+
+      console.log(`🔌 Connected speakers: ${speaker1} ↔ ${speaker2}`);
+    } catch (error) {
+      console.error("❌ Error connecting speakers:", error);
+    }
+  });
+
+  // Handle disconnecting two speakers
+  socket.on("disconnectSpeakers", async (data) => {
+    try {
+      // Rate limiting (use ACTION limit)
+      if (!rateLimiter.checkLimit(socket.id, "ACTIONS")) {
+        return;
+      }
+
+      const { speaker1, speaker2 } = data;
+
+      // Validate IDs
+      const id1Validation = validateId(speaker1);
+      const id2Validation = validateId(speaker2);
+      if (!id1Validation.valid || !id2Validation.valid) return;
+
+      // Delete from database
+      await deleteSpeakerConnection(speaker1, speaker2);
+
+      // Broadcast to OTHER clients
+      socket.broadcast.emit("speakersDisconnected", { speaker1, speaker2 });
+
+      console.log(`🔌 Disconnected speakers: ${speaker1} ↔ ${speaker2}`);
+    } catch (error) {
+      console.error("❌ Error disconnecting speakers:", error);
+    }
+  });
+
+  // Send speaker connections when player connects
+  socket.on("requestConnectionsSync", async () => {
+    try {
+      const connections = await loadSpeakerConnections();
+      socket.emit("connectionsStateSync", connections);
+      console.log(
+        `🔌 Sent connections sync to ${socket.id}: ${connections.length} connections`
+      );
+    } catch (error) {
+      console.error("❌ Error sending connections sync:", error);
     }
   });
 

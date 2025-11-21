@@ -128,6 +128,11 @@ export class InputManager {
       this.toggleSpawnMenu();
     }
 
+    // Toggle speaker connection mode with L key (Link)
+    if (e.code === "KeyL") {
+      this.toggleConnectionMode();
+    }
+
     // Toggle collision boxes with V key (when not in action wheel)
     if (e.code === "KeyV" && !this.actionWheelActive) {
       this.toggleCollisionBoxes();
@@ -404,6 +409,42 @@ export class InputManager {
    * Handle click events
    */
   handleClick(event) {
+    // Check for speaker connection mode FIRST (before any other checks)
+    if (this.sceneManager.speakerConnectionManager?.connectionMode) {
+      // Update mouse coordinates
+      this.mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+      this.mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+
+      // Cast ray to find clicked object
+      this.raycaster.setFromCamera(this.mouse, this.sceneManager.camera);
+      const intersects = this.raycaster.intersectObjects(
+        this.sceneManager.obstacles,
+        true // Check all descendants
+      );
+
+      if (intersects.length > 0) {
+        // Find the root obstacle object
+        let object = intersects[0].object;
+        while (object.parent && !object.userData.id) {
+          object = object.parent;
+        }
+
+        // If we found an obstacle with ID, let connection manager handle it
+        if (object.userData.id) {
+          const handled =
+            this.sceneManager.speakerConnectionManager.handleSpeakerClick(
+              object
+            );
+
+          if (handled) {
+            // Play click sound for feedback
+            this.soundManager?.play("click", { volume: 0.6 });
+            return; // Stop processing - connection mode handled it
+          }
+        }
+      }
+    }
+
     // Block clicks if any menu is open
     if (this.isAnyMenuOpen()) {
       return;
@@ -1320,6 +1361,21 @@ export class InputManager {
         `${isVisible ? "🌅" : "❌"} Day-Night UI: ${
           isVisible ? "OPEN" : "CLOSED"
         } (Press N to toggle)`
+      );
+    }
+  }
+
+  /**
+   * Toggle speaker connection mode
+   */
+  toggleConnectionMode() {
+    if (this.sceneManager.speakerConnectionManager) {
+      const isOn =
+        this.sceneManager.speakerConnectionManager.toggleConnectionMode();
+      console.log(
+        `${isOn ? "🔌" : "❌"} Connection Mode: ${
+          isOn ? "ON" : "OFF"
+        } (Press L to toggle)`
       );
     }
   }

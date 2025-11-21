@@ -326,6 +326,25 @@ export class MusicPlayerManager {
         });
       }
 
+      // Start music on all connected speakers
+      if (this.sceneManager.speakerConnectionManager) {
+        const connectedSpeakers =
+          this.sceneManager.speakerConnectionManager.getConnectedSpeakers(
+            speakerId
+          );
+        connectedSpeakers.forEach((connectedId) => {
+          if (
+            connectedId !== speakerId &&
+            !this.activeSpeakers.has(connectedId)
+          ) {
+            console.log(
+              `🔌 Syncing music to connected speaker: ${connectedId}`
+            );
+            this.startSpeakerMusic(connectedId, songName, serverTime, false);
+          }
+        });
+      }
+
       // Update UI if this is the current speaker
       if (this.currentSpeaker === speakerId) {
         this.updateMusicPlayerUI();

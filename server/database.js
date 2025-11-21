@@ -226,6 +226,19 @@ export async function initializeDatabase() {
       ADD COLUMN IF NOT EXISTS music_start_time BIGINT
     `);
 
+    // Create speaker connections table
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS speaker_connections (
+        id SERIAL PRIMARY KEY,
+        speaker1_id VARCHAR(255) NOT NULL,
+        speaker2_id VARCHAR(255) NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(speaker1_id, speaker2_id),
+        CONSTRAINT fk_speaker1 FOREIGN KEY (speaker1_id) REFERENCES obstacles(id) ON DELETE CASCADE,
+        CONSTRAINT fk_speaker2 FOREIGN KEY (speaker2_id) REFERENCES obstacles(id) ON DELETE CASCADE
+      )
+    `);
+
     // Create food_items table
     await pool.query(`
       CREATE TABLE IF NOT EXISTS food_items (
@@ -877,6 +890,71 @@ export async function updateWorldSettings(platformSize) {
     return true;
   } catch (error) {
     console.error("❌ Error updating world settings:", error.message);
+    return false;
+  }
+}
+
+/**
+ * Load all speaker connections
+ */
+export async function loadSpeakerConnections() {
+  try {
+    const result = await pool.query(
+      "SELECT * FROM speaker_connections ORDER BY created_at"
+    );
+    return result.rows.map((row) => ({
+      speaker1: row.speaker1_id,
+      speaker2: row.speaker2_id,
+    }));
+  } catch (error) {
+    console.error("❌ Error loading speaker connections:", error);
+    return [];
+  }
+}
+
+/**
+ * Save speaker connection
+ */
+export async function saveSpeakerConnection(speaker1Id, speaker2Id) {
+  try {
+    // Ensure consistent ordering (smaller ID first)
+    const [id1, id2] =
+      speaker1Id < speaker2Id
+        ? [speaker1Id, speaker2Id]
+        : [speaker2Id, speaker1Id];
+
+    await pool.query(
+      `INSERT INTO speaker_connections (speaker1_id, speaker2_id)
+       VALUES ($1, $2)
+       ON CONFLICT (speaker1_id, speaker2_id) DO NOTHING`,
+      [id1, id2]
+    );
+
+    console.log(`🔌 Saved speaker connection: ${id1} ↔ ${id2}`);
+    return true;
+  } catch (error) {
+    console.error("❌ Error saving speaker connection:", error);
+    return false;
+  }
+}
+
+/**
+ * Delete speaker connection
+ */
+export async function deleteSpeakerConnection(speaker1Id, speaker2Id) {
+  try {
+    // Check both orderings
+    await pool.query(
+      `DELETE FROM speaker_connections 
+       WHERE (speaker1_id = $1 AND speaker2_id = $2)
+          OR (speaker1_id = $2 AND speaker2_id = $1)`,
+      [speaker1Id, speaker2Id]
+    );
+
+    console.log(`🔌 Deleted speaker connection: ${speaker1Id} ↔ ${speaker2Id}`);
+    return true;
+  } catch (error) {
+    console.error("❌ Error deleting speaker connection:", error);
     return false;
   }
 }
