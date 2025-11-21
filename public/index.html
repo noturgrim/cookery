@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Supercooked</title>
+    <title>LifeVerse</title>
     <link
       href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
       rel="stylesheet"
@@ -325,12 +325,12 @@
         class="bg-gradient-to-br from-purple-900 to-indigo-900 rounded-2xl shadow-2xl border-2 border-yellow-500/50 w-full max-w-lg flex flex-col overflow-hidden"
       >
         <!-- Header -->
-        <div class="bg-gradient-to-r from-yellow-500 to-orange-500 px-6 py-4">
+        <div class="bg-gradient-to-r from-purple-500 to-violet-500 px-6 py-4">
           <h2 class="text-3xl font-bold text-white text-center drop-shadow-lg">
-            Welcome to Supercooked!
+            Welcome to LifeVerse!
           </h2>
           <p class="text-white/90 text-center text-sm mt-1">
-            Choose your chef identity
+            Create your character
           </p>
         </div>
 
@@ -339,12 +339,12 @@
           <!-- Name Input -->
           <div>
             <label class="block text-white text-sm font-bold mb-2">
-              Your Name
+              Character Name
             </label>
             <input
               type="text"
               id="player-name"
-              placeholder="Enter your chef name..."
+              placeholder="Enter your name..."
               maxlength="20"
               autocomplete="off"
               class="w-full py-3 px-4 rounded-lg bg-white/10 border-2 border-white/20 text-white text-base placeholder-white/50 focus:border-yellow-500 focus:outline-none focus:bg-white/15 transition-all"
@@ -365,9 +365,9 @@
           <!-- Start Button -->
           <button
             id="start-game-btn"
-            class="w-full py-3 px-6 rounded-lg bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-600 hover:to-orange-600 text-white font-bold text-lg transition-all hover:scale-105 active:scale-95 shadow-lg"
+            class="w-full py-3 px-6 rounded-lg bg-gradient-to-r from-purple-500 to-violet-500 hover:from-purple-600 hover:to-violet-600 text-white font-bold text-lg transition-all hover:scale-105 active:scale-95 shadow-lg"
           >
-            Start Cooking!
+            Enter LifeVerse
           </button>
         </div>
       </div>
@@ -569,12 +569,12 @@
                 <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2" />
                 <circle cx="12" cy="7" r="4" />
               </svg>
-              Your Name
+              Character Name
             </label>
             <input
               type="text"
               id="settings-player-name"
-              placeholder="Enter your chef name..."
+              placeholder="Enter your name..."
               maxlength="20"
               autocomplete="off"
               class="w-full py-2.5 px-4 rounded-xl bg-gray-800/40 border border-gray-600/40 text-white placeholder-gray-400 focus:border-purple-500/60 focus:bg-gray-800/60 focus:outline-none transition-all duration-200"
@@ -790,7 +790,7 @@
     </div>
 
     <div id="loading">
-      <div>Loading Supercooked...</div>
+      <div>Loading LifeVerse...</div>
       <div class="spinner"></div>
     </div>
 
@@ -800,17 +800,17 @@
       class="fixed inset-0 bg-black/85 backdrop-blur-md z-[2000] hidden items-center justify-center p-4"
     >
       <div
-        class="bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 rounded-2xl shadow-2xl border border-yellow-500/40 w-full max-w-4xl max-h-[88vh] flex flex-col pointer-events-auto overflow-hidden"
+        class="bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 rounded-2xl shadow-2xl border border-purple-500/40 w-full max-w-4xl max-h-[88vh] flex flex-col pointer-events-auto overflow-hidden"
         style="backdrop-filter: blur(20px)"
       >
         <!-- Header -->
         <div
-          class="flex items-center justify-between px-5 py-3.5 border-b border-yellow-500/20 bg-gradient-to-r from-yellow-900/20 to-orange-900/20"
+          class="flex items-center justify-between px-5 py-3.5 border-b border-purple-500/20 bg-gradient-to-r from-purple-900/20 to-violet-900/20"
         >
           <div class="flex items-center gap-3">
             <svg
               viewBox="0 0 24 24"
-              class="w-6 h-6 text-yellow-400"
+              class="w-6 h-6 text-purple-400"
               fill="none"
               stroke="currentColor"
               stroke-width="2"
@@ -821,7 +821,7 @@
                 d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"
               />
             </svg>
-            <h2 class="text-lg font-bold text-yellow-400 tracking-wide">
+            <h2 class="text-lg font-bold text-purple-400 tracking-wide">
               Spawn Menu
             </h2>
           </div>
@@ -874,7 +874,7 @@
               type="text"
               id="model-search"
               placeholder="Search models..."
-              class="w-full py-2.5 px-4 pl-10 rounded-xl bg-gray-800/40 border border-gray-600/40 text-white text-sm placeholder-gray-400 focus:border-yellow-500/60 focus:bg-gray-800/60 focus:outline-none transition-all duration-200"
+              class="w-full py-2.5 px-4 pl-10 rounded-xl bg-gray-800/40 border border-gray-600/40 text-white text-sm placeholder-gray-400 focus:border-purple-500/60 focus:bg-gray-800/60 focus:outline-none transition-all duration-200"
             />
           </div>
 
@@ -882,12 +882,12 @@
           <div class="spawn-category">
             <button
               onclick="this.nextElementSibling.classList.toggle('hidden')"
-              class="w-full flex items-center justify-between p-3.5 rounded-xl bg-gradient-to-r from-yellow-600/15 to-orange-600/15 border border-yellow-500/30 hover:border-yellow-500/60 hover:from-yellow-600/25 hover:to-orange-600/25 transition-all duration-200 group"
+              class="w-full flex items-center justify-between p-3.5 rounded-xl bg-gradient-to-r from-purple-600/15 to-violet-600/15 border border-purple-500/30 hover:border-purple-500/60 hover:from-purple-600/25 hover:to-violet-600/25 transition-all duration-200 group"
             >
               <div class="flex items-center gap-3">
                 <svg
                   viewBox="0 0 24 24"
-                  class="w-5 h-5 text-yellow-400"
+                  class="w-5 h-5 text-purple-400"
                   fill="none"
                   stroke="currentColor"
                   stroke-width="2"
@@ -897,7 +897,7 @@
                   <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
                   <polyline points="9 22 9 12 15 12 15 22" />
                 </svg>
-                <h3 class="text-base font-semibold text-yellow-300">
+                <h3 class="text-base font-semibold text-purple-300">
                   Furniture
                 </h3>
                 <span
@@ -906,7 +906,7 @@
                 ></span>
               </div>
               <svg
-                class="w-5 h-5 text-yellow-400 transition-transform group-hover:translate-y-1"
+                class="w-5 h-5 text-purple-400 transition-transform group-hover:translate-y-1"
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"
