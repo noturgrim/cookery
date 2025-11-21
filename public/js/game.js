@@ -748,6 +748,11 @@ class Game {
       this.interactionManager.update();
     }
 
+    // Update speaker connection visuals (playing indicators)
+    if (this.speakerConnectionManager) {
+      this.speakerConnectionManager.updatePlayingIndicators();
+    }
+
     // Render the scene
     this.sceneManager.render();
   }

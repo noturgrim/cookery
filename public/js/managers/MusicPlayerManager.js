@@ -317,6 +317,13 @@ export class MusicPlayerManager {
         }, Current time: ${audio.currentTime.toFixed(2)}s`
       );
 
+      // Add visual indicator that speaker is playing
+      if (this.sceneManager.speakerConnectionManager) {
+        this.sceneManager.speakerConnectionManager.addPlayingIndicator(
+          speakerId
+        );
+      }
+
       // Broadcast to other clients
       if (broadcast) {
         this.networkManager.socket.emit("startSpeakerMusic", {
@@ -370,6 +377,13 @@ export class MusicPlayerManager {
       this.activeSpeakers.delete(speakerId);
 
       console.log(`🔇 Stopped music on speaker ${speakerId}`);
+
+      // Remove visual indicator
+      if (this.sceneManager.speakerConnectionManager) {
+        this.sceneManager.speakerConnectionManager.removePlayingIndicator(
+          speakerId
+        );
+      }
 
       // Broadcast to other clients
       if (broadcast) {

@@ -1292,12 +1292,23 @@ export class InputManager {
       this.sceneManager.lightingManager.removeLight(objectId);
     }
 
-    // Stop music if this is a speaker playing music
-    if (this.sceneManager.musicPlayerManager && objectType !== "food") {
+    // Stop music and remove connections if this is a speaker
+    if (objectType !== "food") {
       const furnitureName = object.userData.model || "";
       if (furnitureName.toLowerCase().includes("speaker")) {
-        this.sceneManager.musicPlayerManager.stopSpeakerMusic(objectId, true);
-        console.log(`🔇 Stopping music for deleted speaker ${objectId}`);
+        // Stop music
+        if (this.sceneManager.musicPlayerManager) {
+          this.sceneManager.musicPlayerManager.stopSpeakerMusic(objectId, true);
+          console.log(`🔇 Stopping music for deleted speaker ${objectId}`);
+        }
+
+        // Remove all connections
+        if (this.sceneManager.speakerConnectionManager) {
+          this.sceneManager.speakerConnectionManager.handleSpeakerDeleted(
+            objectId
+          );
+          console.log(`🔌 Removed connections for deleted speaker ${objectId}`);
+        }
       }
     }
 
