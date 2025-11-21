@@ -114,17 +114,24 @@ export class MusicPlayerManager {
         (s) => s.isPlaying && s.currentSong
       );
 
+      // Create a set to track already synced speakers (avoid duplicates)
+      const syncedSpeakers = new Set();
+
       speakers.forEach((speaker) => {
         if (speaker.isPlaying && speaker.currentSong) {
           console.log(
             `   🔊 Syncing speaker ${speaker.id}: ${speaker.currentSong}`
           );
+
+          // Start music without triggering connected speaker sync (broadcast = false)
           this.startSpeakerMusic(
             speaker.id,
             speaker.currentSong,
             speaker.serverTime,
-            false
+            false // Don't broadcast - this is initial sync
           );
+
+          syncedSpeakers.add(speaker.id);
         }
       });
 
@@ -379,21 +386,22 @@ export class MusicPlayerManager {
         });
       }
 
-      // Start music on all connected speakers
-      if (this.sceneManager.speakerConnectionManager) {
+      // Start music on all connected speakers (only if broadcasting AND not already playing)
+      if (broadcast && this.sceneManager.speakerConnectionManager) {
         const connectedSpeakers =
           this.sceneManager.speakerConnectionManager.getConnectedSpeakers(
             speakerId
           );
         connectedSpeakers.forEach((connectedId) => {
-          if (
-            connectedId !== speakerId &&
-            !this.activeSpeakers.has(connectedId)
-          ) {
-            console.log(
-              `🔌 Syncing music to connected speaker: ${connectedId}`
-            );
-            this.startSpeakerMusic(connectedId, songName, serverTime, false);
+          if (connectedId !== speakerId) {
+            const existingData = this.activeSpeakers.get(connectedId);
+            // Only start if not playing, or playing different song
+            if (!existingData || existingData.songName !== songName) {
+              console.log(
+                `🔌 Syncing music to connected speaker: ${connectedId}`
+              );
+              this.startSpeakerMusic(connectedId, songName, serverTime, false);
+            }
           }
         });
       }
@@ -434,6 +442,19 @@ export class MusicPlayerManager {
       // Broadcast to other clients
       if (broadcast) {
         this.networkManager.socket.emit("stopSpeakerMusic", { speakerId });
+      }
+
+      // Stop all connected speakers
+      if (this.sceneManager.speakerConnectionManager) {
+        const connectedSpeakers =
+          this.sceneManager.speakerConnectionManager.getConnectedSpeakers(
+            speakerId
+          );
+        connectedSpeakers.forEach((connectedId) => {
+          if (connectedId !== speakerId) {
+            this.stopSpeakerMusic(connectedId, false); // Don't broadcast for connected speakers
+          }
+        });
       }
 
       // Update UI if this is the current speaker
@@ -563,6 +584,19 @@ export class MusicPlayerManager {
         this.networkManager.socket.emit("pauseSpeakerMusic", { speakerId });
       }
 
+      // Pause all connected speakers
+      if (this.sceneManager.speakerConnectionManager) {
+        const connectedSpeakers =
+          this.sceneManager.speakerConnectionManager.getConnectedSpeakers(
+            speakerId
+          );
+        connectedSpeakers.forEach((connectedId) => {
+          if (connectedId !== speakerId) {
+            this.pauseSpeakerMusic(connectedId, false); // Don't broadcast for connected speakers
+          }
+        });
+      }
+
       this.updateMusicPlayerUI();
     }
   }
@@ -582,6 +616,19 @@ export class MusicPlayerManager {
       // Broadcast to other clients
       if (broadcast) {
         this.networkManager.socket.emit("resumeSpeakerMusic", { speakerId });
+      }
+
+      // Resume all connected speakers
+      if (this.sceneManager.speakerConnectionManager) {
+        const connectedSpeakers =
+          this.sceneManager.speakerConnectionManager.getConnectedSpeakers(
+            speakerId
+          );
+        connectedSpeakers.forEach((connectedId) => {
+          if (connectedId !== speakerId) {
+            this.resumeSpeakerMusic(connectedId, false); // Don't broadcast for connected speakers
+          }
+        });
       }
 
       this.updateMusicPlayerUI();
@@ -613,6 +660,19 @@ export class MusicPlayerManager {
       this.networkManager.socket.emit("changeSpeakerVolume", {
         speakerId,
         volume,
+      });
+    }
+
+    // Sync volume to all connected speakers
+    if (this.sceneManager.speakerConnectionManager) {
+      const connectedSpeakers =
+        this.sceneManager.speakerConnectionManager.getConnectedSpeakers(
+          speakerId
+        );
+      connectedSpeakers.forEach((connectedId) => {
+        if (connectedId !== speakerId) {
+          this.setSpeakerVolume(connectedId, volume, false); // Don't broadcast for connected speakers
+        }
       });
     }
   }

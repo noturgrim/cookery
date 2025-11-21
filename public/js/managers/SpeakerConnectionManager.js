@@ -20,11 +20,11 @@ export class SpeakerConnectionManager {
     this.connectionMode = false;
     this.firstSelectedSpeaker = null;
 
-    // Wire material
+    // Wire material (thicker and more visible)
     this.wireMaterial = new THREE.LineBasicMaterial({
-      color: 0x000000, // Black wire
-      linewidth: 2,
-      opacity: 0.8,
+      color: 0x1a1a1a, // Dark gray/black wire
+      linewidth: 3,
+      opacity: 0.9,
       transparent: true,
     });
 
@@ -464,11 +464,21 @@ export class SpeakerConnectionManager {
     const pos2 = speaker2.position.clone();
     pos2.y = 0.05;
 
-    // Create curved wire (catenary curve for realism)
-    const points = this.createCatenaryPoints(pos1, pos2, 20);
+    // Calculate distance for segment count (more segments for longer cables)
+    const distance = Math.sqrt(
+      Math.pow(pos2.x - pos1.x, 2) + Math.pow(pos2.z - pos1.z, 2)
+    );
+    const segmentCount = Math.max(30, Math.min(100, Math.floor(distance * 10)));
+
+    // Create realistic curved wire with natural sag and twists
+    const points = this.createCatenaryPoints(pos1, pos2, segmentCount);
 
     const geometry = new THREE.BufferGeometry().setFromPoints(points);
     const wire = new THREE.Line(geometry, this.wireMaterial);
+
+    // Cast shadow for more realism
+    wire.castShadow = false; // Wires typically don't cast noticeable shadows
+    wire.receiveShadow = true;
 
     // Add to scene
     this.sceneManager.scene.add(wire);
@@ -480,41 +490,81 @@ export class SpeakerConnectionManager {
       speaker1: speakerId1,
       speaker2: speakerId2,
     });
+
+    console.log(
+      `🔌 Created wire with ${segmentCount} segments for distance ${distance.toFixed(
+        2
+      )}`
+    );
   }
 
   /**
-   * Create catenary curve points (realistic hanging wire on floor)
+   * Create realistic cable curve with natural sag, twists, and randomness
    */
-  createCatenaryPoints(pos1, pos2, segments = 30) {
+  createCatenaryPoints(pos1, pos2, segments = 50) {
     const points = [];
-    const sag = 0.15; // Gentle sag for floor cable
-    const wiggle = 0.3; // Add some natural curve/wiggle
+    const distance = Math.sqrt(
+      Math.pow(pos2.x - pos1.x, 2) + Math.pow(pos2.z - pos1.z, 2)
+    );
+
+    // Scale effects based on distance - longer cables sag and curve more
+    const sagAmount = Math.min(0.8, distance * 0.08); // More sag for longer cables
+    const wiggleIntensity = Math.min(1.2, distance * 0.15); // More wiggle for longer cables
+    const twists = Math.floor(distance / 3); // Add twists every 3 units
+
+    // Random seed based on position for consistent but unique curves
+    const seed =
+      Math.abs(Math.sin(pos1.x * 12.9898 + pos1.z * 78.233) * 43758.5453) % 1;
+
+    // Calculate perpendicular direction for wiggle
+    const perpX = -(pos2.z - pos1.z);
+    const perpZ = pos2.x - pos1.x;
+    const perpLength = Math.sqrt(perpX * perpX + perpZ * perpZ);
+    const perpNormX = perpLength > 0 ? perpX / perpLength : 0;
+    const perpNormZ = perpLength > 0 ? perpZ / perpLength : 0;
 
     for (let i = 0; i <= segments; i++) {
       const t = i / segments;
+
+      // Base interpolation
       const x = pos1.x + (pos2.x - pos1.x) * t;
       const z = pos1.z + (pos2.z - pos1.z) * t;
 
-      // Catenary curve (gentle sag) + slight sine wave for natural look
-      const y = 0.02 + Math.sin(t * Math.PI) * 0.01; // Stay ON floor with tiny variation
+      // Natural catenary sag (parabolic curve with more droop in middle)
+      const sagCurve = Math.sin(t * Math.PI); // 0 at ends, 1 in middle
+      const y = 0.02 + sagCurve * sagAmount * 0.3;
 
-      // Add perpendicular wiggle for more natural cable look
-      const perpX = -(pos2.z - pos1.z);
-      const perpZ = pos2.x - pos1.x;
-      const length = Math.sqrt(perpX * perpX + perpZ * perpZ);
+      // Primary wave (natural cable curve)
+      const primaryWave =
+        Math.sin(t * Math.PI * 2 + seed * Math.PI) * wiggleIntensity * 0.3;
 
-      if (length > 0) {
-        const wiggleAmount = Math.sin(t * Math.PI * 3) * wiggle * 0.1;
-        points.push(
-          new THREE.Vector3(
-            x + (perpX / length) * wiggleAmount,
-            y,
-            z + (perpZ / length) * wiggleAmount
-          )
-        );
-      } else {
-        points.push(new THREE.Vector3(x, y, z));
-      }
+      // Secondary wave (smaller variations)
+      const secondaryWave =
+        Math.sin(t * Math.PI * 5 + seed * 2) * wiggleIntensity * 0.15;
+
+      // Twist/spiral effect for long cables
+      const spiralWave =
+        twists > 0
+          ? Math.sin(t * Math.PI * twists + seed * 3) * wiggleIntensity * 0.2
+          : 0;
+
+      // Random micro-variations (different for each cable)
+      const microVariation =
+        Math.sin(t * Math.PI * 8 + seed * 5) * 0.05 +
+        Math.sin(t * Math.PI * 13 + seed * 7) * 0.03;
+
+      // Combine all wave effects
+      const totalWiggle =
+        primaryWave + secondaryWave + spiralWave + microVariation;
+
+      // Apply perpendicular wiggle
+      const finalX = x + perpNormX * totalWiggle;
+      const finalZ = z + perpNormZ * totalWiggle;
+
+      // Add slight vertical variation for more realism
+      const verticalVariation = Math.sin(t * Math.PI * 7 + seed * 4) * 0.02;
+
+      points.push(new THREE.Vector3(finalX, y + verticalVariation, finalZ));
     }
 
     return points;
@@ -643,7 +693,16 @@ export class SpeakerConnectionManager {
         const pos2 = speaker2.position.clone();
         pos2.y = 0.05;
 
-        const points = this.createCatenaryPoints(pos1, pos2, 30);
+        // Calculate distance for proper segment count
+        const distance = Math.sqrt(
+          Math.pow(pos2.x - pos1.x, 2) + Math.pow(pos2.z - pos1.z, 2)
+        );
+        const segmentCount = Math.max(
+          30,
+          Math.min(100, Math.floor(distance * 10))
+        );
+
+        const points = this.createCatenaryPoints(pos1, pos2, segmentCount);
         wireData.line.geometry.setFromPoints(points);
         wireData.line.geometry.attributes.position.needsUpdate = true;
       }
