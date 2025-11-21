@@ -249,13 +249,13 @@ export class MusicPlayerManager {
           speakerData.audio.volume = finalVolume;
 
           // Debug logging (comment out after fixing)
-          if (finalVolume > 0) {
-            console.log(
-              `🔊 Speaker distance: ${distance.toFixed(
-                2
-              )}, Volume: ${finalVolume.toFixed(3)}`
-            );
-          }
+          // if (finalVolume > 0) {
+          //   console.log(
+          //     `🔊 Speaker distance: ${distance.toFixed(
+          //       2
+          //     )}, Volume: ${finalVolume.toFixed(3)}`
+          //   );
+          // }
         });
       }
 
