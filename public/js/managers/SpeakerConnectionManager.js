@@ -181,13 +181,11 @@ export class SpeakerConnectionManager {
 
     // Initial sync of all connections
     socket.on("connectionsStateSync", (connections) => {
+      console.log(`🔌 Received connections state sync`);
       this.loadConnections(connections);
     });
 
-    // Request connections sync
-    setTimeout(() => {
-      socket.emit("requestConnectionsSync");
-    }, 600); // After music sync
+    // Note: Connection sync is now requested by NetworkManager before music sync
   }
 
   /**
@@ -718,6 +716,12 @@ export class SpeakerConnectionManager {
     connectionsData.forEach((conn) => {
       this.connectSpeakers(conn.speaker1, conn.speaker2, false);
     });
+
+    // Notify that connections are loaded (for music sync)
+    if (this.onConnectionsLoaded) {
+      console.log(`🔌 Connections loaded, notifying listeners`);
+      this.onConnectionsLoaded();
+    }
   }
 
   /**

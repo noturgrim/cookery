@@ -109,40 +109,36 @@ export class MusicPlayerManager {
     socket.on("speakersStateSync", (speakers) => {
       console.log(`🎵 Received music state sync: ${speakers.length} speakers`);
 
-      // Store pending speakers to start after audio unlock
-      this.pendingSpeakers = speakers.filter(
-        (s) => s.isPlaying && s.currentSong
-      );
+      // Check if connections are loaded yet
+      const connectionsReady =
+        this.sceneManager.speakerConnectionManager?.connections?.size > 0;
 
-      // Create a set to track already synced speakers (avoid duplicates)
-      const syncedSpeakers = new Set();
-
-      speakers.forEach((speaker) => {
-        if (speaker.isPlaying && speaker.currentSong) {
-          console.log(
-            `   🔊 Syncing speaker ${speaker.id}: ${speaker.currentSong}`
-          );
-
-          // Start music without triggering connected speaker sync (broadcast = false)
-          this.startSpeakerMusic(
-            speaker.id,
-            speaker.currentSong,
-            speaker.serverTime,
-            false // Don't broadcast - this is initial sync
-          );
-
-          syncedSpeakers.add(speaker.id);
-        }
-      });
-
-      // If audio isn't unlocked yet, show notice and retry after unlock
-      if (!this.soundManager.audioUnlocked && this.pendingSpeakers.length > 0) {
+      if (!connectionsReady && speakers.length > 0) {
         console.log(
-          "⚠️ Audio not unlocked yet. Music will start after you interact with the page."
+          `   ⏳ Connections not ready yet, storing speakers for later sync`
         );
-        this.setupAudioUnlockHandler();
+        // Store speakers to sync after connections load
+        this.pendingMusicSync = speakers;
+        return;
       }
+
+      // Process the music sync
+      this.processMusicSync(speakers);
     });
+
+    // Listen for when connections are loaded
+    if (this.sceneManager.speakerConnectionManager) {
+      // This will be called by SpeakerConnectionManager after loading connections
+      this.sceneManager.speakerConnectionManager.onConnectionsLoaded = () => {
+        if (this.pendingMusicSync && this.pendingMusicSync.length > 0) {
+          console.log(
+            `   🔗 Connections loaded, now processing pending music sync`
+          );
+          this.processMusicSync(this.pendingMusicSync);
+          this.pendingMusicSync = null;
+        }
+      };
+    }
 
     // When speaker is paused by another player
     socket.on("speakerMusicPaused", (data) => {
@@ -166,11 +162,130 @@ export class MusicPlayerManager {
   }
 
   /**
+   * Process music sync (extracted to be reusable)
+   */
+  processMusicSync(speakers) {
+    console.log(`🎵 Processing music sync: ${speakers.length} speakers`);
+
+    // Filter speakers to only sync "primary" ones (not connected duplicates)
+    // For each group of connected speakers, we only need to start one
+    const speakersToSync = this.filterPrimarySpeakers(speakers);
+
+    console.log(
+      `   📍 Filtered to ${speakersToSync.length} primary speakers (avoiding connected duplicates)`
+    );
+
+    // Store pending speakers to start after audio unlock
+    this.pendingSpeakers = speakersToSync.filter(
+      (s) => s.isPlaying && s.currentSong
+    );
+
+    // Start all speakers with synchronized timing
+    speakersToSync.forEach(async (speaker) => {
+      if (speaker.isPlaying && speaker.currentSong) {
+        console.log(
+          `   🔊 Syncing speaker ${speaker.id}: ${speaker.currentSong}`
+        );
+
+        // Get connected speakers group
+        let speakersInGroup = [speaker.id];
+        if (this.sceneManager.speakerConnectionManager) {
+          speakersInGroup =
+            this.sceneManager.speakerConnectionManager.getConnectedSpeakers(
+              speaker.id
+            );
+          if (speakersInGroup.length > 1) {
+            console.log(
+              `   🔗 Syncing ${speakersInGroup.length} speakers together as a group`
+            );
+          }
+        }
+
+        // Calculate sync time ONCE for all speakers in the group
+        const groupSyncTime = Date.now();
+        console.log(
+          `   ⏱️ Group sync time: ${groupSyncTime} (ensures perfect sync)`
+        );
+
+        // Start all speakers in the group with the SAME sync time
+        const startPromises = speakersInGroup.map((speakerId) => {
+          console.log(`   🔊 Starting speaker: ${speakerId}`);
+          return this.startSpeakerMusic(
+            speakerId,
+            speaker.currentSong,
+            speaker.serverTime,
+            false, // Don't broadcast - this is initial sync
+            groupSyncTime // Pass the SAME sync time to all speakers
+          );
+        });
+
+        // Wait for all speakers to start
+        await Promise.all(startPromises);
+      }
+    });
+
+    // If audio isn't unlocked yet, show notice and retry after unlock
+    // Check if we have pending speakers OR if audio is locked (will affect future plays)
+    if (this.pendingSpeakers.length > 0 && !this.soundManager.audioUnlocked) {
+      console.log(
+        "⚠️ Audio not unlocked yet. Music will start after you interact with the page."
+      );
+      this.setupAudioUnlockHandler();
+    }
+  }
+
+  /**
+   * Filter speakers to only return "primary" speakers from each connection group
+   * This prevents starting the same song multiple times on connected speakers
+   */
+  filterPrimarySpeakers(speakers) {
+    if (!this.sceneManager.speakerConnectionManager) {
+      return speakers; // No connection manager, return all
+    }
+
+    const processedSpeakers = new Set();
+    const primarySpeakers = [];
+
+    speakers.forEach((speaker) => {
+      // Skip if we've already processed this speaker as part of a group
+      if (processedSpeakers.has(speaker.id)) {
+        return;
+      }
+
+      // Get all speakers connected to this one
+      const connectedGroup =
+        this.sceneManager.speakerConnectionManager.getConnectedSpeakers(
+          speaker.id
+        );
+
+      // Mark all speakers in this group as processed
+      connectedGroup.forEach((id) => processedSpeakers.add(id));
+
+      // Add this speaker as the primary for its group
+      primarySpeakers.push(speaker);
+
+      // Log the group
+      if (connectedGroup.length > 1) {
+        console.log(
+          `   🔗 Speaker group: ${speaker.id} (primary) + ${
+            connectedGroup.length - 1
+          } connected`
+        );
+      }
+    });
+
+    return primarySpeakers;
+  }
+
+  /**
    * Setup handler to retry music playback after audio unlock
    */
   setupAudioUnlockHandler() {
     if (this.audioUnlockHandlerSetup) return; // Already setup
     this.audioUnlockHandlerSetup = true;
+
+    // Show user-friendly notification
+    this.showAudioUnlockNotice();
 
     const checkAudioUnlock = setInterval(() => {
       if (
@@ -180,8 +295,14 @@ export class MusicPlayerManager {
       ) {
         console.log("🔓 Audio unlocked! Starting pending music...");
 
+        // Hide the notice
+        this.hideAudioUnlockNotice();
+
         // Retry starting all pending speakers
-        this.pendingSpeakers.forEach((speaker) => {
+        const speakersToRetry = [...this.pendingSpeakers]; // Copy array
+        this.pendingSpeakers = []; // Clear before retrying
+
+        speakersToRetry.forEach((speaker) => {
           this.startSpeakerMusic(
             speaker.id,
             speaker.currentSong,
@@ -190,10 +311,120 @@ export class MusicPlayerManager {
           );
         });
 
-        this.pendingSpeakers = [];
         clearInterval(checkAudioUnlock);
       }
     }, 500); // Check every 500ms
+  }
+
+  /**
+   * Show audio unlock notice to user
+   */
+  showAudioUnlockNotice() {
+    // Check if notice already exists
+    let notice = document.getElementById("music-unlock-notice");
+    if (notice) {
+      notice.style.display = "block";
+      return;
+    }
+
+    // Create notice element
+    notice = document.createElement("div");
+    notice.id = "music-unlock-notice";
+    notice.style.cssText = `
+      position: fixed;
+      bottom: 100px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: linear-gradient(135deg, rgba(147, 51, 234, 0.95), rgba(168, 85, 247, 0.95));
+      color: white;
+      padding: 16px 24px;
+      border-radius: 12px;
+      font-weight: 600;
+      font-size: 14px;
+      z-index: 3000;
+      box-shadow: 0 8px 32px rgba(147, 51, 234, 0.4);
+      backdrop-filter: blur(10px);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      animation: slideUpBounce 0.5s ease-out;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      cursor: pointer;
+    `;
+    notice.innerHTML = `
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M9 18V5l12-2v13M6 21a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM18 19a3 3 0 1 0 0-6 3 3 0 0 0 0 6z"/>
+      </svg>
+      <div>
+        <div style="font-size: 15px; margin-bottom: 2px;">🎵 Music is waiting!</div>
+        <div style="font-size: 12px; opacity: 0.9;">Click anywhere to enable audio playback</div>
+      </div>
+    `;
+
+    // Add click handler to dismiss
+    notice.addEventListener("click", () => {
+      notice.style.display = "none";
+    });
+
+    // Add animation keyframe if not exists
+    if (!document.getElementById("music-unlock-animation")) {
+      const style = document.createElement("style");
+      style.id = "music-unlock-animation";
+      style.textContent = `
+        @keyframes slideUpBounce {
+          0% {
+            transform: translateX(-50%) translateY(100px);
+            opacity: 0;
+          }
+          60% {
+            transform: translateX(-50%) translateY(-10px);
+            opacity: 1;
+          }
+          80% {
+            transform: translateX(-50%) translateY(5px);
+          }
+          100% {
+            transform: translateX(-50%) translateY(0);
+          }
+        }
+      `;
+      document.head.appendChild(style);
+    }
+
+    document.body.appendChild(notice);
+  }
+
+  /**
+   * Hide audio unlock notice
+   */
+  hideAudioUnlockNotice() {
+    const notice = document.getElementById("music-unlock-notice");
+    if (notice) {
+      notice.style.animation = "fadeOut 0.3s ease-out";
+      setTimeout(() => {
+        notice.remove();
+      }, 300);
+    }
+
+    // Add fadeOut animation if not exists
+    if (!document.getElementById("fadeout-animation")) {
+      const style = document.createElement("style");
+      style.id = "fadeout-animation";
+      style.textContent = `
+        @keyframes fadeOut {
+          from {
+            opacity: 1;
+            transform: translateX(-50%) translateY(0);
+          }
+          to {
+            opacity: 0;
+            transform: translateX(-50%) translateY(20px);
+          }
+        }
+      `;
+      document.head.appendChild(style);
+    }
   }
 
   /**
@@ -278,8 +509,15 @@ export class MusicPlayerManager {
    * @param {string} songName - Name of the song file
    * @param {number} serverTime - Server timestamp when song started
    * @param {boolean} broadcast - Whether to broadcast to other clients
+   * @param {number} syncTime - Optional: Pre-calculated client time for perfect sync
    */
-  async startSpeakerMusic(speakerId, songName, serverTime, broadcast = true) {
+  async startSpeakerMusic(
+    speakerId,
+    songName,
+    serverTime,
+    broadcast = true,
+    syncTime = null
+  ) {
     try {
       // Check if this speaker is already playing this exact song at this time
       const existingSpeaker = this.activeSpeakers.get(speakerId);
@@ -335,7 +573,8 @@ export class MusicPlayerManager {
       });
 
       // Calculate playback position based on server time
-      const clientTime = Date.now();
+      // Use provided syncTime for perfect synchronization across multiple speakers
+      const clientTime = syncTime !== null ? syncTime : Date.now();
       const timeDiff = (clientTime - serverTime) / 1000; // Seconds since start
 
       // Wait for audio to load metadata
@@ -350,8 +589,51 @@ export class MusicPlayerManager {
         audio.currentTime = timeDiff % duration; // Sync with loop
       }
 
-      // Play audio
-      await audio.play();
+      // Try to play audio with autoplay policy handling
+      try {
+        await audio.play();
+      } catch (playError) {
+        // Handle autoplay policy errors
+        if (
+          playError.name === "NotAllowedError" ||
+          playError.message.includes("user didn't interact")
+        ) {
+          console.warn(
+            `⚠️ Autoplay blocked for speaker ${speakerId}. Adding to pending list.`
+          );
+
+          // Add to pending speakers for retry after user interaction
+          if (!this.pendingSpeakers) {
+            this.pendingSpeakers = [];
+          }
+
+          // Check if not already in pending list
+          const alreadyPending = this.pendingSpeakers.some(
+            (s) => s.id === speakerId
+          );
+          if (!alreadyPending) {
+            this.pendingSpeakers.push({
+              id: speakerId,
+              currentSong: songName,
+              serverTime: serverTime,
+              isPlaying: true,
+            });
+          }
+
+          // Setup audio unlock handler if not already setup
+          this.setupAudioUnlockHandler();
+
+          // Cleanup the failed audio element
+          audio.pause();
+          audio.remove();
+
+          // Don't continue with the rest of the function
+          return;
+        } else {
+          // Re-throw other types of errors
+          throw playError;
+        }
+      }
 
       // Store active speaker data
       this.activeSpeakers.set(speakerId, {
@@ -411,7 +693,17 @@ export class MusicPlayerManager {
         this.updateMusicPlayerUI();
       }
     } catch (error) {
-      console.error(`Error starting music on speaker ${speakerId}:`, error);
+      console.error(`❌ Error starting music on speaker ${speakerId}:`, error);
+
+      // Show user-friendly message for autoplay issues
+      if (
+        error.name === "NotAllowedError" ||
+        error.message.includes("user didn't interact")
+      ) {
+        console.log(
+          "💡 Tip: Click anywhere on the page to enable audio playback"
+        );
+      }
     }
   }
 
@@ -444,8 +736,8 @@ export class MusicPlayerManager {
         this.networkManager.socket.emit("stopSpeakerMusic", { speakerId });
       }
 
-      // Stop all connected speakers
-      if (this.sceneManager.speakerConnectionManager) {
+      // Stop all connected speakers (without broadcasting each one)
+      if (broadcast && this.sceneManager.speakerConnectionManager) {
         const connectedSpeakers =
           this.sceneManager.speakerConnectionManager.getConnectedSpeakers(
             speakerId
@@ -584,8 +876,8 @@ export class MusicPlayerManager {
         this.networkManager.socket.emit("pauseSpeakerMusic", { speakerId });
       }
 
-      // Pause all connected speakers
-      if (this.sceneManager.speakerConnectionManager) {
+      // Pause all connected speakers (without broadcasting each one)
+      if (broadcast && this.sceneManager.speakerConnectionManager) {
         const connectedSpeakers =
           this.sceneManager.speakerConnectionManager.getConnectedSpeakers(
             speakerId
@@ -618,8 +910,8 @@ export class MusicPlayerManager {
         this.networkManager.socket.emit("resumeSpeakerMusic", { speakerId });
       }
 
-      // Resume all connected speakers
-      if (this.sceneManager.speakerConnectionManager) {
+      // Resume all connected speakers (without broadcasting each one)
+      if (broadcast && this.sceneManager.speakerConnectionManager) {
         const connectedSpeakers =
           this.sceneManager.speakerConnectionManager.getConnectedSpeakers(
             speakerId
@@ -663,8 +955,8 @@ export class MusicPlayerManager {
       });
     }
 
-    // Sync volume to all connected speakers
-    if (this.sceneManager.speakerConnectionManager) {
+    // Sync volume to all connected speakers (without broadcasting each one)
+    if (broadcast && this.sceneManager.speakerConnectionManager) {
       const connectedSpeakers =
         this.sceneManager.speakerConnectionManager.getConnectedSpeakers(
           speakerId

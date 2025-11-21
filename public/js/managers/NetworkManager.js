@@ -116,11 +116,18 @@ export class NetworkManager {
       // Clear existing players
       this.playerManager.clear();
 
-      // Request music sync after a short delay to ensure everything is initialized
+      // Request connections sync FIRST, then music sync
+      // This ensures we know which speakers are connected before starting music
+      setTimeout(() => {
+        console.log("🔌 Requesting connections sync from server...");
+        this.socket.emit("requestConnectionsSync");
+      }, 300);
+
+      // Request music sync after connections are loaded
       setTimeout(() => {
         console.log("🎵 Requesting music sync from server...");
         this.socket.emit("requestMusicSync");
-      }, 500);
+      }, 800); // After connections sync
 
       // Initialize world time from server
       if (
