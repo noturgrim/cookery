@@ -761,6 +761,17 @@ class Game {
    * Setup music player UI handlers
    */
   setupMusicPlayerUI() {
+    // Modal backdrop click to close
+    const musicModal = document.getElementById("music-player-modal");
+    if (musicModal) {
+      musicModal.addEventListener("click", (e) => {
+        // Only close if clicking the backdrop (not the content)
+        if (e.target === musicModal) {
+          this.musicPlayerManager.closeMusicPlayer();
+        }
+      });
+    }
+
     // Close button
     const closeBtn = document.getElementById("music-player-close-btn");
     if (closeBtn) {

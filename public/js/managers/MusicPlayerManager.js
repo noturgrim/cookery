@@ -465,6 +465,7 @@ export class MusicPlayerManager {
     const modal = document.getElementById("music-player-modal");
     if (modal) {
       modal.style.display = "flex";
+      modal.style.pointerEvents = "auto"; // Ensure it blocks clicks
       this.updateMusicPlayerUI();
     }
   }
@@ -477,6 +478,7 @@ export class MusicPlayerManager {
     const modal = document.getElementById("music-player-modal");
     if (modal) {
       modal.style.display = "none";
+      modal.style.pointerEvents = "none"; // Allow clicks through when closed
     }
   }
 

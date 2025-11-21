@@ -120,6 +120,20 @@ export class InputManager {
       return;
     }
 
+    // If music player is open
+    if (this.isMusicPlayerOpen()) {
+      // ESC closes the music player
+      if (e.code === "Escape") {
+        e.preventDefault();
+        if (this.sceneManager?.musicPlayerManager) {
+          this.sceneManager.musicPlayerManager.closeMusicPlayer();
+        }
+        return;
+      }
+      // Block all game hotkeys when music player is open
+      return;
+    }
+
     if (e.code === "KeyE") {
       this.toggleEditMode();
     }
@@ -1018,10 +1032,22 @@ export class InputManager {
   }
 
   /**
+   * Check if music player is open
+   */
+  isMusicPlayerOpen() {
+    const modal = document.getElementById("music-player-modal");
+    return modal && modal.style.display === "flex";
+  }
+
+  /**
    * Check if any modal/menu is open
    */
   isAnyMenuOpen() {
-    return this.isSpawnMenuOpen() || this.isSettingsOpen();
+    return (
+      this.isSpawnMenuOpen() ||
+      this.isSettingsOpen() ||
+      this.isMusicPlayerOpen()
+    );
   }
 
   /**
