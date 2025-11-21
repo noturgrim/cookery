@@ -214,28 +214,54 @@ export class SpeakerConnectionManager {
 
     if (this.connectionMode) {
       if (!indicator) {
+        // Add CSS animation keyframe
+        if (!document.getElementById("connection-mode-style")) {
+          const style = document.createElement("style");
+          style.id = "connection-mode-style";
+          style.textContent = `
+            @keyframes slideIn {
+              from {
+                opacity: 0;
+                transform: translateX(20px);
+              }
+              to {
+                opacity: 1;
+                transform: translateX(0);
+              }
+            }
+          `;
+          document.head.appendChild(style);
+        }
+
         indicator = document.createElement("div");
         indicator.id = "connection-mode-indicator";
         indicator.style.cssText = `
           position: fixed;
-          top: 120px;
-          left: 20px;
-          background: rgba(0, 0, 0, 0.9);
-          color: #00ff00;
-          padding: 12px 20px;
-          border-radius: 8px;
-          font-weight: bold;
-          font-size: 14px;
+          top: 20px;
+          right: 20px;
+          background: rgba(0, 0, 0, 0.85);
+          backdrop-filter: blur(10px);
+          -webkit-backdrop-filter: blur(10px);
+          color: #fff;
+          padding: 10px 16px;
+          border-radius: 12px;
+          font-weight: 600;
+          font-size: 13px;
           z-index: 1000;
-          border: 2px solid #00ff00;
-          box-shadow: 0 0 20px rgba(0, 255, 0, 0.3);
-          font-family: 'Inter', Arial, sans-serif;
+          border: 1.5px solid rgba(0, 255, 0, 0.3);
+          box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+          font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          animation: slideIn 0.3s ease-out;
         `;
         indicator.innerHTML = `
-          🔌 CONNECTION MODE<br>
-          <span style="font-size: 11px; font-weight: normal;">
-          Click 2 speakers to connect them
-          </span>
+          <span style="font-size: 16px;">🔌</span>
+          <div style="line-height: 1.3;">
+            <div style="color: #00ff00; font-size: 12px; font-weight: 600;">CONNECTION MODE</div>
+            <div style="color: rgba(255,255,255,0.7); font-size: 11px; font-weight: 400;">Click 2 or more speakers to connect them</div>
+          </div>
         `;
         document.body.appendChild(indicator);
       }
