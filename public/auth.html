@@ -3,47 +3,16 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Supercooked - Login</title>
+    <title>LifeVerse - Login</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link
-      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
       rel="stylesheet"
     />
     <style>
       body {
         font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI",
           Roboto, sans-serif;
-      }
-
-      .gradient-bg {
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        position: relative;
-        overflow: hidden;
-      }
-
-      .gradient-bg::before {
-        content: "";
-        position: absolute;
-        top: -50%;
-        left: -50%;
-        width: 200%;
-        height: 200%;
-        background: radial-gradient(
-          circle,
-          rgba(255, 255, 255, 0.1) 0%,
-          transparent 70%
-        );
-        animation: pulse-bg 15s ease-in-out infinite;
-      }
-
-      @keyframes pulse-bg {
-        0%,
-        100% {
-          transform: translate(0, 0) scale(1);
-        }
-        50% {
-          transform: translate(-10%, -10%) scale(1.1);
-        }
       }
 
       @keyframes spin {
@@ -56,10 +25,28 @@
         animation: spin 0.6s linear infinite;
       }
 
-      @keyframes slideIn {
+      @keyframes shake {
+        0%,
+        100% {
+          transform: translateX(0);
+        }
+        25% {
+          transform: translateX(-5px);
+        }
+        75% {
+          transform: translateX(5px);
+        }
+      }
+
+      .shake {
+        animation: shake 0.4s ease-in-out;
+      }
+
+      /* GPU-accelerated animations - high performance */
+      @keyframes fadeIn {
         from {
           opacity: 0;
-          transform: translateY(20px);
+          transform: translateY(10px);
         }
         to {
           opacity: 1;
@@ -67,69 +54,149 @@
         }
       }
 
-      .animate-slide-in {
-        animation: slideIn 0.4s ease-out;
+      @keyframes subtleFloat {
+        0%,
+        100% {
+          transform: translateY(0);
+        }
+        50% {
+          transform: translateY(-6px);
+        }
+      }
+
+      @keyframes shimmer {
+        0% {
+          background-position: -200% center;
+        }
+        100% {
+          background-position: 200% center;
+        }
+      }
+
+      .auth-card {
+        animation: fadeIn 0.5s ease-out;
+        will-change: auto; /* Let browser decide */
+      }
+
+      .icon-float {
+        animation: subtleFloat 2.5s ease-in-out infinite;
+        will-change: transform;
+      }
+
+      .btn-shimmer {
+        background-size: 200% 100%;
+        position: relative;
+      }
+
+      .btn-shimmer::before {
+        content: "";
+        position: absolute;
+        top: 0;
+        left: -100%;
+        width: 100%;
+        height: 100%;
+        background: linear-gradient(
+          90deg,
+          transparent,
+          rgba(255, 255, 255, 0.15),
+          transparent
+        );
+        transition: left 0.5s ease;
+      }
+
+      .btn-shimmer:hover::before {
+        left: 100%;
+      }
+
+      /* Smooth input focus with transform instead of box-shadow */
+      .input-focus {
+        position: relative;
+      }
+
+      .input-focus::after {
+        content: "";
+        position: absolute;
+        top: -2px;
+        left: -2px;
+        right: -2px;
+        bottom: -2px;
+        border-radius: 0.5rem;
+        border: 2px solid rgb(192, 132, 252);
+        opacity: 0;
+        transition: opacity 0.2s ease;
+        pointer-events: none;
+      }
+
+      .input-focus:focus-within::after {
+        opacity: 1;
       }
     </style>
   </head>
-  <body class="gradient-bg min-h-screen flex items-center justify-center p-4">
-    <!-- Background decorative elements -->
-    <div class="fixed inset-0 overflow-hidden pointer-events-none">
-      <div
-        class="absolute top-1/4 -left-20 w-72 h-72 bg-purple-500 rounded-full mix-blend-multiply filter blur-xl opacity-20 animate-pulse"
-      ></div>
-      <div
-        class="absolute top-1/3 -right-20 w-72 h-72 bg-pink-500 rounded-full mix-blend-multiply filter blur-xl opacity-20 animate-pulse"
-        style="animation-delay: 2s"
-      ></div>
-      <div
-        class="absolute -bottom-20 left-1/3 w-72 h-72 bg-indigo-500 rounded-full mix-blend-multiply filter blur-xl opacity-20 animate-pulse"
-        style="animation-delay: 4s"
-      ></div>
-    </div>
-
+  <body
+    class="bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 min-h-screen flex items-center justify-center p-4"
+  >
     <!-- Auth Container -->
-    <div class="relative w-full max-w-md animate-slide-in">
+    <div class="w-full max-w-sm">
       <!-- Card -->
       <div
-        class="bg-gradient-to-br from-gray-900 to-gray-800 rounded-2xl shadow-2xl border-2 border-purple-500/50 overflow-hidden backdrop-blur-sm"
+        class="auth-card bg-slate-800 rounded-xl shadow-xl border-2 border-purple-500/60 overflow-hidden"
       >
         <!-- Header -->
         <div
-          class="bg-gradient-to-r from-purple-600 to-pink-600 p-8 text-center"
+          class="bg-gradient-to-r from-purple-600 via-violet-600 to-purple-600 p-6 text-center relative overflow-hidden"
         >
-          <div class="text-6xl mb-3">🍳</div>
-          <h1 class="text-3xl font-bold text-white mb-2">Supercooked</h1>
-          <p class="text-purple-100 text-sm font-medium" id="auth-subtitle">
-            Sign in to start cooking!
-          </p>
+          <div
+            class="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDAiIGhlaWdodD0iNDAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PGRlZnM+PHBhdHRlcm4gaWQ9ImdyaWQiIHdpZHRoPSI0MCIgaGVpZ2h0PSI0MCIgcGF0dGVyblVuaXRzPSJ1c2VyU3BhY2VPblVzZSI+PHBhdGggZD0iTSAwIDEwIEwgNDAgMTAgTSAxMCAwIEwgMTAgNDAgTSAwIDIwIEwgNDAgMjAgTSAyMCAwIEwgMjAgNDAgTSAwIDMwIEwgNDAgMzAgTSAzMCAwIEwgMzAgNDAiIGZpbGw9Im5vbmUiIHN0cm9rZT0icmdiYSgyNTUsMjU1LDI1NSwwLjAzKSIgc3Ryb2tlLXdpZHRoPSIxIi8+PC9wYXR0ZXJuPjwvZGVmcz48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSJ1cmwoI2dyaWQpIi8+PC9zdmc+')] opacity-30"
+          ></div>
+          <div class="icon-float text-5xl mb-2 relative">🏠</div>
+          <h1 class="text-2xl font-bold text-white relative tracking-tight">
+            <span class="inline-block">L</span
+            ><span class="inline-block">I</span
+            ><span class="inline-block">F</span
+            ><span class="inline-block">E</span
+            ><span class="inline-block">V</span
+            ><span class="inline-block">E</span
+            ><span class="inline-block">R</span
+            ><span class="inline-block">S</span
+            ><span class="inline-block">E</span>
+          </h1>
+          <div class="mt-2 flex items-center justify-center gap-2">
+            <span
+              class="px-2 py-0.5 bg-yellow-400 text-yellow-900 text-xs font-bold rounded"
+              >LVL 1</span
+            >
+            <span
+              class="px-2 py-0.5 bg-purple-900 text-purple-200 text-xs font-bold rounded border border-purple-400"
+              >LIFE SIM</span
+            >
+          </div>
         </div>
 
         <!-- Content -->
-        <div class="p-6 space-y-4">
+        <div class="p-5 space-y-3">
           <!-- Messages -->
           <div
             id="error-message"
-            class="hidden bg-red-500/20 border-2 border-red-500 text-red-200 px-4 py-3 rounded-lg text-sm text-center animate-slide-in"
+            class="hidden bg-red-500/20 border-2 border-red-500/60 text-red-200 px-3 py-2 rounded-lg text-sm text-center font-medium"
           ></div>
           <div
             id="success-message"
-            class="hidden bg-green-500/20 border-2 border-green-500 text-green-200 px-4 py-3 rounded-lg text-sm text-center animate-slide-in"
+            class="hidden bg-green-500/20 border-2 border-green-500/60 text-green-200 px-3 py-2 rounded-lg text-sm text-center font-medium"
           ></div>
 
           <!-- Login Form -->
-          <form id="login-form" class="space-y-4">
+          <form id="login-form" class="space-y-3">
             <div>
               <label
-                class="block text-white text-sm font-semibold mb-2"
+                class="block text-purple-300 text-xs font-bold mb-1.5 uppercase tracking-wide"
                 for="login-username"
               >
-                Username
+                Player ID
               </label>
               <input
                 type="text"
                 id="login-username"
-                class="w-full px-4 py-3 bg-gray-800/50 border-2 border-gray-600 rounded-lg text-white placeholder-gray-400 focus:border-purple-500 focus:ring-2 focus:ring-purple-500/50 focus:outline-none transition-all"
+                class="w-full px-3 py-2.5 bg-slate-900/70 border-2 border-purple-500/40 rounded-lg text-white text-sm placeholder-slate-400 focus:border-purple-400 focus:outline-none transition-colors"
                 placeholder="Enter your username"
                 required
                 autocomplete="username"
@@ -138,7 +205,7 @@
 
             <div>
               <label
-                class="block text-white text-sm font-semibold mb-2"
+                class="block text-purple-300 text-xs font-bold mb-1.5 uppercase tracking-wide"
                 for="login-password"
               >
                 Password
@@ -146,7 +213,7 @@
               <input
                 type="password"
                 id="login-password"
-                class="w-full px-4 py-3 bg-gray-800/50 border-2 border-gray-600 rounded-lg text-white placeholder-gray-400 focus:border-purple-500 focus:ring-2 focus:ring-purple-500/50 focus:outline-none transition-all"
+                class="w-full px-3 py-2.5 bg-slate-900/70 border-2 border-purple-500/40 rounded-lg text-white text-sm placeholder-slate-400 focus:border-purple-400 focus:outline-none transition-colors"
                 placeholder="Enter your password"
                 required
                 autocomplete="current-password"
@@ -156,58 +223,58 @@
             <button
               type="submit"
               id="login-button"
-              class="w-full py-3 px-4 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white font-bold rounded-lg transition-all duration-200 hover:scale-105 active:scale-95 shadow-lg hover:shadow-xl"
+              class="btn-shimmer w-full py-3 px-4 bg-gradient-to-r from-purple-600 to-violet-600 hover:from-purple-500 hover:to-violet-500 text-white font-bold text-sm rounded-lg transition-colors shadow-lg border-2 border-purple-400/50 hover:border-purple-300 overflow-hidden"
             >
-              Sign In
+              START GAME
             </button>
 
-            <div class="text-center pt-2">
-              <span class="text-gray-400 text-sm">Don't have an account? </span>
+            <div class="text-center pt-1 pb-2">
+              <span class="text-slate-400 text-xs">New player? </span>
               <a
-                class="text-purple-400 hover:text-purple-300 font-semibold text-sm cursor-pointer transition-colors"
+                class="text-purple-400 hover:text-purple-300 font-bold text-xs cursor-pointer underline"
                 id="show-register"
               >
-                Create one
+                Build your world
               </a>
             </div>
           </form>
 
           <!-- Register Form -->
-          <form id="register-form" class="space-y-4 hidden">
+          <form id="register-form" class="space-y-3 hidden">
             <div>
               <label
-                class="block text-white text-sm font-semibold mb-2"
+                class="block text-purple-300 text-xs font-bold mb-1.5 uppercase tracking-wide"
                 for="register-username"
               >
-                Username
+                Player ID
               </label>
               <input
                 type="text"
                 id="register-username"
-                class="w-full px-4 py-3 bg-gray-800/50 border-2 border-gray-600 rounded-lg text-white placeholder-gray-400 focus:border-purple-500 focus:ring-2 focus:ring-purple-500/50 focus:outline-none transition-all"
-                placeholder="Choose a username"
+                class="w-full px-3 py-2.5 bg-slate-900/70 border-2 border-purple-500/40 rounded-lg text-white text-sm placeholder-slate-400 focus:border-purple-400 focus:outline-none transition-colors"
+                placeholder="Choose your username"
                 required
                 autocomplete="username"
                 minlength="3"
                 maxlength="50"
               />
-              <p class="text-gray-400 text-xs mt-1">
-                3-50 characters, letters, numbers, - and _ only
+              <p class="text-slate-500 text-xs mt-1">
+                3-50 chars • letters, numbers, - and _
               </p>
             </div>
 
             <div>
               <label
-                class="block text-white text-sm font-semibold mb-2"
+                class="block text-purple-300 text-xs font-bold mb-1.5 uppercase tracking-wide"
                 for="register-display-name"
               >
-                Display Name
+                Character Name
               </label>
               <input
                 type="text"
                 id="register-display-name"
-                class="w-full px-4 py-3 bg-gray-800/50 border-2 border-gray-600 rounded-lg text-white placeholder-gray-400 focus:border-purple-500 focus:ring-2 focus:ring-purple-500/50 focus:outline-none transition-all"
-                placeholder="Your chef name"
+                class="w-full px-3 py-2.5 bg-slate-900/70 border-2 border-purple-500/40 rounded-lg text-white text-sm placeholder-slate-400 focus:border-purple-400 focus:outline-none transition-colors"
+                placeholder="Your character's name"
                 required
                 maxlength="50"
               />
@@ -215,7 +282,7 @@
 
             <div>
               <label
-                class="block text-white text-sm font-semibold mb-2"
+                class="block text-purple-300 text-xs font-bold mb-1.5 uppercase tracking-wide"
                 for="register-password"
               >
                 Password
@@ -223,18 +290,18 @@
               <input
                 type="password"
                 id="register-password"
-                class="w-full px-4 py-3 bg-gray-800/50 border-2 border-gray-600 rounded-lg text-white placeholder-gray-400 focus:border-purple-500 focus:ring-2 focus:ring-purple-500/50 focus:outline-none transition-all"
+                class="w-full px-3 py-2.5 bg-slate-900/70 border-2 border-purple-500/40 rounded-lg text-white text-sm placeholder-slate-400 focus:border-purple-400 focus:outline-none transition-colors"
                 placeholder="Create a password"
                 required
                 autocomplete="new-password"
                 minlength="6"
               />
-              <p class="text-gray-400 text-xs mt-1">At least 6 characters</p>
+              <p class="text-slate-500 text-xs mt-1">Min 6 characters</p>
             </div>
 
             <div>
               <label
-                class="block text-white text-sm font-semibold mb-2"
+                class="block text-purple-300 text-xs font-bold mb-1.5 uppercase tracking-wide"
                 for="register-password-confirm"
               >
                 Confirm Password
@@ -242,7 +309,7 @@
               <input
                 type="password"
                 id="register-password-confirm"
-                class="w-full px-4 py-3 bg-gray-800/50 border-2 border-gray-600 rounded-lg text-white placeholder-gray-400 focus:border-purple-500 focus:ring-2 focus:ring-purple-500/50 focus:outline-none transition-all"
+                class="w-full px-3 py-2.5 bg-slate-900/70 border-2 border-purple-500/40 rounded-lg text-white text-sm placeholder-slate-400 focus:border-purple-400 focus:outline-none transition-colors"
                 placeholder="Confirm your password"
                 required
                 autocomplete="new-password"
@@ -253,29 +320,22 @@
             <button
               type="submit"
               id="register-button"
-              class="w-full py-3 px-4 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white font-bold rounded-lg transition-all duration-200 hover:scale-105 active:scale-95 shadow-lg hover:shadow-xl"
+              class="btn-shimmer w-full py-3 px-4 bg-gradient-to-r from-purple-600 to-violet-600 hover:from-purple-500 hover:to-violet-500 text-white font-bold text-sm rounded-lg transition-colors shadow-lg border-2 border-purple-400/50 hover:border-purple-300 overflow-hidden"
             >
-              Create Account
+              CREATE CHARACTER
             </button>
 
-            <div class="text-center pt-2">
-              <span class="text-gray-400 text-sm"
-                >Already have an account?
-              </span>
+            <div class="text-center pt-1 pb-2">
+              <span class="text-slate-400 text-xs">Already playing? </span>
               <a
-                class="text-purple-400 hover:text-purple-300 font-semibold text-sm cursor-pointer transition-colors"
+                class="text-purple-400 hover:text-purple-300 font-bold text-xs cursor-pointer underline"
                 id="show-login"
               >
-                Sign in
+                Enter your world
               </a>
             </div>
           </form>
         </div>
-      </div>
-
-      <!-- Footer -->
-      <div class="text-center mt-6 text-white/80 text-sm">
-        <p>🔒 Your data is secure and encrypted</p>
       </div>
     </div>
 
@@ -284,12 +344,13 @@
       const registerForm = document.getElementById("register-form");
       const errorMessage = document.getElementById("error-message");
       const successMessage = document.getElementById("success-message");
-      const authSubtitle = document.getElementById("auth-subtitle");
 
       const showError = (message) => {
         errorMessage.textContent = message;
         errorMessage.classList.remove("hidden");
+        errorMessage.classList.add("shake");
         successMessage.classList.add("hidden");
+        setTimeout(() => errorMessage.classList.remove("shake"), 400);
       };
 
       const showSuccess = (message) => {
@@ -307,14 +368,12 @@
       document.getElementById("show-register").addEventListener("click", () => {
         loginForm.classList.add("hidden");
         registerForm.classList.remove("hidden");
-        authSubtitle.textContent = "Create your chef account!";
         hideMessages();
       });
 
       document.getElementById("show-login").addEventListener("click", () => {
         registerForm.classList.add("hidden");
         loginForm.classList.remove("hidden");
-        authSubtitle.textContent = "Sign in to start cooking!";
         hideMessages();
       });
 
@@ -329,7 +388,7 @@
 
         loginButton.disabled = true;
         loginButton.innerHTML =
-          '<span class="flex items-center justify-center">Signing In<span class="ml-2 w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></span></span>';
+          '<span class="flex items-center justify-center">Loading<span class="ml-2 w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></span></span>';
 
         try {
           const response = await fetch("/api/auth/login", {
@@ -345,19 +404,19 @@
             localStorage.setItem("sessionToken", data.sessionToken);
             localStorage.setItem("user", JSON.stringify(data.user));
 
-            showSuccess("✅ Login successful! Redirecting...");
+            showSuccess("Login successful! Redirecting...");
             setTimeout(() => {
               window.location.href = "/";
             }, 1000);
           } else {
             showError(data.error || "Login failed");
             loginButton.disabled = false;
-            loginButton.textContent = "Sign In";
+            loginButton.textContent = "START GAME";
           }
         } catch (error) {
           showError("Connection error. Please try again.");
           loginButton.disabled = false;
-          loginButton.textContent = "Sign In";
+          loginButton.textContent = "START GAME";
         }
       });
 
@@ -380,13 +439,13 @@
 
         // Validate passwords match
         if (password !== passwordConfirm) {
-          showError("❌ Passwords do not match");
+          showError("Passwords do not match");
           return;
         }
 
         registerButton.disabled = true;
         registerButton.innerHTML =
-          '<span class="flex items-center justify-center">Creating Account<span class="ml-2 w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></span></span>';
+          '<span class="flex items-center justify-center">Creating<span class="ml-2 w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></span></span>';
 
         try {
           const response = await fetch("/api/auth/register", {
@@ -407,19 +466,19 @@
             localStorage.setItem("sessionToken", data.sessionToken);
             localStorage.setItem("user", JSON.stringify(data.user));
 
-            showSuccess("✅ Account created! Redirecting...");
+            showSuccess("Account created! Redirecting...");
             setTimeout(() => {
               window.location.href = "/";
             }, 1000);
           } else {
             showError(data.error || "Registration failed");
             registerButton.disabled = false;
-            registerButton.textContent = "Create Account";
+            registerButton.textContent = "CREATE CHARACTER";
           }
         } catch (error) {
           showError("Connection error. Please try again.");
           registerButton.disabled = false;
-          registerButton.textContent = "Create Account";
+          registerButton.textContent = "CREATE CHARACTER";
         }
       });
 
