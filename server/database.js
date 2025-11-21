@@ -209,9 +209,21 @@ export async function initializeDatabase() {
         scale FLOAT DEFAULT 1.0,
         rotation FLOAT DEFAULT 0.0,
         is_passthrough BOOLEAN DEFAULT false,
+        opacity FLOAT DEFAULT 1.0,
+        music_current_song VARCHAR(255),
+        music_is_playing BOOLEAN DEFAULT false,
+        music_start_time BIGINT,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
+    `);
+
+    // Add music columns if they don't exist (for existing databases)
+    await pool.query(`
+      ALTER TABLE obstacles 
+      ADD COLUMN IF NOT EXISTS music_current_song VARCHAR(255),
+      ADD COLUMN IF NOT EXISTS music_is_playing BOOLEAN DEFAULT false,
+      ADD COLUMN IF NOT EXISTS music_start_time BIGINT
     `);
 
     // Create food_items table
@@ -323,6 +335,11 @@ export async function loadObstacles() {
       rotation: parseFloat(row.rotation),
       isPassthrough: row.is_passthrough || false,
       opacity: parseFloat(row.opacity) || 1.0,
+      musicCurrentSong: row.music_current_song || null,
+      musicIsPlaying: row.music_is_playing || false,
+      musicStartTime: row.music_start_time
+        ? parseInt(row.music_start_time)
+        : null,
     }));
   } catch (error) {
     console.error("❌ Error loading obstacles:", error);
@@ -340,8 +357,8 @@ export async function saveObstacle(obstacle) {
 
     const result = await pool.query(
       `
-      INSERT INTO obstacles (id, name, type, x, y, z, width, height, depth, model, scale, rotation, is_passthrough, opacity, updated_at)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, CURRENT_TIMESTAMP)
+      INSERT INTO obstacles (id, name, type, x, y, z, width, height, depth, model, scale, rotation, is_passthrough, opacity, music_current_song, music_is_playing, music_start_time, updated_at)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, CURRENT_TIMESTAMP)
       ON CONFLICT (id) 
       DO UPDATE SET 
         x = $4, 
@@ -355,6 +372,9 @@ export async function saveObstacle(obstacle) {
         rotation = $12,
         is_passthrough = $13,
         opacity = $14,
+        music_current_song = $15,
+        music_is_playing = $16,
+        music_start_time = $17,
         updated_at = CURRENT_TIMESTAMP
       RETURNING id
     `,
@@ -373,6 +393,9 @@ export async function saveObstacle(obstacle) {
         obstacle.rotation || 0.0,
         obstacle.isPassthrough || false,
         obstacle.opacity || 1.0,
+        obstacle.musicCurrentSong || null,
+        obstacle.musicIsPlaying || false,
+        obstacle.musicStartTime || null,
       ]
     );
 

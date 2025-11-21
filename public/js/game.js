@@ -8,6 +8,7 @@ import { NetworkManager } from "./managers/NetworkManager.js";
 import { InteractionManager } from "./managers/InteractionManager.js";
 import { DayNightUI } from "./managers/DayNightUI.js";
 import { TimeDisplay } from "./managers/TimeDisplay.js";
+import { MusicPlayerManager } from "./managers/MusicPlayerManager.js";
 
 /**
  * Main Game Class
@@ -605,16 +606,30 @@ class Game {
       console.log("🌅 Day-Night Cycle initialized! Press N to open controls");
     }
 
+    // Initialize music player manager
+    this.musicPlayerManager = new MusicPlayerManager(
+      this.sceneManager,
+      this.networkManager,
+      this.soundManager
+    );
+
+    // Store reference to player manager (needed for spatial audio)
+    this.sceneManager.playerManager = this.playerManager;
+
     // Initialize interaction manager
     this.interactionManager = new InteractionManager(
       this.sceneManager,
       this.playerManager,
       this.networkManager,
-      this.uiManager
+      this.uiManager,
+      this.musicPlayerManager
     );
 
     // Set interaction manager reference in network manager
     this.networkManager.setInteractionManager(this.interactionManager);
+
+    // Setup music player UI handlers
+    this.setupMusicPlayerUI();
 
     // If animate loop isn't running yet, start it
     if (!this.sceneManager.renderer) {
@@ -725,6 +740,65 @@ class Game {
 
     // Render the scene
     this.sceneManager.render();
+  }
+
+  /**
+   * Setup music player UI handlers
+   */
+  setupMusicPlayerUI() {
+    // Close button
+    const closeBtn = document.getElementById("music-player-close-btn");
+    if (closeBtn) {
+      closeBtn.addEventListener("click", () => {
+        this.musicPlayerManager.closeMusicPlayer();
+      });
+    }
+
+    // Stop button
+    const stopBtn = document.getElementById("music-stop-btn");
+    if (stopBtn) {
+      stopBtn.addEventListener("click", () => {
+        if (this.musicPlayerManager.currentSpeaker) {
+          this.musicPlayerManager.stopSpeakerMusic(
+            this.musicPlayerManager.currentSpeaker,
+            true
+          );
+        }
+      });
+    }
+
+    // Populate song list when modal opens
+    const modal = document.getElementById("music-player-modal");
+    if (modal) {
+      // Watch for modal display changes
+      const observer = new MutationObserver((mutations) => {
+        mutations.forEach((mutation) => {
+          if (
+            mutation.type === "attributes" &&
+            mutation.attributeName === "style"
+          ) {
+            const isVisible =
+              modal.style.display === "flex" ||
+              modal.classList.contains("active");
+            if (isVisible) {
+              this.musicPlayerManager.populateSongList();
+            }
+          }
+        });
+      });
+
+      observer.observe(modal, {
+        attributes: true,
+        attributeFilter: ["style", "class"],
+      });
+    }
+
+    // Request music sync from server
+    if (this.networkManager && this.networkManager.socket) {
+      this.networkManager.socket.emit("requestMusicSync");
+    }
+
+    console.log("🎵 Music Player UI initialized");
   }
 }
 

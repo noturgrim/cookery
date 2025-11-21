@@ -5,11 +5,18 @@ import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.m
  * Handles player interactions with furniture and objects
  */
 export class InteractionManager {
-  constructor(sceneManager, playerManager, networkManager, uiManager) {
+  constructor(
+    sceneManager,
+    playerManager,
+    networkManager,
+    uiManager,
+    musicPlayerManager
+  ) {
     this.sceneManager = sceneManager;
     this.playerManager = playerManager;
     this.networkManager = networkManager;
     this.uiManager = uiManager;
+    this.musicPlayerManager = musicPlayerManager;
 
     // Interaction state
     this.interactionRange = 2.5; // Distance to interact (from bounding box surface)
@@ -41,6 +48,9 @@ export class InteractionManager {
 
     // Define furniture types that can be laid on
     this.lyingFurniture = ["bed", "bathtub"];
+
+    // Define furniture types that play music (speakers)
+    this.musicFurniture = ["speaker", "speakersmall"];
 
     // Setup interaction prompt
     this.setupInteractionPrompt();
@@ -140,8 +150,11 @@ export class InteractionManager {
       const isLyingFurniture = this.lyingFurniture.some((type) =>
         furnitureNameLower.includes(type)
       );
+      const isMusicFurniture = this.musicFurniture.some((type) =>
+        furnitureNameLower.includes(type)
+      );
 
-      if (!isSittable && !isLyingFurniture) return;
+      if (!isSittable && !isLyingFurniture && !isMusicFurniture) return;
 
       // Calculate distance to furniture's actual bounding box (same as visual collision box)
       const bbox = this.sceneManager.calculateBoundingBox(furniture);
@@ -170,7 +183,13 @@ export class InteractionManager {
         closest = furniture;
         closestDistance = distance;
         // Mark furniture type for interaction
-        furniture.userData.interactionType = isLyingFurniture ? "lie" : "sit";
+        if (isMusicFurniture) {
+          furniture.userData.interactionType = "music";
+        } else if (isLyingFurniture) {
+          furniture.userData.interactionType = "lie";
+        } else {
+          furniture.userData.interactionType = "sit";
+        }
       }
     });
 
@@ -191,7 +210,15 @@ export class InteractionManager {
 
     const furnitureName = this.getFurnitureName(furniture);
     const interactionType = furniture.userData.interactionType || "sit";
-    const action = interactionType === "lie" ? "lie down on" : "sit on";
+
+    let action;
+    if (interactionType === "music") {
+      action = "play music on";
+    } else if (interactionType === "lie") {
+      action = "lie down on";
+    } else {
+      action = "sit on";
+    }
 
     prompt.innerHTML = `Press <strong>F</strong> to ${action} ${furnitureName}`;
     prompt.style.display = "block";
@@ -229,11 +256,29 @@ export class InteractionManager {
     } else if (this.nearbyFurniture) {
       const interactionType =
         this.nearbyFurniture.userData.interactionType || "sit";
-      if (interactionType === "lie") {
+      if (interactionType === "music") {
+        this.openMusicPlayer(this.nearbyFurniture);
+      } else if (interactionType === "lie") {
         this.lieDown(this.nearbyFurniture);
       } else {
         this.sitDown(this.nearbyFurniture);
       }
+    }
+  }
+
+  /**
+   * Open music player for speaker furniture
+   */
+  openMusicPlayer(furniture) {
+    if (!this.musicPlayerManager) {
+      console.warn("Music player manager not initialized");
+      return;
+    }
+
+    const speakerId = furniture.userData.id;
+    if (speakerId) {
+      this.musicPlayerManager.openMusicPlayer(speakerId);
+      console.log(`🎵 Opening music player for speaker ${speakerId}`);
     }
   }
 

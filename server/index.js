@@ -239,6 +239,32 @@ app.get("/api/models/food", async (req, res) => {
   }
 });
 
+// API endpoint to list available music files
+app.get("/api/music/list", async (req, res) => {
+  try {
+    const musicDir = join(__dirname, "../public/sounds/music");
+    const files = await readdir(musicDir);
+    const songs = files
+      .filter(
+        (file) =>
+          file.endsWith(".mp3") ||
+          file.endsWith(".wav") ||
+          file.endsWith(".ogg")
+      )
+      .map((file) => ({
+        filename: file,
+        name: file
+          .replace(/\.(mp3|wav|ogg)$/, "")
+          .replace(/-/g, " ")
+          .replace(/_/g, " "),
+      }));
+    res.json(songs);
+  } catch (error) {
+    console.error("Error reading music directory:", error);
+    res.status(500).json({ error: "Failed to load music files" });
+  }
+});
+
 // World Time API endpoints
 app.get("/api/world-time", async (req, res) => {
   try {
@@ -2702,6 +2728,120 @@ io.on("connection", (socket) => {
       }
     } catch (error) {
       console.error("❌ Error handling platform size update:", error);
+    }
+  });
+
+  // ============================================
+  // MUSIC PLAYER SYNC (for speakers)
+  // ============================================
+
+  // Handle starting music on a speaker
+  socket.on("startSpeakerMusic", async (data) => {
+    try {
+      // Rate limiting (use ACTION limit)
+      if (!rateLimiter.checkLimit(socket.id, "ACTIONS")) {
+        return;
+      }
+
+      // Validate speaker ID
+      const idValidation = validateId(data.speakerId);
+      if (!idValidation.valid) return;
+
+      // Find the speaker obstacle
+      const speaker = gameState.obstacles.find(
+        (obs) => obs.id === idValidation.sanitized
+      );
+
+      if (!speaker) {
+        console.warn(`Speaker ${data.speakerId} not found`);
+        return;
+      }
+
+      // Validate song name
+      const songName = sanitizeString(data.songName, 255);
+      const serverTime = Date.now();
+
+      // Update speaker state
+      speaker.musicCurrentSong = songName;
+      speaker.musicIsPlaying = true;
+      speaker.musicStartTime = serverTime;
+
+      // Save to database
+      await saveObstacle(speaker);
+
+      // Broadcast to ALL clients (including sender for confirmation)
+      io.emit("speakerMusicStarted", {
+        speakerId: speaker.id,
+        songName,
+        serverTime,
+      });
+
+      console.log(`🎵 Speaker ${speaker.id} started playing: ${songName}`);
+    } catch (error) {
+      console.error("❌ Error starting speaker music:", error);
+    }
+  });
+
+  // Handle stopping music on a speaker
+  socket.on("stopSpeakerMusic", async (data) => {
+    try {
+      // Rate limiting (use ACTION limit)
+      if (!rateLimiter.checkLimit(socket.id, "ACTIONS")) {
+        return;
+      }
+
+      // Validate speaker ID
+      const idValidation = validateId(data.speakerId);
+      if (!idValidation.valid) return;
+
+      // Find the speaker obstacle
+      const speaker = gameState.obstacles.find(
+        (obs) => obs.id === idValidation.sanitized
+      );
+
+      if (!speaker) {
+        console.warn(`Speaker ${data.speakerId} not found`);
+        return;
+      }
+
+      // Update speaker state
+      speaker.musicCurrentSong = null;
+      speaker.musicIsPlaying = false;
+      speaker.musicStartTime = null;
+
+      // Save to database
+      await saveObstacle(speaker);
+
+      // Broadcast to ALL clients
+      io.emit("speakerMusicStopped", {
+        speakerId: speaker.id,
+      });
+
+      console.log(`🔇 Speaker ${speaker.id} stopped playing`);
+    } catch (error) {
+      console.error("❌ Error stopping speaker music:", error);
+    }
+  });
+
+  // Send current music state when player connects
+  socket.on("requestMusicSync", () => {
+    try {
+      // Find all speakers that are currently playing
+      const activeSpeakers = gameState.obstacles
+        .filter((obs) => obs.musicIsPlaying && obs.musicCurrentSong)
+        .map((speaker) => ({
+          id: speaker.id,
+          currentSong: speaker.musicCurrentSong,
+          isPlaying: speaker.musicIsPlaying,
+          serverTime: speaker.musicStartTime,
+        }));
+
+      socket.emit("speakersStateSync", activeSpeakers);
+      console.log(
+        `🎵 Sent music sync to ${socket.id}: ${activeSpeakers.length} active speakers`
+      );
+    } catch (error) {
+      console.error("❌ Error sending music sync:", error);
     }
   });
 

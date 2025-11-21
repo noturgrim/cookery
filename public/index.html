@@ -974,6 +974,116 @@
       </div>
     </div>
 
+    <!-- Music Player Modal -->
+    <div
+      id="music-player-modal"
+      class="fixed inset-0 bg-black/85 backdrop-blur-md z-[2500] hidden items-center justify-center p-4"
+      style="display: none"
+    >
+      <div
+        class="bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 rounded-2xl shadow-2xl border border-purple-500/40 w-full max-w-md flex flex-col pointer-events-auto overflow-hidden"
+        style="backdrop-filter: blur(20px)"
+      >
+        <!-- Header -->
+        <div
+          class="flex items-center justify-between px-5 py-3.5 border-b border-purple-500/20 bg-gradient-to-r from-purple-900/20 to-pink-900/20"
+        >
+          <div class="flex items-center gap-3">
+            <svg
+              viewBox="0 0 24 24"
+              class="w-6 h-6 text-purple-400"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <path d="M9 18V5l12-2v13" />
+              <circle cx="6" cy="18" r="3" />
+              <circle cx="18" cy="16" r="3" />
+            </svg>
+            <h2 class="text-lg font-bold text-purple-400 tracking-wide">
+              🔊 Speaker Music Player
+            </h2>
+          </div>
+          <button
+            id="music-player-close-btn"
+            class="w-8 h-8 rounded-lg bg-red-500/20 hover:bg-red-500 border border-red-500/40 hover:border-red-500 text-white text-lg font-bold transition-all duration-200 hover:scale-105 active:scale-95 flex items-center justify-center"
+          >
+            ×
+          </button>
+        </div>
+
+        <!-- Content -->
+        <div class="p-5 space-y-4">
+          <!-- Now Playing -->
+          <div
+            class="p-4 rounded-xl bg-gradient-to-r from-purple-900/30 to-pink-900/30 border border-purple-500/30"
+          >
+            <div class="text-xs text-gray-400 mb-1">Now Playing</div>
+            <div
+              id="current-song-name"
+              class="text-base font-semibold text-white"
+            >
+              No song playing
+            </div>
+          </div>
+
+          <!-- Controls -->
+          <div class="flex gap-2">
+            <button
+              id="music-stop-btn"
+              class="flex-1 py-2.5 px-4 rounded-xl bg-red-500/20 hover:bg-red-500/30 border border-red-500/40 hover:border-red-500 text-white font-semibold text-sm transition-all duration-200 hover:scale-[1.02] active:scale-[0.98] flex items-center justify-center gap-2"
+            >
+              <svg
+                viewBox="0 0 24 24"
+                class="w-4 h-4"
+                fill="currentColor"
+                stroke="none"
+              >
+                <rect x="6" y="6" width="12" height="12" />
+              </svg>
+              Stop
+            </button>
+          </div>
+
+          <!-- Song List -->
+          <div>
+            <label
+              class="flex items-center gap-2 text-white text-sm font-semibold mb-2"
+            >
+              <svg
+                viewBox="0 0 24 24"
+                class="w-4 h-4"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <path d="M3 18v-6a9 9 0 0 1 18 0v6" />
+                <path
+                  d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3v5zM3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3v5z"
+                />
+              </svg>
+              Select Song
+            </label>
+            <div
+              id="music-song-list"
+              class="max-h-60 overflow-y-auto p-2 bg-gray-800/20 rounded-xl border border-gray-700/30 space-y-1"
+            >
+              <!-- Songs will be populated here -->
+            </div>
+          </div>
+
+          <!-- Info -->
+          <div class="text-xs text-gray-400 text-center">
+            🎵 All players near this speaker will hear the music
+          </div>
+        </div>
+      </div>
+    </div>
+
     <script type="module" src="/js/game.js"></script>
 
     <script>

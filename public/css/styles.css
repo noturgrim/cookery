@@ -187,3 +187,60 @@
 #settings-btn:hover svg {
   stroke: #c4b5fd;
 }
+
+/* Music Player Modal Styles */
+.music-song-item {
+  padding: 12px 16px;
+  background: rgba(147, 51, 234, 0.1);
+  border: 1px solid rgba(147, 51, 234, 0.2);
+  border-radius: 10px;
+  color: white;
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.music-song-item:hover {
+  background: rgba(147, 51, 234, 0.2);
+  border-color: rgba(147, 51, 234, 0.4);
+  transform: translateX(4px);
+}
+
+.music-song-item.selected {
+  background: linear-gradient(
+    135deg,
+    rgba(147, 51, 234, 0.3),
+    rgba(168, 85, 247, 0.3)
+  );
+  border-color: rgba(147, 51, 234, 0.6);
+  font-weight: 600;
+  box-shadow: 0 2px 10px rgba(147, 51, 234, 0.3);
+}
+
+.music-song-item.selected::before {
+  content: "▶";
+  color: #a78bfa;
+  font-size: 12px;
+  animation: pulse 2s ease-in-out infinite;
+}
+
+#music-song-list::-webkit-scrollbar {
+  width: 6px;
+}
+
+#music-song-list::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.3);
+  border-radius: 10px;
+}
+
+#music-song-list::-webkit-scrollbar-thumb {
+  background: rgba(147, 51, 234, 0.5);
+  border-radius: 10px;
+}
+
+#music-song-list::-webkit-scrollbar-thumb:hover {
+  background: rgba(147, 51, 234, 0.8);
+}
