@@ -38,7 +38,7 @@ export class SpeakerConnectionManager {
   }
 
   /**
-   * Add visual indicator that speaker is playing music
+   * Add visual indicator that speaker is playing music (animated music notes)
    */
   addPlayingIndicator(speakerId) {
     const speaker = this.sceneManager.obstacles.find(
@@ -47,25 +47,64 @@ export class SpeakerConnectionManager {
 
     if (!speaker || this.playingIndicators.has(speakerId)) return;
 
-    // Create pulsing ring around speaker
-    const geometry = new THREE.RingGeometry(0.8, 1.0, 32);
-    const material = new THREE.MeshBasicMaterial({
-      color: 0x00ff00,
-      side: THREE.DoubleSide,
-      transparent: true,
-      opacity: 0.6,
-    });
+    // Create group to hold multiple music notes
+    const notesGroup = new THREE.Group();
+    const notes = [];
 
-    const ring = new THREE.Mesh(geometry, material);
-    ring.rotation.x = -Math.PI / 2; // Lay flat on ground
-    ring.position.copy(speaker.position);
-    ring.position.y = 0.05; // Just above floor
+    // Create 3 music notes with different symbols
+    const noteSymbols = ["♪", "♫", "♬"];
+    const noteColors = [0x00ffff, 0xff00ff, 0xffff00]; // Cyan, Magenta, Yellow
 
-    this.sceneManager.scene.add(ring);
+    for (let i = 0; i < 3; i++) {
+      // Create canvas for text
+      const canvas = document.createElement("canvas");
+      canvas.width = 128;
+      canvas.height = 128;
+      const ctx = canvas.getContext("2d");
+
+      // Draw music note symbol
+      ctx.font = "Bold 80px Arial";
+      ctx.fillStyle = "#ffffff";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText(noteSymbols[i % noteSymbols.length], 64, 64);
+
+      // Create sprite
+      const texture = new THREE.CanvasTexture(canvas);
+      const material = new THREE.SpriteMaterial({
+        map: texture,
+        color: noteColors[i % noteColors.length],
+        transparent: true,
+        opacity: 0.8,
+      });
+
+      const sprite = new THREE.Sprite(material);
+      sprite.scale.set(0.5, 0.5, 1);
+
+      // Random starting position around speaker
+      const angle = (i / 3) * Math.PI * 2;
+      sprite.position.set(
+        Math.cos(angle) * 0.3,
+        0.5, // Start from middle of speaker
+        Math.sin(angle) * 0.3
+      );
+
+      notesGroup.add(sprite);
+      notes.push({
+        sprite,
+        startY: 0.5,
+        speed: 0.5 + Math.random() * 0.3, // Random speed
+        phase: (i * Math.PI) / 3, // Phase offset for wave motion
+      });
+    }
+
+    notesGroup.position.copy(speaker.position);
+    this.sceneManager.scene.add(notesGroup);
 
     // Store reference
     this.playingIndicators.set(speakerId, {
-      ring,
+      notesGroup,
+      notes,
       startTime: Date.now(),
       speaker,
     });
@@ -77,30 +116,50 @@ export class SpeakerConnectionManager {
   removePlayingIndicator(speakerId) {
     const indicator = this.playingIndicators.get(speakerId);
     if (indicator) {
-      this.sceneManager.scene.remove(indicator.ring);
-      indicator.ring.geometry.dispose();
-      indicator.ring.material.dispose();
+      this.sceneManager.scene.remove(indicator.notesGroup);
+
+      // Dispose of all sprites and materials
+      indicator.notes.forEach((note) => {
+        note.sprite.material.map.dispose();
+        note.sprite.material.dispose();
+      });
+
       this.playingIndicators.delete(speakerId);
     }
   }
 
   /**
-   * Update playing indicators (call every frame)
+   * Update playing indicators (call every frame) - Animated floating music notes
    */
   updatePlayingIndicators() {
     const now = Date.now();
 
     this.playingIndicators.forEach((indicator, speakerId) => {
-      // Pulsing animation
       const elapsed = (now - indicator.startTime) / 1000;
-      const pulse = Math.sin(elapsed * 3) * 0.5 + 0.5; // 0 to 1
 
-      indicator.ring.material.opacity = 0.3 + pulse * 0.4;
-      indicator.ring.scale.set(1 + pulse * 0.2, 1 + pulse * 0.2, 1);
+      // Update each music note
+      indicator.notes.forEach((note, index) => {
+        // Float upward
+        note.sprite.position.y = note.startY + ((elapsed * note.speed) % 2.0);
 
-      // Follow speaker if it moves
-      indicator.ring.position.copy(indicator.speaker.position);
-      indicator.ring.position.y = 0.05;
+        // Wave motion (side to side)
+        const wave = Math.sin(elapsed * 2 + note.phase) * 0.2;
+        note.sprite.position.x =
+          Math.cos((index / 3) * Math.PI * 2) * 0.3 + wave;
+        note.sprite.position.z =
+          Math.sin((index / 3) * Math.PI * 2) * 0.3 + wave * 0.5;
+
+        // Fade out as it goes up
+        const fadeProgress = ((elapsed * note.speed) % 2.0) / 2.0;
+        note.sprite.material.opacity = 0.8 * (1 - fadeProgress);
+
+        // Scale pulse
+        const scale = 0.5 + Math.sin(elapsed * 3 + note.phase) * 0.1;
+        note.sprite.scale.set(scale, scale, 1);
+      });
+
+      // Follow speaker position if it moves
+      indicator.notesGroup.position.copy(indicator.speaker.position);
     });
   }
 

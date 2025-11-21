@@ -22,7 +22,7 @@
 
 ### 3. Playing Indicator ✅
 
-**New Feature:** Pulsing green ring around playing speakers
+**New Feature:** Animated floating music notes around playing speakers
 
 **Details:**
 
@@ -110,10 +110,13 @@ Speaker 1                        Speaker 2
 
 ```
 Not Playing:              Playing:
-    [🔊]                     [🔊]
-                           ╱     ╲
-                          │  💚  │  ← Pulsing green ring
-                           ╲     ╱
+    [🔊]                      ♪  ← Cyan (floating up)
+                             ↑
+                            ♫   ← Magenta (waving)
+                           ↑
+                          ♬    ← Yellow (pulsing)
+                         ↑
+                        [🔊]
 ```
 
 ## Code Locations
@@ -217,7 +220,7 @@ if (this.speakerConnectionManager) {
 
 ✅ Wires on floor (not under)  
 ✅ Natural curved wires (not straight)  
-✅ Pulsing green indicators  
+✅ Animated floating music notes (♪ ♫ ♬)  
 ✅ Auto-delete connections  
 ✅ Real-time multiplayer sync  
 ✅ Unlimited speaker chains

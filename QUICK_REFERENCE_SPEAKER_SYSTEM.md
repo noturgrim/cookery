@@ -9,11 +9,12 @@
 - **Style:** Natural curve with wiggle
 - **Real-time:** Everyone sees wires instantly
 
-### 2. Green Pulsing Rings
+### 2. Animated Music Notes
 
-- **Color:** Green (#00ff00)
+- **Symbols:** ♪ ♫ ♬ (floating notes)
+- **Colors:** Cyan, Magenta, Yellow
 - **When:** Speaker is playing music
-- **Animation:** Pulses 3 times per second
+- **Animation:** Floats upward, waves side-to-side, fades out
 - **Visible to:** All players
 
 ## Keyboard Controls
@@ -46,7 +47,7 @@
 2. Press F (Music Player opens)
 3. Click a song
    → ALL connected speakers start playing
-   → Green rings appear on all
+   → Animated music notes float up from all speakers
    → Everyone hears synced music
 ```
 
@@ -59,7 +60,7 @@
    → Speaker removed
    → ALL wires to it removed
    → Music stops
-   → Green rings disappear
+   → Music notes disappear
 ```
 
 ## Features
@@ -68,7 +69,7 @@
 ✅ **Chain Connections** - A↔B↔C↔D...  
 ✅ **Real-time Sync** - Everyone sees/hears everything  
 ✅ **Auto-cleanup** - Delete speaker = remove wires  
-✅ **Visual Feedback** - Wires + pulsing rings  
+✅ **Visual Feedback** - Wires + floating music notes  
 ✅ **Spatial Audio** - Volume by distance  
 ✅ **Perfect Sync** - Timestamp-based synchronization
 

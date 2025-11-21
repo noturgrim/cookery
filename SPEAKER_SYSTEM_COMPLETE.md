@@ -17,9 +17,11 @@
 
 ### 3. ✅ Visual Music Indicators
 
-- **Pulsing green ring** around playing speakers
+- **Animated floating music notes** (♪ ♫ ♬)
+- **Colorful** - Cyan, Magenta, Yellow
 - **Everyone sees it** - all players
-- **Animated** - scales and fades in rhythm
+- **Animated** - floats up and waves side-to-side
+- **Fades out** - as notes float upward
 - **Follows speaker** - updates when moved
 
 ### 4. ✅ Auto-Delete Wires
@@ -66,7 +68,7 @@ Press L → Connection Mode OFF
 Walk to ANY connected speaker
 Press F → Music Player opens
 Click song → ALL connected speakers start playing!
-          → Green pulsing rings appear on all
+          → Animated music notes float up from all speakers
           → Everyone hears synced music
 ```
 
@@ -95,12 +97,17 @@ Press Delete → Speaker deleted
 
 ### Playing Indicator
 
-- **Shape:** Pulsing ring
-- **Color:** Green (#00ff00)
-- **Size:** 0.8-1.2 units diameter (pulses)
-- **Opacity:** 30-70% (pulses)
-- **Speed:** 3 pulses per second
-- **Position:** Follows speaker
+- **Type:** Animated floating music notes
+- **Symbols:** ♪ ♫ ♬ (3 different notes)
+- **Colors:** Cyan, Magenta, Yellow
+- **Animation:**
+  - Floats upward continuously
+  - Waves side-to-side
+  - Pulses in scale
+  - Fades out as it rises
+- **Size:** 0.5 units (with pulse variation)
+- **Opacity:** 80% → 0% (fades as it floats)
+- **Position:** Follows speaker, resets at 2-unit height
 
 ## Technical Details
 
@@ -139,7 +146,7 @@ Press Delete → Speaker deleted
 ✅ Spawn unlimited speakers  
 ✅ Connect any number together  
 ✅ Beautiful curved wires on floor  
-✅ Pulsing green indicators when playing  
+✅ Animated floating music notes when playing  
 ✅ Real-time multiplayer sync  
 ✅ No refresh needed  
 ✅ Persistent (database)  
@@ -184,8 +191,8 @@ Press Delete → Speaker deleted
 
 - [x] Wires appear on floor (not under)
 - [x] Wires have natural curves
-- [x] Green ring appears when playing
-- [x] Ring pulses and animates
+- [x] Music notes appear when playing
+- [x] Notes float upward and animate
 - [x] Delete speaker removes wires
 - [x] Delete speaker removes indicator
 - [x] Other players see wires instantly
