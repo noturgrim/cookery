@@ -1251,6 +1251,15 @@ export class InputManager {
       this.sceneManager.lightingManager.removeLight(objectId);
     }
 
+    // Stop music if this is a speaker playing music
+    if (this.sceneManager.musicPlayerManager && objectType !== "food") {
+      const furnitureName = object.userData.model || "";
+      if (furnitureName.toLowerCase().includes("speaker")) {
+        this.sceneManager.musicPlayerManager.stopSpeakerMusic(objectId, true);
+        console.log(`🔇 Stopping music for deleted speaker ${objectId}`);
+      }
+    }
+
     // Remove from scene
     this.sceneManager.scene.remove(object);
 

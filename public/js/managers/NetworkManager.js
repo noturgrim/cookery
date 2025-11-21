@@ -116,6 +116,12 @@ export class NetworkManager {
       // Clear existing players
       this.playerManager.clear();
 
+      // Request music sync after a short delay to ensure everything is initialized
+      setTimeout(() => {
+        console.log("🎵 Requesting music sync from server...");
+        this.socket.emit("requestMusicSync");
+      }, 500);
+
       // Initialize world time from server
       if (
         data.worldTime &&

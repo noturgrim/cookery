@@ -19,6 +19,13 @@ export class MusicPlayerManager {
     // Currently interacting speaker
     this.currentSpeaker = null;
 
+    // Pending speakers (waiting for audio unlock)
+    this.pendingSpeakers = [];
+    this.audioUnlockHandlerSetup = false;
+
+    // Retry timers (prevent duplicate retries)
+    this.retryTimers = new Set();
+
     // Spatial audio settings
     this.maxHearingDistance = 50; // Maximum distance to hear music
     this.maxVolume = 0.4; // Maximum volume at close range
@@ -90,8 +97,18 @@ export class MusicPlayerManager {
 
     // Initial sync of all active speakers
     socket.on("speakersStateSync", (speakers) => {
+      console.log(`🎵 Received music state sync: ${speakers.length} speakers`);
+
+      // Store pending speakers to start after audio unlock
+      this.pendingSpeakers = speakers.filter(
+        (s) => s.isPlaying && s.currentSong
+      );
+
       speakers.forEach((speaker) => {
         if (speaker.isPlaying && speaker.currentSong) {
+          console.log(
+            `   🔊 Syncing speaker ${speaker.id}: ${speaker.currentSong}`
+          );
           this.startSpeakerMusic(
             speaker.id,
             speaker.currentSong,
@@ -100,7 +117,46 @@ export class MusicPlayerManager {
           );
         }
       });
+
+      // If audio isn't unlocked yet, show notice and retry after unlock
+      if (!this.soundManager.audioUnlocked && this.pendingSpeakers.length > 0) {
+        console.log(
+          "⚠️ Audio not unlocked yet. Music will start after you interact with the page."
+        );
+        this.setupAudioUnlockHandler();
+      }
     });
+  }
+
+  /**
+   * Setup handler to retry music playback after audio unlock
+   */
+  setupAudioUnlockHandler() {
+    if (this.audioUnlockHandlerSetup) return; // Already setup
+    this.audioUnlockHandlerSetup = true;
+
+    const checkAudioUnlock = setInterval(() => {
+      if (
+        this.soundManager.audioUnlocked &&
+        this.pendingSpeakers &&
+        this.pendingSpeakers.length > 0
+      ) {
+        console.log("🔓 Audio unlocked! Starting pending music...");
+
+        // Retry starting all pending speakers
+        this.pendingSpeakers.forEach((speaker) => {
+          this.startSpeakerMusic(
+            speaker.id,
+            speaker.currentSong,
+            speaker.serverTime,
+            false
+          );
+        });
+
+        this.pendingSpeakers = [];
+        clearInterval(checkAudioUnlock);
+      }
+    }, 500); // Check every 500ms
   }
 
   /**
@@ -183,6 +239,19 @@ export class MusicPlayerManager {
    */
   async startSpeakerMusic(speakerId, songName, serverTime, broadcast = true) {
     try {
+      // Check if this speaker is already playing this exact song at this time
+      const existingSpeaker = this.activeSpeakers.get(speakerId);
+      if (
+        existingSpeaker &&
+        existingSpeaker.songName === songName &&
+        existingSpeaker.startTime === serverTime
+      ) {
+        console.log(
+          `🔄 Speaker ${speakerId} already playing ${songName}, skipping duplicate`
+        );
+        return;
+      }
+
       // Stop any existing music from this speaker
       this.stopSpeakerMusic(speakerId, false);
 
@@ -192,7 +261,19 @@ export class MusicPlayerManager {
       );
 
       if (!speaker) {
-        console.warn(`Speaker ${speakerId} not found in scene`);
+        console.warn(
+          `Speaker ${speakerId} not found in scene, retrying in 1s...`
+        );
+        // Retry after 1 second (speaker might still be loading)
+        // Use a retry flag to prevent multiple retries
+        if (!this.retryTimers) this.retryTimers = new Set();
+        if (!this.retryTimers.has(speakerId)) {
+          this.retryTimers.add(speakerId);
+          setTimeout(() => {
+            this.retryTimers.delete(speakerId);
+            this.startSpeakerMusic(speakerId, songName, serverTime, false);
+          }, 1000);
+        }
         return;
       }
 

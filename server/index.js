@@ -1884,6 +1884,12 @@ io.on("connection", (socket) => {
       // Remove from game state
       const index = gameState.obstacles.findIndex((obs) => obs.id === id);
       if (index > -1) {
+        const deletedObstacle = gameState.obstacles[index];
+
+        // Check if this was a speaker playing music
+        const wasSpeaker =
+          deletedObstacle.musicIsPlaying && deletedObstacle.musicCurrentSong;
+
         gameState.obstacles.splice(index, 1);
 
         // Delete from database
@@ -1895,7 +1901,19 @@ io.on("connection", (socket) => {
         // Broadcast to all OTHER clients (deleter already removed it)
         socket.broadcast.emit("obstacleDeleted", { id });
 
-        console.log(`🗑️ Deleted obstacle: ${id}`);
+        // If it was a speaker playing music, notify all clients to stop music
+        if (wasSpeaker) {
+          console.log(
+            `🔇 Deleted speaker was playing music, stopping for all clients`
+          );
+          io.emit("speakerMusicStopped", { speakerId: id });
+        }
+
+        console.log(
+          `🗑️ Deleted obstacle: ${id}${
+            wasSpeaker ? " (was playing music)" : ""
+          }`
+        );
       } else {
         console.warn(`⚠️ Obstacle not found for deletion: ${id}`);
       }
@@ -2769,8 +2787,8 @@ io.on("connection", (socket) => {
       // Save to database
       await saveObstacle(speaker);
 
-      // Broadcast to ALL clients (including sender for confirmation)
-      io.emit("speakerMusicStarted", {
+      // Broadcast to OTHER clients (sender already has it playing)
+      socket.broadcast.emit("speakerMusicStarted", {
         speakerId: speaker.id,
         songName,
         serverTime,
@@ -2812,8 +2830,8 @@ io.on("connection", (socket) => {
       // Save to database
       await saveObstacle(speaker);
 
-      // Broadcast to ALL clients
-      io.emit("speakerMusicStopped", {
+      // Broadcast to OTHER clients (sender already stopped it)
+      socket.broadcast.emit("speakerMusicStopped", {
         speakerId: speaker.id,
       });
 

@@ -613,8 +613,9 @@ class Game {
       this.soundManager
     );
 
-    // Store reference to player manager (needed for spatial audio)
+    // Store references (needed for spatial audio and cleanup)
     this.sceneManager.playerManager = this.playerManager;
+    this.sceneManager.musicPlayerManager = this.musicPlayerManager;
 
     // Initialize interaction manager
     this.interactionManager = new InteractionManager(
