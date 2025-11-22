@@ -109,24 +109,24 @@ export class MusicPlayerManager {
     socket.on("speakersStateSync", (speakers) => {
       console.log(`🎵 Received music state sync: ${speakers.length} speakers`);
 
-      // Check if connections manager exists and has been initialized
+      // Check if connections manager exists and has been loaded from server
       const connectionsManager = this.sceneManager.speakerConnectionManager;
       const hasConnectionsManager = !!connectionsManager;
-      const connectionsInitialized =
-        hasConnectionsManager && connectionsManager.connections !== undefined;
+      const connectionsLoaded =
+        hasConnectionsManager && connectionsManager.connectionsLoaded;
 
-      if (!connectionsInitialized && speakers.length > 0) {
+      if (!connectionsLoaded && speakers.length > 0) {
         console.log(
-          `   ⏳ Connections manager not initialized yet, storing speakers for later sync`
+          `   ⏳ Connections not loaded yet, storing speakers for later sync`
         );
         // Store speakers to sync after connections load
         this.pendingMusicSync = speakers;
         return;
       }
 
-      // Process the music sync immediately (connections might be empty, that's fine)
+      // Process the music sync immediately (connections are loaded)
       console.log(
-        `   ✅ Processing music sync now (connections ready: ${connectionsInitialized})`
+        `   ✅ Processing music sync now (connections ready: ${connectionsLoaded})`
       );
       this.processMusicSync(speakers);
     });
@@ -325,16 +325,23 @@ export class MusicPlayerManager {
         // Hide the notice
         this.hideAudioUnlockNotice();
 
-        // Retry starting all pending speakers
+        // Retry starting all pending speakers with a SHARED sync time
         const speakersToRetry = [...this.pendingSpeakers]; // Copy array
         this.pendingSpeakers = []; // Clear before retrying
+
+        // Calculate sync time ONCE for all pending speakers (perfect synchronization)
+        const sharedSyncTime = Date.now();
+        console.log(
+          `   ⏱️ Retrying ${speakersToRetry.length} speakers with shared sync time: ${sharedSyncTime}`
+        );
 
         speakersToRetry.forEach((speaker) => {
           this.startSpeakerMusic(
             speaker.id,
             speaker.currentSong,
             speaker.serverTime,
-            false
+            false,
+            sharedSyncTime // Pass the SAME sync time to all speakers
           );
         });
 

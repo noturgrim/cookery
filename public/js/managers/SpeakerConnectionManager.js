@@ -31,6 +31,9 @@ export class SpeakerConnectionManager {
     // Music playing indicators (visual effects)
     this.playingIndicators = new Map(); // speakerId -> visual effect
 
+    // Track if connections have been loaded from server
+    this.connectionsLoaded = false;
+
     // Setup socket listeners
     this.setupSocketListeners();
 
@@ -747,8 +750,12 @@ export class SpeakerConnectionManager {
     console.log(`🔌 Loading ${connectionsData.length} speaker connections`);
 
     connectionsData.forEach((conn) => {
-      this.connectSpeakers(conn.speaker1, conn.speaker2, false);
+      // Pass skipMusicSync=true to prevent duplicate music sync during load
+      this.connectSpeakers(conn.speaker1, conn.speaker2, false, true);
     });
+
+    // Mark connections as loaded
+    this.connectionsLoaded = true;
 
     // Always notify that connections are loaded (even if 0 connections)
     // This is important for music sync to proceed
