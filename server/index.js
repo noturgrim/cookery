@@ -3125,13 +3125,36 @@ io.on("connection", (socket) => {
     }
   });
 
-  // Handle disconnection
+  // Handle host status request
+  socket.on("requestHostStatus", () => {
+    if (!isAuthenticated) return;
+
+    const players = Array.from(gameState.players.keys());
+    const hostPlayerId = players[0];
+    const isHost = socket.id === hostPlayerId;
+
+    socket.emit("hostStatus", { isHost });
+
+    if (isHost) {
+      console.log(`👑 Player ${socket.id} is the HOST (controls cats)`);
+    }
+  });
+
   // Handle cat position updates
   socket.on("updateCatPositions", (cats) => {
     if (!isAuthenticated) return;
 
     // Only update if we received valid cat data
     if (!cats || !Array.isArray(cats)) return;
+
+    // Only allow the first connected player (host) to update cat positions
+    const players = Array.from(gameState.players.keys());
+    const hostPlayerId = players[0];
+
+    if (socket.id !== hostPlayerId) {
+      // Not the host, ignore update
+      return;
+    }
 
     // Update server cat state (this becomes the source of truth)
     gameState.cats = cats;
@@ -3141,7 +3164,10 @@ io.on("connection", (socket) => {
       cats: cats,
     });
 
-    console.log(`🐱 Updated cat positions: ${cats.length} cats`);
+    // Log occasionally to avoid spam
+    if (Math.random() < 0.05) {
+      console.log(`🐱 Updated cat positions: ${cats.length} cats`);
+    }
   });
 
   socket.on("disconnect", () => {

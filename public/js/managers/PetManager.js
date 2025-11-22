@@ -205,17 +205,32 @@ export class PetManager {
 
   /**
    * Start syncing cat positions to server
+   * Only the HOST player (first connected) controls cat movement
    */
   startSync() {
-    console.log(`📡 Starting cat position sync...`);
+    if (!this.networkManager || !this.networkManager.socket) {
+      console.log(`⚠️ Cannot sync - no network connection`);
+      return;
+    }
 
-    // Sync immediately first
-    this.syncToServer();
+    // Request host status from server
+    this.networkManager.socket.emit("requestHostStatus");
 
-    // Then sync every 1 second for more frequent updates
-    this.syncInterval = setInterval(() => {
-      this.syncToServer();
-    }, 1000);
+    this.networkManager.socket.once("hostStatus", (data) => {
+      if (!data.isHost) {
+        console.log(`👥 Not host - receiving cat positions from host player`);
+        this.isHost = false;
+        return;
+      }
+
+      console.log(`👑 HOST player - controlling cat movement`);
+      this.isHost = true;
+
+      // Only host syncs to server every 2 seconds
+      this.syncInterval = setInterval(() => {
+        this.syncToServer();
+      }, 2000);
+    });
   }
 
   /**
@@ -248,7 +263,7 @@ export class PetManager {
   }
 
   /**
-   * Receive cat positions from server (real-time updates from other players)
+   * Receive cat positions from server (real-time updates from HOST player)
    */
   receiveCatsUpdate(cats) {
     if (!cats || cats.length === 0) return;
@@ -260,24 +275,25 @@ export class PetManager {
       return;
     }
 
-    // Update existing cat positions from server
-    // Only log occasionally to avoid spam
-    if (Math.random() < 0.1) {
-      console.log(
-        `📥 Received cat update from other player: ${cats.length} cats`
-      );
+    // If we're the host, ignore server updates (we control movement)
+    if (this.isHost) {
+      return;
     }
 
+    // Non-host players: Update cat positions from server
     cats.forEach((serverCat) => {
       const pet = this.pets.get(serverCat.id);
       if (pet) {
-        // Smoothly update position
+        // Update position directly (host controls the movement)
         pet.mesh.position.x = serverCat.x;
         pet.mesh.position.y = serverCat.y;
         pet.mesh.position.z = serverCat.z;
         pet.mesh.rotation.y = serverCat.rotation;
 
-        // Update last position to prevent stuck detection
+        // Update last position for animation detection
+        if (!pet.lastPosition) {
+          pet.lastPosition = new THREE.Vector3();
+        }
         pet.lastPosition.copy(pet.mesh.position);
       }
     });
@@ -336,7 +352,23 @@ export class PetManager {
    */
   updatePets(delta) {
     this.pets.forEach((pet, petId) => {
-      const isMoving = this.updateWandering(pet, delta);
+      // Only HOST player controls cat movement AI
+      let isMoving = false;
+
+      if (this.isHost) {
+        isMoving = this.updateWandering(pet, delta);
+      } else {
+        // Non-host: Check if position changed (from server update)
+        if (pet.lastPosition) {
+          const moved = pet.mesh.position.distanceTo(pet.lastPosition) > 0.01;
+          if (moved) {
+            isMoving = true;
+            pet.lastPosition.copy(pet.mesh.position);
+          }
+        } else {
+          pet.lastPosition = pet.mesh.position.clone();
+        }
+      }
 
       // Animate legs if moving and legs exist
       if (isMoving) {
