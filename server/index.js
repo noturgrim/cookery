@@ -3136,8 +3136,10 @@ io.on("connection", (socket) => {
     // Update server cat state (this becomes the source of truth)
     gameState.cats = cats;
 
-    // Broadcast to all other clients so they stay in sync
-    socket.broadcast.emit("catsUpdate", cats);
+    // Broadcast to all OTHER clients (not the sender) so they stay in sync
+    socket.broadcast.emit("catPositionsUpdated", {
+      cats: cats,
+    });
 
     console.log(`🐱 Updated cat positions: ${cats.length} cats`);
   });

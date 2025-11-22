@@ -297,9 +297,9 @@ export class NetworkManager {
 
     // Handle new player joining
     // Listen for cat updates from other players
-    this.socket.on("catsUpdate", (cats) => {
+    this.socket.on("catPositionsUpdated", (data) => {
       if (window.game && window.game.petManager) {
-        window.game.petManager.receiveCatsUpdate(cats);
+        window.game.petManager.receiveCatsUpdate(data.cats);
       }
     });
 

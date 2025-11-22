@@ -240,7 +240,10 @@ export class PetManager {
 
     if (catData.length > 0) {
       this.networkManager.socket.emit("updateCatPositions", catData);
-      console.log(`📤 Synced ${catData.length} cat positions to server`);
+      // Only log occasionally to avoid spam
+      if (Math.random() < 0.1) {
+        console.log(`📤 Synced ${catData.length} cat positions to server`);
+      }
     }
   }
 
@@ -258,9 +261,12 @@ export class PetManager {
     }
 
     // Update existing cat positions from server
-    console.log(
-      `📥 Received cat update from other player: ${cats.length} cats`
-    );
+    // Only log occasionally to avoid spam
+    if (Math.random() < 0.1) {
+      console.log(
+        `📥 Received cat update from other player: ${cats.length} cats`
+      );
+    }
 
     cats.forEach((serverCat) => {
       const pet = this.pets.get(serverCat.id);
