@@ -1108,26 +1108,43 @@ export class MusicPlayerManager {
       speakerData.baseVolume = normalizedVolume;
     }
 
-    console.log(`🔊 Set volume for speaker ${speakerId}: ${volume}%`);
+    console.log(
+      `🔊 Set volume for speaker ${speakerId.substring(0, 8)}: ${volume}%`
+    );
 
-    // Broadcast to other clients
-    if (broadcast) {
-      this.networkManager.socket.emit("changeSpeakerVolume", {
-        speakerId,
-        volume,
-      });
-    }
-
-    // Sync volume to all connected speakers (without broadcasting each one)
-    if (broadcast && this.sceneManager.speakerConnectionManager) {
-      const connectedSpeakers =
+    // Get all connected speakers FIRST (before broadcasting)
+    let connectedSpeakers = [speakerId];
+    if (this.sceneManager.speakerConnectionManager) {
+      connectedSpeakers =
         this.sceneManager.speakerConnectionManager.getConnectedSpeakers(
           speakerId
         );
+    }
+
+    // Sync volume to all connected speakers locally (without broadcasting each one)
+    if (broadcast) {
       connectedSpeakers.forEach((connectedId) => {
         if (connectedId !== speakerId) {
-          this.setSpeakerVolume(connectedId, volume, false); // Don't broadcast for connected speakers
+          // Apply locally without broadcasting
+          this.setSpeakerVolume(connectedId, volume, false);
         }
+      });
+    }
+
+    // Broadcast to other clients - send ALL speakers in the group
+    if (broadcast) {
+      // Broadcast volume change for ALL connected speakers so other clients update them too
+      connectedSpeakers.forEach((connectedId) => {
+        console.log(
+          `   📡 Broadcasting volume change for speaker ${connectedId.substring(
+            0,
+            8
+          )}: ${volume}%`
+        );
+        this.networkManager.socket.emit("changeSpeakerVolume", {
+          speakerId: connectedId,
+          volume,
+        });
       });
     }
   }
