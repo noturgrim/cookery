@@ -499,7 +499,7 @@ export class PlayerManager {
       const texture = new THREE.CanvasTexture(canvas);
       const material = new THREE.SpriteMaterial({
         map: texture,
-        color: 0x6699ff, // Light blue color for Z's
+        color: 0xffff00, // Yellow color for Z's
         transparent: true,
         opacity: 0.8,
       });
@@ -511,14 +511,14 @@ export class PlayerManager {
       const angle = (i / 4) * Math.PI * 2;
       sprite.position.set(
         Math.cos(angle) * 0.4,
-        1.5, // Start from player's head level
+        2.2, // Start from player's head level (raised from 1.5)
         Math.sin(angle) * 0.4
       );
 
       notesGroup.add(sprite);
       notes.push({
         sprite,
-        startY: 1.5,
+        startY: 3, // Raised from 1.5
         speed: 0.4 + Math.random() * 0.2, // Slower floating speed
         phase: (i * Math.PI) / 4, // Phase offset for wave motion
       });
