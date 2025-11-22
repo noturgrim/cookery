@@ -13,6 +13,8 @@ export class PetManager {
     this.pets = new Map(); // petId -> { mesh, legs, target, speed, walkCycle }
     this.petModels = new Map(); // modelName -> scene
     this.syncInterval = null;
+    this.isHost = false; // Will be set by startSync()
+    this.pendingCats = null; // For initial spawn sync
   }
 
   /**
@@ -213,24 +215,32 @@ export class PetManager {
       return;
     }
 
-    // Request host status from server
-    this.networkManager.socket.emit("requestHostStatus");
-
-    this.networkManager.socket.once("hostStatus", (data) => {
-      if (!data.isHost) {
-        console.log(`👥 Not host - receiving cat positions from host player`);
-        this.isHost = false;
+    // Wait a bit for socket to be fully connected before requesting host status
+    setTimeout(() => {
+      if (!this.networkManager || !this.networkManager.socket) {
+        console.log(`⚠️ Socket disconnected, cannot sync`);
         return;
       }
 
-      console.log(`👑 HOST player - controlling cat movement`);
-      this.isHost = true;
+      // Request host status from server
+      this.networkManager.socket.emit("requestHostStatus");
 
-      // Only host syncs to server every 2 seconds
-      this.syncInterval = setInterval(() => {
-        this.syncToServer();
-      }, 2000);
-    });
+      this.networkManager.socket.once("hostStatus", (data) => {
+        if (!data.isHost) {
+          console.log(`👥 Not host - receiving cat positions from host player`);
+          this.isHost = false;
+          return;
+        }
+
+        console.log(`👑 HOST player - controlling cat movement`);
+        this.isHost = true;
+
+        // Only host syncs to server every 2 seconds
+        this.syncInterval = setInterval(() => {
+          this.syncToServer();
+        }, 2000);
+      });
+    }, 500); // Wait 500ms for socket to be fully ready
   }
 
   /**

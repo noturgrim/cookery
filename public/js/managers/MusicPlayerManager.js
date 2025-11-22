@@ -1202,12 +1202,21 @@ export class MusicPlayerManager {
     const nextIndex = (currentIndex + 1) % this.availableSongs.length;
     const nextSong = this.availableSongs[nextIndex];
 
+    // Use a shared sync time for auto-play to keep connected speakers in sync
+    const autoPlaySyncTime = Date.now();
+
     console.log(
       `⏭️ Auto-playing next song on speaker ${speakerId.substring(0, 8)}: ${
         nextSong.name
       }`
     );
-    this.startSpeakerMusic(speakerId, nextSong.filename, Date.now(), true);
+    this.startSpeakerMusic(
+      speakerId,
+      nextSong.filename,
+      autoPlaySyncTime,
+      true,
+      autoPlaySyncTime
+    );
   }
 
   /**
