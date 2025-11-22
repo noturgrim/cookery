@@ -109,20 +109,25 @@ export class MusicPlayerManager {
     socket.on("speakersStateSync", (speakers) => {
       console.log(`🎵 Received music state sync: ${speakers.length} speakers`);
 
-      // Check if connections are loaded yet
-      const connectionsReady =
-        this.sceneManager.speakerConnectionManager?.connections?.size > 0;
+      // Check if connections manager exists and has been initialized
+      const connectionsManager = this.sceneManager.speakerConnectionManager;
+      const hasConnectionsManager = !!connectionsManager;
+      const connectionsInitialized =
+        hasConnectionsManager && connectionsManager.connections !== undefined;
 
-      if (!connectionsReady && speakers.length > 0) {
+      if (!connectionsInitialized && speakers.length > 0) {
         console.log(
-          `   ⏳ Connections not ready yet, storing speakers for later sync`
+          `   ⏳ Connections manager not initialized yet, storing speakers for later sync`
         );
         // Store speakers to sync after connections load
         this.pendingMusicSync = speakers;
         return;
       }
 
-      // Process the music sync
+      // Process the music sync immediately (connections might be empty, that's fine)
+      console.log(
+        `   ✅ Processing music sync now (connections ready: ${connectionsInitialized})`
+      );
       this.processMusicSync(speakers);
     });
 
@@ -172,7 +177,8 @@ export class MusicPlayerManager {
     const speakersToSync = this.filterPrimarySpeakers(speakers);
 
     console.log(
-      `   📍 Filtered to ${speakersToSync.length} primary speakers (avoiding connected duplicates)`
+      `   📍 Filtered to ${speakersToSync.length} primary speakers (avoiding connected duplicates)`,
+      speakersToSync.map((s) => s.id)
     );
 
     // Store pending speakers to start after audio unlock
@@ -184,8 +190,20 @@ export class MusicPlayerManager {
     speakersToSync.forEach(async (speaker) => {
       if (speaker.isPlaying && speaker.currentSong) {
         console.log(
-          `   🔊 Syncing speaker ${speaker.id}: ${speaker.currentSong}`
+          `   🔊 Syncing speaker ${speaker.id}: ${
+            speaker.currentSong
+          } (paused: ${speaker.isPaused || false}, volume: ${
+            speaker.volume || 70
+          }%)`
         );
+
+        // Set speaker volume if provided
+        if (speaker.volume !== undefined) {
+          this.speakerVolumes.set(speaker.id, speaker.volume / 100);
+          console.log(
+            `   📊 Set speaker ${speaker.id} volume to ${speaker.volume}%`
+          );
+        }
 
         // Get connected speakers group
         let speakersInGroup = [speaker.id];
@@ -196,7 +214,8 @@ export class MusicPlayerManager {
             );
           if (speakersInGroup.length > 1) {
             console.log(
-              `   🔗 Syncing ${speakersInGroup.length} speakers together as a group`
+              `   🔗 Syncing ${speakersInGroup.length} speakers together as a group:`,
+              speakersInGroup
             );
           }
         }
@@ -221,6 +240,14 @@ export class MusicPlayerManager {
 
         // Wait for all speakers to start
         await Promise.all(startPromises);
+
+        // If speaker should be paused, pause it after starting
+        if (speaker.isPaused) {
+          speakersInGroup.forEach((speakerId) => {
+            console.log(`   ⏸️ Pausing synced speaker: ${speakerId}`);
+            this.pauseSpeakerMusic(speakerId, false);
+          });
+        }
       }
     });
 
@@ -519,15 +546,25 @@ export class MusicPlayerManager {
     syncTime = null
   ) {
     try {
+      console.log(
+        `🎬 startSpeakerMusic called: speaker=${speakerId.substring(
+          0,
+          8
+        )}..., song=${songName}, broadcast=${broadcast}, syncTime=${
+          syncTime ? "provided" : "null"
+        }`
+      );
+
       // Check if this speaker is already playing this exact song at this time
       const existingSpeaker = this.activeSpeakers.get(speakerId);
       if (
         existingSpeaker &&
         existingSpeaker.songName === songName &&
-        existingSpeaker.startTime === serverTime
+        existingSpeaker.startTime === serverTime &&
+        !existingSpeaker.audio.paused
       ) {
         console.log(
-          `🔄 Speaker ${speakerId} already playing ${songName}, skipping duplicate`
+          `🔄 Speaker ${speakerId} already playing ${songName} at same time, skipping duplicate`
         );
         return;
       }
@@ -560,7 +597,15 @@ export class MusicPlayerManager {
       // Create audio element
       const audio = new Audio(`/sounds/music/${songName}`);
       audio.loop = false; // Don't loop - we'll handle auto-play
-      audio.volume = 0; // Start at 0, spatial audio will adjust
+
+      // Get speaker's base volume (user-set volume) - default to 70%
+      const baseVolume = this.speakerVolumes.get(speakerId) || 0.7;
+      // Start with a reasonable initial volume (spatial audio will adjust)
+      audio.volume =
+        baseVolume *
+        this.maxVolume *
+        this.soundManager.masterVolume *
+        (this.soundManager.enabled ? 1 : 0);
 
       // Add ended event listener for auto-play
       audio.addEventListener("ended", () => {
@@ -647,9 +692,14 @@ export class MusicPlayerManager {
 
       console.log(`🎵 Started music on speaker ${speakerId}: ${songName}`);
       console.log(
-        `   Audio paused: ${audio.paused}, Volume: ${
-          audio.volume
-        }, Current time: ${audio.currentTime.toFixed(2)}s`
+        `   Audio paused: ${audio.paused}, Volume: ${audio.volume.toFixed(
+          3
+        )} (base: ${baseVolume.toFixed(
+          2
+        )}), Current time: ${audio.currentTime.toFixed(2)}s`
+      );
+      console.log(
+        `   Sound settings - Master: ${this.soundManager.masterVolume}, Enabled: ${this.soundManager.enabled}, MaxVolume: ${this.maxVolume}`
       );
 
       // Add visual indicator that speaker is playing

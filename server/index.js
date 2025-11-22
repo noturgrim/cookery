@@ -2854,6 +2854,8 @@ io.on("connection", (socket) => {
           id: speaker.id,
           currentSong: speaker.musicCurrentSong,
           isPlaying: speaker.musicIsPlaying,
+          isPaused: speaker.musicIsPaused || false,
+          volume: speaker.musicVolume || 70,
           serverTime: speaker.musicStartTime,
         }));
 
@@ -2878,6 +2880,18 @@ io.on("connection", (socket) => {
       const idValidation = validateId(data.speakerId);
       if (!idValidation.valid) return;
 
+      // Find the speaker and update pause state
+      const speaker = gameState.obstacles.find(
+        (obs) => obs.id === idValidation.sanitized
+      );
+
+      if (speaker) {
+        speaker.musicIsPaused = true;
+        speaker.musicPausedTime = Date.now();
+        // Save to database
+        await saveObstacle(speaker);
+      }
+
       // Broadcast to ALL clients (including sender for confirmation)
       io.emit("speakerMusicPaused", {
         speakerId: idValidation.sanitized,
@@ -2900,6 +2914,18 @@ io.on("connection", (socket) => {
       // Validate speaker ID
       const idValidation = validateId(data.speakerId);
       if (!idValidation.valid) return;
+
+      // Find the speaker and update pause state
+      const speaker = gameState.obstacles.find(
+        (obs) => obs.id === idValidation.sanitized
+      );
+
+      if (speaker) {
+        speaker.musicIsPaused = false;
+        speaker.musicPausedTime = null;
+        // Save to database
+        await saveObstacle(speaker);
+      }
 
       // Broadcast to ALL clients (including sender for confirmation)
       io.emit("speakerMusicResumed", {
@@ -2926,6 +2952,17 @@ io.on("connection", (socket) => {
 
       // Validate volume (0-100)
       const volume = Math.max(0, Math.min(100, parseInt(data.volume) || 70));
+
+      // Find the speaker and update volume
+      const speaker = gameState.obstacles.find(
+        (obs) => obs.id === idValidation.sanitized
+      );
+
+      if (speaker) {
+        speaker.musicVolume = volume;
+        // Save to database
+        await saveObstacle(speaker);
+      }
 
       // Broadcast to ALL clients (including sender for confirmation)
       io.emit("speakerVolumeChanged", {
@@ -2960,6 +2997,39 @@ io.on("connection", (socket) => {
 
       // Save to database
       await saveSpeakerConnection(speaker1, speaker2);
+
+      // Find the speakers
+      const speakerObj1 = gameState.obstacles.find(
+        (obs) => obs.id === speaker1
+      );
+      const speakerObj2 = gameState.obstacles.find(
+        (obs) => obs.id === speaker2
+      );
+
+      // If one speaker is playing music, sync to the other
+      if (speakerObj1 && speakerObj2) {
+        if (speakerObj1.musicIsPlaying && speakerObj1.musicCurrentSong) {
+          // Sync speaker1's music to speaker2
+          speakerObj2.musicCurrentSong = speakerObj1.musicCurrentSong;
+          speakerObj2.musicIsPlaying = speakerObj1.musicIsPlaying;
+          speakerObj2.musicStartTime = speakerObj1.musicStartTime;
+          speakerObj2.musicIsPaused = speakerObj1.musicIsPaused;
+          speakerObj2.musicPausedTime = speakerObj1.musicPausedTime;
+          speakerObj2.musicVolume = speakerObj1.musicVolume;
+          await saveObstacle(speakerObj2);
+          console.log(`🎵 Synced music from ${speaker1} to ${speaker2}`);
+        } else if (speakerObj2.musicIsPlaying && speakerObj2.musicCurrentSong) {
+          // Sync speaker2's music to speaker1
+          speakerObj1.musicCurrentSong = speakerObj2.musicCurrentSong;
+          speakerObj1.musicIsPlaying = speakerObj2.musicIsPlaying;
+          speakerObj1.musicStartTime = speakerObj2.musicStartTime;
+          speakerObj1.musicIsPaused = speakerObj2.musicIsPaused;
+          speakerObj1.musicPausedTime = speakerObj2.musicPausedTime;
+          speakerObj1.musicVolume = speakerObj2.musicVolume;
+          await saveObstacle(speakerObj1);
+          console.log(`🎵 Synced music from ${speaker2} to ${speaker1}`);
+        }
+      }
 
       // Broadcast to OTHER clients
       socket.broadcast.emit("speakersConnected", { speaker1, speaker2 });

@@ -123,11 +123,7 @@ export class NetworkManager {
         this.socket.emit("requestConnectionsSync");
       }, 300);
 
-      // Request music sync after connections are loaded
-      setTimeout(() => {
-        console.log("🎵 Requesting music sync from server...");
-        this.socket.emit("requestMusicSync");
-      }, 800); // After connections sync
+      // Music sync is already requested at 300ms, no need to request again
 
       // Initialize world time from server
       if (

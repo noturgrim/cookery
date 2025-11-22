@@ -336,7 +336,12 @@ export class SpeakerConnectionManager {
   /**
    * Connect two speakers
    */
-  connectSpeakers(speakerId1, speakerId2, broadcast = true) {
+  connectSpeakers(
+    speakerId1,
+    speakerId2,
+    broadcast = true,
+    skipMusicSync = false
+  ) {
     // Don't connect speaker to itself
     if (speakerId1 === speakerId2) return;
 
@@ -372,7 +377,10 @@ export class SpeakerConnectionManager {
     }
 
     // If either speaker is playing music, sync to all connected speakers
-    this.syncMusicAcrossConnections(speakerId1);
+    // Skip during initial connection load to prevent duplicates
+    if (!skipMusicSync) {
+      this.syncMusicAcrossConnections(speakerId1);
+    }
   }
 
   /**
@@ -641,14 +649,39 @@ export class SpeakerConnectionManager {
     // Get all connected speakers
     const connectedSpeakers = this.getConnectedSpeakers(speakerId);
 
-    // Start music on all connected speakers
+    // Calculate sync time ONCE for perfect synchronization
+    const groupSyncTime = Date.now();
+
+    console.log(
+      `🔗 Syncing music to ${
+        connectedSpeakers.length - 1
+      } connected speakers (song: ${speakerData.songName})`
+    );
+
+    // Start music on all connected speakers with the SAME sync time
     connectedSpeakers.forEach((connectedId) => {
       if (connectedId !== speakerId) {
+        // Check if connected speaker is already playing the same song
+        const connectedData =
+          this.musicPlayerManager.activeSpeakers.get(connectedId);
+        if (
+          connectedData &&
+          connectedData.songName === speakerData.songName &&
+          !connectedData.audio.paused
+        ) {
+          console.log(
+            `   ⏭️ Speaker ${connectedId} already playing ${speakerData.songName}, skipping`
+          );
+          return;
+        }
+
+        console.log(`   🔊 Syncing to speaker: ${connectedId}`);
         this.musicPlayerManager.startSpeakerMusic(
           connectedId,
           speakerData.songName,
           speakerData.startTime,
-          false // Don't broadcast, already handled
+          false, // Don't broadcast, already handled
+          groupSyncTime // Pass the SAME sync time for perfect sync
         );
       }
     });
@@ -717,9 +750,12 @@ export class SpeakerConnectionManager {
       this.connectSpeakers(conn.speaker1, conn.speaker2, false);
     });
 
-    // Notify that connections are loaded (for music sync)
+    // Always notify that connections are loaded (even if 0 connections)
+    // This is important for music sync to proceed
     if (this.onConnectionsLoaded) {
-      console.log(`🔌 Connections loaded, notifying listeners`);
+      console.log(
+        `🔌 Connections loaded (${connectionsData.length} total), notifying listeners`
+      );
       this.onConnectionsLoaded();
     }
   }

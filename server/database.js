@@ -223,7 +223,10 @@ export async function initializeDatabase() {
       ALTER TABLE obstacles 
       ADD COLUMN IF NOT EXISTS music_current_song VARCHAR(255),
       ADD COLUMN IF NOT EXISTS music_is_playing BOOLEAN DEFAULT false,
-      ADD COLUMN IF NOT EXISTS music_start_time BIGINT
+      ADD COLUMN IF NOT EXISTS music_start_time BIGINT,
+      ADD COLUMN IF NOT EXISTS music_is_paused BOOLEAN DEFAULT false,
+      ADD COLUMN IF NOT EXISTS music_paused_time BIGINT,
+      ADD COLUMN IF NOT EXISTS music_volume INTEGER DEFAULT 70
     `);
 
     // Create speaker connections table
@@ -350,8 +353,13 @@ export async function loadObstacles() {
       opacity: parseFloat(row.opacity) || 1.0,
       musicCurrentSong: row.music_current_song || null,
       musicIsPlaying: row.music_is_playing || false,
+      musicIsPaused: row.music_is_paused || false,
+      musicVolume: parseInt(row.music_volume) || 70,
       musicStartTime: row.music_start_time
         ? parseInt(row.music_start_time)
+        : null,
+      musicPausedTime: row.music_paused_time
+        ? parseInt(row.music_paused_time)
         : null,
     }));
   } catch (error) {
@@ -370,8 +378,8 @@ export async function saveObstacle(obstacle) {
 
     const result = await pool.query(
       `
-      INSERT INTO obstacles (id, name, type, x, y, z, width, height, depth, model, scale, rotation, is_passthrough, opacity, music_current_song, music_is_playing, music_start_time, updated_at)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, CURRENT_TIMESTAMP)
+      INSERT INTO obstacles (id, name, type, x, y, z, width, height, depth, model, scale, rotation, is_passthrough, opacity, music_current_song, music_is_playing, music_start_time, music_is_paused, music_paused_time, music_volume, updated_at)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, CURRENT_TIMESTAMP)
       ON CONFLICT (id) 
       DO UPDATE SET 
         x = $4, 
@@ -388,6 +396,9 @@ export async function saveObstacle(obstacle) {
         music_current_song = $15,
         music_is_playing = $16,
         music_start_time = $17,
+        music_is_paused = $18,
+        music_paused_time = $19,
+        music_volume = $20,
         updated_at = CURRENT_TIMESTAMP
       RETURNING id
     `,
@@ -409,6 +420,9 @@ export async function saveObstacle(obstacle) {
         obstacle.musicCurrentSong || null,
         obstacle.musicIsPlaying || false,
         obstacle.musicStartTime || null,
+        obstacle.musicIsPaused || false,
+        obstacle.musicPausedTime || null,
+        obstacle.musicVolume || 70,
       ]
     );
 
