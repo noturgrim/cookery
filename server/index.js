@@ -337,7 +337,7 @@ setInterval(async () => {
 
 // Server configuration
 const SERVER_TICK_RATE = 20; // Reduced from 30 to 20 updates per second for bandwidth
-const PLAYER_SPEED = 0.15; // Units per tick
+const PLAYER_SPEED = 0.22; // Units per tick (increased from 0.15 for faster movement)
 const PLAYER_SIZE = { width: 0.6, height: 2, depth: 0.6 }; // Player AABB dimensions (smaller for better navigation)
 const GRID_SIZE = 0.4; // Grid cell size for pathfinding (smaller = more precise paths)
 
