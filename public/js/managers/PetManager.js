@@ -144,6 +144,10 @@ export class PetManager {
       lastPosition: petMesh.position.clone(), // For stuck detection
       ghostMode: false, // Can walk through obstacles when true
       ghostModeTimer: 0, // How long to stay in ghost mode
+      // For smooth interpolation on non-host clients
+      targetPosition: null, // Server position to lerp towards
+      targetRotation: null, // Server rotation to lerp towards
+      lerpSpeed: 0.15, // Interpolation speed
     });
 
     console.log(
@@ -229,16 +233,60 @@ export class PetManager {
         if (!data.isHost) {
           console.log(`👥 Not host - receiving cat positions from host player`);
           this.isHost = false;
+
+          // Set up fallback: If we don't receive updates for 5 seconds, take over as fallback host
+          this.lastCatUpdateTime = Date.now();
+          this.fallbackCheckInterval = setInterval(() => {
+            const timeSinceUpdate = Date.now() - this.lastCatUpdateTime;
+
+            // If no updates for 5 seconds and we have cats, take over control
+            if (timeSinceUpdate > 5000 && this.pets.size > 0 && !this.isHost) {
+              console.log(
+                `👑 No host updates received for 5s - taking over cat control (fallback mode)`
+              );
+              this.isHost = true;
+
+              // Start syncing at higher frequency for smooth movement
+              if (!this.syncInterval) {
+                this.syncInterval = setInterval(() => {
+                  this.syncToServer();
+                }, 100);
+              }
+
+              // Clear fallback check
+              if (this.fallbackCheckInterval) {
+                clearInterval(this.fallbackCheckInterval);
+                this.fallbackCheckInterval = null;
+              }
+            }
+          }, 1000); // Check every second
+
+          // Log status to help debug
+          setTimeout(() => {
+            console.log(
+              `🐱 Cat Status (Non-Host): ${this.pets.size} cats loaded, waiting for host updates`
+            );
+            console.log(
+              `   💡 Will take over control if no updates received for 5 seconds`
+            );
+          }, 2000);
           return;
         }
 
         console.log(`👑 HOST player - controlling cat movement`);
         this.isHost = true;
 
-        // Only host syncs to server every 2 seconds
+        // Log status to help debug
+        setTimeout(() => {
+          console.log(
+            `🐱 Cat Status (Host): ${this.pets.size} cats loaded, AI active`
+          );
+        }, 2000);
+
+        // Host syncs to server frequently for smooth movement (10 times per second)
         this.syncInterval = setInterval(() => {
           this.syncToServer();
-        }, 2000);
+        }, 100);
       });
     }, 500); // Wait 500ms for socket to be fully ready
   }
@@ -265,8 +313,8 @@ export class PetManager {
 
     if (catData.length > 0) {
       this.networkManager.socket.emit("updateCatPositions", catData);
-      // Only log occasionally to avoid spam
-      if (Math.random() < 0.1) {
+      // Only log very occasionally to avoid spam (now syncing 10x per second)
+      if (Math.random() < 0.01) {
         console.log(`📤 Synced ${catData.length} cat positions to server`);
       }
     }
@@ -277,6 +325,9 @@ export class PetManager {
    */
   receiveCatsUpdate(cats) {
     if (!cats || cats.length === 0) return;
+
+    // Update last update time for fallback detection
+    this.lastCatUpdateTime = Date.now();
 
     // If we have no cats yet, store as pending for initial spawn
     if (this.pets.size === 0) {
@@ -290,21 +341,16 @@ export class PetManager {
       return;
     }
 
-    // Non-host players: Update cat positions from server
+    // Non-host players: Set target positions for smooth interpolation
     cats.forEach((serverCat) => {
       const pet = this.pets.get(serverCat.id);
       if (pet) {
-        // Update position directly (host controls the movement)
-        pet.mesh.position.x = serverCat.x;
-        pet.mesh.position.y = serverCat.y;
-        pet.mesh.position.z = serverCat.z;
-        pet.mesh.rotation.y = serverCat.rotation;
-
-        // Update last position for animation detection
-        if (!pet.lastPosition) {
-          pet.lastPosition = new THREE.Vector3();
+        // Store target position and rotation for smooth lerping
+        if (!pet.targetPosition) {
+          pet.targetPosition = new THREE.Vector3();
         }
-        pet.lastPosition.copy(pet.mesh.position);
+        pet.targetPosition.set(serverCat.x, serverCat.y, serverCat.z);
+        pet.targetRotation = serverCat.rotation;
       }
     });
   }
@@ -368,16 +414,8 @@ export class PetManager {
       if (this.isHost) {
         isMoving = this.updateWandering(pet, delta);
       } else {
-        // Non-host: Check if position changed (from server update)
-        if (pet.lastPosition) {
-          const moved = pet.mesh.position.distanceTo(pet.lastPosition) > 0.01;
-          if (moved) {
-            isMoving = true;
-            pet.lastPosition.copy(pet.mesh.position);
-          }
-        } else {
-          pet.lastPosition = pet.mesh.position.clone();
-        }
+        // Non-host: Smoothly interpolate towards target position from server
+        isMoving = this.updateInterpolation(pet, delta);
       }
 
       // Animate legs if moving and legs exist
@@ -396,6 +434,63 @@ export class PetManager {
         }
       }
     });
+  }
+
+  /**
+   * Smoothly interpolate cat position for non-host players
+   */
+  updateInterpolation(pet, delta) {
+    // If we have a target position from the server, lerp towards it
+    if (pet.targetPosition) {
+      const distance = pet.mesh.position.distanceTo(pet.targetPosition);
+
+      // If very close, snap to target
+      if (distance < 0.01) {
+        pet.mesh.position.copy(pet.targetPosition);
+        if (pet.targetRotation !== null) {
+          pet.mesh.rotation.y = pet.targetRotation;
+        }
+        return false; // Not moving anymore
+      }
+
+      // Smooth interpolation
+      pet.mesh.position.lerp(pet.targetPosition, pet.lerpSpeed);
+
+      // Smooth rotation interpolation
+      if (pet.targetRotation !== null) {
+        let currentAngle = pet.mesh.rotation.y;
+        let targetAngle = pet.targetRotation;
+
+        // Normalize angles to -PI to PI range
+        while (currentAngle > Math.PI) currentAngle -= Math.PI * 2;
+        while (currentAngle < -Math.PI) currentAngle += Math.PI * 2;
+        while (targetAngle > Math.PI) targetAngle -= Math.PI * 2;
+        while (targetAngle < -Math.PI) targetAngle += Math.PI * 2;
+
+        let angleDiff = targetAngle - currentAngle;
+
+        // Take shortest rotation path
+        if (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
+        if (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
+
+        // Smoothly interpolate rotation
+        pet.mesh.rotation.y += angleDiff * pet.lerpSpeed;
+      }
+
+      return true; // Is moving
+    }
+
+    return false; // No target, not moving
+  }
+
+  /**
+   * Get current host status
+   */
+  getHostStatus() {
+    return {
+      isHost: this.isHost,
+      petCount: this.pets.size,
+    };
   }
 
   /**
@@ -639,6 +734,11 @@ export class PetManager {
     if (this.syncInterval) {
       clearInterval(this.syncInterval);
       this.syncInterval = null;
+    }
+
+    if (this.fallbackCheckInterval) {
+      clearInterval(this.fallbackCheckInterval);
+      this.fallbackCheckInterval = null;
     }
 
     this.pets.forEach((pet) => {

@@ -955,4 +955,43 @@ class Game {
 window.addEventListener("DOMContentLoaded", () => {
   const game = new Game();
   window.game = game; // Make accessible to NetworkManager
+
+  // Debug command to check cat status
+  window.checkCats = () => {
+    if (!game.petManager) {
+      console.log("❌ Pet Manager not initialized");
+      return;
+    }
+
+    const status = game.petManager.getHostStatus();
+    console.log("🐱 Cat Status:");
+    console.log(
+      `   - Is Host: ${
+        status.isHost
+          ? "✅ YES (cats should be moving)"
+          : "❌ NO (waiting for host updates)"
+      }`
+    );
+    console.log(`   - Cat Count: ${status.petCount}`);
+
+    if (status.petCount === 0) {
+      console.log("   ⚠️ No cats spawned yet!");
+    }
+
+    // List all cats
+    game.petManager.pets.forEach((pet, id) => {
+      const pos = pet.mesh.position;
+      console.log(
+        `   - Cat ${id.substring(0, 8)}: (${pos.x.toFixed(1)}, ${pos.z.toFixed(
+          1
+        )}) Target: ${pet.target ? "YES" : "NO"}`
+      );
+    });
+
+    console.log("\n💡 Type checkCats() again to refresh status");
+  };
+
+  console.log(
+    "💡 Debug: Type checkCats() in console to check cat movement status"
+  );
 });
