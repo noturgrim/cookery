@@ -892,6 +892,9 @@ export class InteractionManager {
       console.log("🛏️ Using procedural lying animation");
     }
 
+    // Add sleeping indicator (Z's floating above player)
+    this.playerManager.addSleepingIndicator(this.networkManager.playerId);
+
     // Get bbox for accurate collision center
     const bboxForSync = this.sceneManager.calculateBoundingBox(furniture);
 
@@ -998,6 +1001,9 @@ export class InteractionManager {
     this.playerManager.animationController.resetToIdle(
       this.networkManager.playerId
     );
+
+    // Remove sleeping indicator
+    this.playerManager.removeSleepingIndicator(this.networkManager.playerId);
 
     // Notify server
     this.networkManager.socket.emit("playerGetUp", {
@@ -1149,6 +1155,9 @@ export class InteractionManager {
         this.playerManager.animationController.applyLyingPose(playerId);
       }
 
+      // Add sleeping indicator (Z's floating above player)
+      this.playerManager.addSleepingIndicator(playerId);
+
       console.log(
         `👀 Player ${playerId} is now lying on ${furnitureId} (position ${
           lyingIndex + 1
@@ -1180,6 +1189,9 @@ export class InteractionManager {
       // Stop animation and reset to idle
       this.playerManager.animationController.stopCurrentAnimation(playerId);
       this.playerManager.animationController.resetToIdle(playerId);
+
+      // Remove sleeping indicator
+      this.playerManager.removeSleepingIndicator(playerId);
 
       console.log(`👀 Player ${playerId} got up`);
     }

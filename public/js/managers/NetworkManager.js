@@ -232,6 +232,9 @@ export class NetworkManager {
                 );
               }
 
+              // Add sleeping indicator (Z's)
+              this.playerManager.addSleepingIndicator(player.id);
+
               console.log(
                 `👀 Loaded lying player ${player.id} on ${
                   player.lyingOn

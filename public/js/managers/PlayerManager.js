@@ -14,6 +14,9 @@ export class PlayerManager {
     this.characterManager = new CharacterManager();
     this.animationController = new AnimationController();
     this.playerId = null;
+
+    // Sleeping indicators (Z's floating above lying players)
+    this.sleepingIndicators = new Map(); // playerId -> { notesGroup, notes, startTime, playerMesh }
   }
 
   /**
@@ -331,6 +334,9 @@ export class PlayerManager {
         animData.mixer.update(delta);
       }
     });
+
+    // Update sleeping indicators (Z's floating above lying players)
+    this.updateSleepingIndicators();
   }
 
   /**
@@ -455,5 +461,136 @@ export class PlayerManager {
     } catch (error) {
       console.error(`❌ Failed to update player model:`, error);
     }
+  }
+
+  /**
+   * Add sleeping indicator (Z's floating above lying player)
+   */
+  addSleepingIndicator(playerId) {
+    const player = this.players.get(playerId);
+    if (!player || !player.mesh || this.sleepingIndicators.has(playerId))
+      return;
+
+    console.log(`💤 Adding sleeping indicator for player ${playerId}`);
+
+    // Create group to hold multiple Z's
+    const notesGroup = new THREE.Group();
+    const notes = [];
+
+    // Create 4 Z's with different sizes
+    const zSymbols = ["Z", "z", "Z", "z"];
+    const zSizes = [80, 60, 70, 55]; // Different font sizes
+
+    for (let i = 0; i < 4; i++) {
+      // Create canvas for text
+      const canvas = document.createElement("canvas");
+      canvas.width = 128;
+      canvas.height = 128;
+      const ctx = canvas.getContext("2d");
+
+      // Draw Z symbol
+      ctx.font = `Bold ${zSizes[i]}px Arial`;
+      ctx.fillStyle = "#ffffff";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText(zSymbols[i], 64, 64);
+
+      // Create sprite
+      const texture = new THREE.CanvasTexture(canvas);
+      const material = new THREE.SpriteMaterial({
+        map: texture,
+        color: 0x6699ff, // Light blue color for Z's
+        transparent: true,
+        opacity: 0.8,
+      });
+
+      const sprite = new THREE.Sprite(material);
+      sprite.scale.set(0.4, 0.4, 1);
+
+      // Random starting position around player's head
+      const angle = (i / 4) * Math.PI * 2;
+      sprite.position.set(
+        Math.cos(angle) * 0.4,
+        1.5, // Start from player's head level
+        Math.sin(angle) * 0.4
+      );
+
+      notesGroup.add(sprite);
+      notes.push({
+        sprite,
+        startY: 1.5,
+        speed: 0.4 + Math.random() * 0.2, // Slower floating speed
+        phase: (i * Math.PI) / 4, // Phase offset for wave motion
+      });
+    }
+
+    // Position group at player
+    notesGroup.position.copy(player.mesh.position);
+    this.sceneManager.scene.add(notesGroup);
+
+    // Store reference
+    this.sleepingIndicators.set(playerId, {
+      notesGroup,
+      notes,
+      startTime: Date.now(),
+      playerMesh: player.mesh,
+    });
+  }
+
+  /**
+   * Remove sleeping indicator
+   */
+  removeSleepingIndicator(playerId) {
+    const indicator = this.sleepingIndicators.get(playerId);
+    if (indicator) {
+      console.log(`💤 Removing sleeping indicator for player ${playerId}`);
+
+      this.sceneManager.scene.remove(indicator.notesGroup);
+
+      // Dispose of all sprites and materials
+      indicator.notes.forEach((note) => {
+        note.sprite.material.map.dispose();
+        note.sprite.material.dispose();
+      });
+
+      this.sleepingIndicators.delete(playerId);
+    }
+  }
+
+  /**
+   * Update sleeping indicators (call every frame) - Animated floating Z's
+   */
+  updateSleepingIndicators() {
+    const now = Date.now();
+
+    this.sleepingIndicators.forEach((indicator, playerId) => {
+      const elapsed = (now - indicator.startTime) / 1000;
+
+      // Update position to follow player
+      if (indicator.playerMesh) {
+        indicator.notesGroup.position.copy(indicator.playerMesh.position);
+      }
+
+      // Update each Z
+      indicator.notes.forEach((note, index) => {
+        // Float upward slowly
+        note.sprite.position.y = note.startY + ((elapsed * note.speed) % 2.5);
+
+        // Wave motion (side to side) - more gentle
+        const wave = Math.sin(elapsed * 1.5 + note.phase) * 0.15;
+        note.sprite.position.x =
+          Math.cos((index / 4) * Math.PI * 2) * 0.4 + wave;
+        note.sprite.position.z =
+          Math.sin((index / 4) * Math.PI * 2) * 0.4 + wave * 0.5;
+
+        // Fade out as it goes up
+        const fadeProgress = ((elapsed * note.speed) % 2.5) / 2.5;
+        note.sprite.material.opacity = 0.8 * (1 - fadeProgress);
+
+        // Scale pulse - slower and gentler
+        const scale = 0.4 + Math.sin(elapsed * 2 + note.phase) * 0.08;
+        note.sprite.scale.set(scale, scale, 1);
+      });
+    });
   }
 }
