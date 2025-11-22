@@ -9,6 +9,7 @@ import { InteractionManager } from "./managers/InteractionManager.js";
 import { DayNightUI } from "./managers/DayNightUI.js";
 import { TimeDisplay } from "./managers/TimeDisplay.js";
 import { MusicPlayerManager } from "./managers/MusicPlayerManager.js";
+import { PetManager } from "./managers/PetManager.js";
 import { SpeakerConnectionManager } from "./managers/SpeakerConnectionManager.js";
 
 /**
@@ -25,6 +26,7 @@ class Game {
     this.networkManager = null;
     this.interactionManager = null;
     this.soundManager = new SoundManager();
+    this.petManager = null;
 
     // Player customization
     this.playerName = "";
@@ -549,6 +551,9 @@ class Game {
     // Initialize player manager
     this.playerManager = new PlayerManager(this.sceneManager, this.uiManager);
 
+    // Initialize pet manager (will get networkManager later)
+    this.petManager = new PetManager(this.sceneManager, null);
+
     // Start animation loop
     this.animate();
 
@@ -580,6 +585,11 @@ class Game {
     );
     this.networkManager.setPlayerData(this.playerName, this.playerSkin);
     this.networkManager.setupSocket();
+
+    // Connect pet manager to network
+    if (this.petManager) {
+      this.petManager.networkManager = this.networkManager;
+    }
 
     // Initialize input manager
     this.inputManager = new InputManager(
@@ -661,6 +671,9 @@ class Game {
 
     // Spawn demo food items
     this.spawnDemoFoodItems();
+
+    // Load and spawn pets AFTER network is connected
+    // This will be triggered by the network init event
   }
 
   /**
@@ -717,6 +730,41 @@ class Game {
   }
 
   /**
+   * Load and spawn pets
+   */
+  async loadPets() {
+    console.log("🐱 Loading pets...");
+
+    try {
+      // Load geometric cat model with separated legs
+      await this.petManager.loadPetModel("cat", "/pets/glb/cat2.glb");
+
+      // Check if server has cats already
+      if (
+        this.petManager.pendingCats &&
+        this.petManager.pendingCats.length > 0
+      ) {
+        // Apply positions from server
+        this.petManager.applyPendingCats();
+      } else {
+        // First player - spawn cats at random safe positions
+        const numCats = 3;
+
+        for (let i = 0; i < numCats; i++) {
+          this.petManager.spawnPet("cat", null);
+        }
+
+        console.log(`🐱 Spawned ${numCats} wandering cats!`);
+      }
+
+      // Start syncing cat positions to server
+      this.petManager.startSync();
+    } catch (error) {
+      console.error("❌ Failed to load pets:", error);
+    }
+  }
+
+  /**
    * Spawn demo food items on the table
    * (Currently disabled - use Press B to spawn objects)
    */
@@ -741,6 +789,11 @@ class Game {
     // Update all players
     if (this.playerManager) {
       this.playerManager.updatePlayers(delta, this.soundManager);
+    }
+
+    // Update pets (wandering and leg animation)
+    if (this.petManager) {
+      this.petManager.updatePets(delta);
     }
 
     // Update interactions
@@ -900,5 +953,6 @@ class Game {
 
 // Initialize game when DOM is ready
 window.addEventListener("DOMContentLoaded", () => {
-  new Game();
+  const game = new Game();
+  window.game = game; // Make accessible to NetworkManager
 });

@@ -314,6 +314,7 @@ const gameState = {
   players: new Map(),
   obstacles: [], // Will be loaded from database
   foodItems: [], // Will be loaded from database
+  cats: [], // Shared cat positions across all clients
 };
 
 // Rate limiter instance
@@ -1516,6 +1517,7 @@ io.on("connection", (socket) => {
       socket.emit("init", {
         playerId: socket.id,
         players: Array.from(gameState.players.values()),
+        cats: gameState.cats, // Send cat positions
         obstacles: gameState.obstacles,
         foodItems: gameState.foodItems,
         worldTime: worldTime, // Send world time to new player
@@ -3124,6 +3126,22 @@ io.on("connection", (socket) => {
   });
 
   // Handle disconnection
+  // Handle cat position updates
+  socket.on("updateCatPositions", (cats) => {
+    if (!isAuthenticated) return;
+
+    // Only update if we received valid cat data
+    if (!cats || !Array.isArray(cats)) return;
+
+    // Update server cat state (this becomes the source of truth)
+    gameState.cats = cats;
+
+    // Broadcast to all other clients so they stay in sync
+    socket.broadcast.emit("catsUpdate", cats);
+
+    console.log(`🐱 Updated cat positions: ${cats.length} cats`);
+  });
+
   socket.on("disconnect", () => {
     console.log(`Player disconnected: ${socket.id}`);
     gameState.players.delete(socket.id);

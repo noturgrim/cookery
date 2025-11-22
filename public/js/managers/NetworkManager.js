@@ -245,6 +245,22 @@ export class NetworkManager {
         }
       });
 
+      // Store cat positions for later (after model loads)
+      if (data.cats && data.cats.length > 0) {
+        console.log(
+          `🐱 Received ${data.cats.length} cat positions from server`
+        );
+        if (window.game && window.game.petManager) {
+          window.game.petManager.pendingCats = data.cats;
+        }
+      }
+
+      // Trigger pet loading after network is ready
+      if (window.game && window.game.petManager && !window.game.petsLoaded) {
+        window.game.petsLoaded = true;
+        window.game.loadPets();
+      }
+
       // Create all obstacles
       data.obstacles.forEach(async (obstacle) => {
         const obj = await this.sceneManager.createObstacle(obstacle);
@@ -280,6 +296,13 @@ export class NetworkManager {
     });
 
     // Handle new player joining
+    // Listen for cat updates from other players
+    this.socket.on("catsUpdate", (cats) => {
+      if (window.game && window.game.petManager) {
+        window.game.petManager.receiveCatsUpdate(cats);
+      }
+    });
+
     this.socket.on("playerJoined", (playerData) => {
       console.log("👋 Player joined:", playerData.id);
 
