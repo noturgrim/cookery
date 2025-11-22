@@ -46,6 +46,9 @@ export class MusicPlayerManager {
     // Setup socket listeners
     this.setupSocketListeners();
 
+    // Setup connection manager callback (will be called when connections load)
+    this.setupConnectionManagerCallback();
+
     // Setup update loop for spatial audio
     this.setupSpatialAudioUpdate();
 
@@ -131,20 +134,6 @@ export class MusicPlayerManager {
       this.processMusicSync(speakers);
     });
 
-    // Listen for when connections are loaded
-    if (this.sceneManager.speakerConnectionManager) {
-      // This will be called by SpeakerConnectionManager after loading connections
-      this.sceneManager.speakerConnectionManager.onConnectionsLoaded = () => {
-        if (this.pendingMusicSync && this.pendingMusicSync.length > 0) {
-          console.log(
-            `   🔗 Connections loaded, now processing pending music sync`
-          );
-          this.processMusicSync(this.pendingMusicSync);
-          this.pendingMusicSync = null;
-        }
-      };
-    }
-
     // When speaker is paused by another player
     socket.on("speakerMusicPaused", (data) => {
       console.log(`⏸️ Received pause for speaker ${data.speakerId}`);
@@ -167,7 +156,33 @@ export class MusicPlayerManager {
   }
 
   /**
-   * Process music sync (extracted to be reusable)
+   * Setup callback for when speaker connections are loaded
+   */
+  setupConnectionManagerCallback() {
+    // Wait for connection manager to be available, then set callback
+    const checkConnectionManager = () => {
+      if (this.sceneManager.speakerConnectionManager) {
+        // Set the callback that will be triggered when connections finish loading
+        this.sceneManager.speakerConnectionManager.onConnectionsLoaded = () => {
+          if (this.pendingMusicSync && this.pendingMusicSync.length > 0) {
+            console.log(
+              `   🔗 Connections loaded, now processing pending music sync`
+            );
+            this.processMusicSync(this.pendingMusicSync);
+            this.pendingMusicSync = null;
+          }
+        };
+      } else {
+        // Connection manager not ready yet, try again in 50ms
+        setTimeout(checkConnectionManager, 50);
+      }
+    };
+
+    checkConnectionManager();
+  }
+
+  /**
+   * Process music sync for multiple speakers (filters out connected duplicates)
    */
   processMusicSync(speakers) {
     console.log(`🎵 Processing music sync: ${speakers.length} speakers`);

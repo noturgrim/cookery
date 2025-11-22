@@ -341,6 +341,29 @@ const PLAYER_SPEED = 0.15; // Units per tick
 const PLAYER_SIZE = { width: 0.6, height: 2, depth: 0.6 }; // Player AABB dimensions (smaller for better navigation)
 const GRID_SIZE = 0.4; // Grid cell size for pathfinding (smaller = more precise paths)
 
+// Helper to get all connected speakers (recursively follows connections)
+const getConnectedSpeakers = (speakerId, connections) => {
+  const visited = new Set();
+  const queue = [speakerId];
+
+  while (queue.length > 0) {
+    const current = queue.shift();
+    if (visited.has(current)) continue;
+    visited.add(current);
+
+    // Find all speakers connected to current
+    connections.forEach((conn) => {
+      if (conn.speaker1 === current && !visited.has(conn.speaker2)) {
+        queue.push(conn.speaker2);
+      } else if (conn.speaker2 === current && !visited.has(conn.speaker1)) {
+        queue.push(conn.speaker1);
+      }
+    });
+  }
+
+  return Array.from(visited);
+};
+
 // AABB Collision Detection
 const checkAABBCollision = (box1, box2) => {
   return (
@@ -2825,20 +2848,40 @@ io.on("connection", (socket) => {
         return;
       }
 
-      // Update speaker state
-      speaker.musicCurrentSong = null;
-      speaker.musicIsPlaying = false;
-      speaker.musicStartTime = null;
+      // Get all connected speakers
+      const connections = await loadSpeakerConnections();
+      const connectedSpeakers = getConnectedSpeakers(speaker.id, connections);
 
-      // Save to database
-      await saveObstacle(speaker);
+      // Stop all speakers in the connected group
+      const speakersToStop = [
+        speaker.id,
+        ...connectedSpeakers.filter((id) => id !== speaker.id),
+      ];
 
-      // Broadcast to OTHER clients (sender already stopped it)
-      socket.broadcast.emit("speakerMusicStopped", {
-        speakerId: speaker.id,
-      });
+      for (const speakerId of speakersToStop) {
+        const speakerToStop = gameState.obstacles.find(
+          (obs) => obs.id === speakerId
+        );
+        if (speakerToStop) {
+          // Update speaker state
+          speakerToStop.musicCurrentSong = null;
+          speakerToStop.musicIsPlaying = false;
+          speakerToStop.musicStartTime = null;
 
-      console.log(`🔇 Speaker ${speaker.id} stopped playing`);
+          // Save to database
+          await saveObstacle(speakerToStop);
+
+          // Broadcast to OTHER clients (sender already stopped it)
+          socket.broadcast.emit("speakerMusicStopped", {
+            speakerId: speakerToStop.id,
+          });
+        }
+      }
+
+      console.log(
+        `🔇 Stopped ${speakersToStop.length} connected speaker(s):`,
+        speakersToStop
+      );
     } catch (error) {
       console.error("❌ Error stopping speaker music:", error);
     }
