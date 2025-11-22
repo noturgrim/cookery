@@ -85,6 +85,12 @@ export class MusicPlayerManager {
 
     // When speaker starts playing music
     socket.on("speakerMusicStarted", (data) => {
+      console.log(
+        `📡 Network event: speakerMusicStarted for ${data.speakerId.substring(
+          0,
+          8
+        )}: ${data.songName}`
+      );
       this.startSpeakerMusic(
         data.speakerId,
         data.songName,
@@ -187,6 +193,16 @@ export class MusicPlayerManager {
   processMusicSync(speakers) {
     console.log(`🎵 Processing music sync: ${speakers.length} speakers`);
 
+    // Check what speakers are currently active
+    const activeSpeakerIds = Array.from(this.activeSpeakers.keys()).map((id) =>
+      id.substring(0, 8)
+    );
+    console.log(
+      `   📍 Currently active speakers: [${
+        activeSpeakerIds.join(", ") || "none"
+      }]`
+    );
+
     // Filter speakers to only sync "primary" ones (not connected duplicates)
     // For each group of connected speakers, we only need to start one
     const speakersToSync = this.filterPrimarySpeakers(speakers);
@@ -212,15 +228,7 @@ export class MusicPlayerManager {
           }%)`
         );
 
-        // Set speaker volume if provided
-        if (speaker.volume !== undefined) {
-          this.speakerVolumes.set(speaker.id, speaker.volume / 100);
-          console.log(
-            `   📊 Set speaker ${speaker.id} volume to ${speaker.volume}%`
-          );
-        }
-
-        // Get connected speakers group
+        // Get connected speakers group FIRST
         let speakersInGroup = [speaker.id];
         if (this.sceneManager.speakerConnectionManager) {
           speakersInGroup =
@@ -233,6 +241,18 @@ export class MusicPlayerManager {
               speakersInGroup
             );
           }
+        }
+
+        // Set speaker volume if provided - APPLY TO ALL SPEAKERS IN GROUP
+        if (speaker.volume !== undefined) {
+          speakersInGroup.forEach((speakerId) => {
+            this.speakerVolumes.set(speakerId, speaker.volume / 100);
+            console.log(
+              `   📊 Set speaker ${speakerId.substring(0, 8)} volume to ${
+                speaker.volume
+              }%`
+            );
+          });
         }
 
         // Calculate sync time ONCE for all speakers in the group
@@ -481,6 +501,7 @@ export class MusicPlayerManager {
    */
   setupSpatialAudioUpdate() {
     let debugLogged = false; // Only log once
+    let lastDebugTime = 0;
 
     const updateSpatialAudio = () => {
       // Get the local player from the player manager
@@ -489,7 +510,8 @@ export class MusicPlayerManager {
       const localPlayer =
         playerManager && playerId ? playerManager.players.get(playerId) : null;
 
-      // Debug: Check why spatial audio isn't working
+      // Debug: Check why spatial audio isn't working (log once per session + every 5 seconds if still having issues)
+      const now = Date.now();
       if (!debugLogged && this.activeSpeakers.size > 0) {
         console.log("🎧 Spatial Audio Debug:", {
           hasSceneManager: !!this.sceneManager,
@@ -502,10 +524,12 @@ export class MusicPlayerManager {
           masterVolume: this.soundManager.masterVolume,
         });
         debugLogged = true;
+        lastDebugTime = now;
       }
 
       if (localPlayer && localPlayer.mesh) {
         const listenerPos = localPlayer.mesh.position;
+        let anyVolumeSet = false;
 
         this.activeSpeakers.forEach((speakerData, speakerId) => {
           const speaker = speakerData.speakerObj;
@@ -535,14 +559,45 @@ export class MusicPlayerManager {
 
           speakerData.audio.volume = finalVolume;
 
-          // Debug logging (comment out after fixing)
-          // if (finalVolume > 0) {
-          //   console.log(
-          //     `🔊 Speaker distance: ${distance.toFixed(
-          //       2
-          //     )}, Volume: ${finalVolume.toFixed(3)}`
-          //   );
-          // }
+          if (finalVolume > 0) {
+            anyVolumeSet = true;
+          }
+
+          // Debug logging every 5 seconds if volumes are still 0
+          if (
+            now - lastDebugTime > 5000 &&
+            !anyVolumeSet &&
+            this.activeSpeakers.size > 0
+          ) {
+            console.log(
+              `🔊 Spatial Audio Update - Speaker: ${speakerId.substring(
+                0,
+                8
+              )}, Distance: ${distance.toFixed(
+                2
+              )}, Volume: ${finalVolume.toFixed(
+                3
+              )}, Base: ${baseVolume}, Master: ${
+                this.soundManager.masterVolume
+              }`
+            );
+            lastDebugTime = now;
+          }
+        });
+      } else {
+        // If player not ready, use a default volume so music is audible
+        this.activeSpeakers.forEach((speakerData, speakerId) => {
+          if (speakerData.audio) {
+            const baseVolume =
+              speakerData.baseVolume ||
+              this.speakerVolumes.get(speakerId) ||
+              0.7;
+            const fallbackVolume =
+              baseVolume *
+              this.soundManager.masterVolume *
+              (this.soundManager.enabled ? 1 : 0);
+            speakerData.audio.volume = fallbackVolume;
+          }
         });
       }
 
@@ -567,28 +622,37 @@ export class MusicPlayerManager {
     broadcast = true,
     syncTime = null
   ) {
-    try {
-      console.log(
-        `🎬 startSpeakerMusic called: speaker=${speakerId.substring(
-          0,
-          8
-        )}..., song=${songName}, broadcast=${broadcast}, syncTime=${
-          syncTime ? "provided" : "null"
-        }`
-      );
+    console.log(
+      `🎬 startSpeakerMusic called: speaker=${speakerId.substring(
+        0,
+        8
+      )}..., song=${songName}, broadcast=${broadcast}, syncTime=${
+        syncTime ? "provided" : "null"
+      }`
+    );
 
-      // Check if this speaker is already playing this exact song at this time
+    try {
+      // Check if this speaker is already playing this exact song
       const existingSpeaker = this.activeSpeakers.get(speakerId);
       if (
         existingSpeaker &&
         existingSpeaker.songName === songName &&
-        existingSpeaker.startTime === serverTime &&
         !existingSpeaker.audio.paused
       ) {
-        console.log(
-          `🔄 Speaker ${speakerId} already playing ${songName} at same time, skipping duplicate`
-        );
-        return;
+        // Check if the time difference is reasonable (within 2 seconds)
+        const timeDiff =
+          Math.abs(existingSpeaker.startTime - serverTime) / 1000;
+        if (timeDiff < 2) {
+          console.log(
+            `🔄 Speaker ${speakerId.substring(
+              0,
+              8
+            )} already playing ${songName}, skipping duplicate (time diff: ${timeDiff.toFixed(
+              2
+            )}s)`
+          );
+          return;
+        }
       }
 
       // Stop any existing music from this speaker
@@ -630,9 +694,24 @@ export class MusicPlayerManager {
         (this.soundManager.enabled ? 1 : 0);
 
       // Add ended event listener for auto-play
+      // Only the "primary" speaker in a group should trigger auto-play to avoid duplicates
       audio.addEventListener("ended", () => {
-        console.log(`🎵 Song ended: ${songName}`);
+        console.log(
+          `🎵 Song ended on speaker ${speakerId.substring(0, 8)}: ${songName}`
+        );
+
+        // Check if this speaker is the primary in its connection group
+        const isPrimarySpeaker = this.isPrimarySpeakerInGroup(speakerId);
+
+        if (!isPrimarySpeaker) {
+          console.log(
+            `   ⏭️ Skipping auto-play - this is a connected speaker, not primary`
+          );
+          return;
+        }
+
         if (this.autoPlayEnabled) {
+          console.log(`   ⏭️ Primary speaker triggering auto-play`);
           this.playNextSong(speakerId);
         } else {
           this.stopSpeakerMusic(speakerId, true);
@@ -746,6 +825,10 @@ export class MusicPlayerManager {
           this.sceneManager.speakerConnectionManager.getConnectedSpeakers(
             speakerId
           );
+
+        // Use the same sync time for all connected speakers to ensure perfect sync
+        const groupSyncTime = syncTime !== null ? syncTime : Date.now();
+
         connectedSpeakers.forEach((connectedId) => {
           if (connectedId !== speakerId) {
             const existingData = this.activeSpeakers.get(connectedId);
@@ -754,7 +837,14 @@ export class MusicPlayerManager {
               console.log(
                 `🔌 Syncing music to connected speaker: ${connectedId}`
               );
-              this.startSpeakerMusic(connectedId, songName, serverTime, false);
+              // Pass the same serverTime and groupSyncTime for perfect sync
+              this.startSpeakerMusic(
+                connectedId,
+                songName,
+                serverTime,
+                false,
+                groupSyncTime
+              );
             }
           }
         });
@@ -794,7 +884,7 @@ export class MusicPlayerManager {
       }
       this.activeSpeakers.delete(speakerId);
 
-      console.log(`🔇 Stopped music on speaker ${speakerId}`);
+      console.log(`🔇 Stopped music on speaker ${speakerId.substring(0, 8)}`);
 
       // Remove visual indicator
       if (this.sceneManager.speakerConnectionManager) {
@@ -844,6 +934,7 @@ export class MusicPlayerManager {
    * @param {string} speakerId - ID of the speaker obstacle
    */
   openMusicPlayer(speakerId) {
+    console.log(`Opening music player for speaker ${speakerId}`);
     this.currentSpeaker = speakerId;
 
     // Show the music player modal
@@ -1049,6 +1140,34 @@ export class MusicPlayerManager {
   }
 
   /**
+   * Check if this speaker is the primary speaker in its connection group
+   * Used to determine which speaker should trigger auto-play
+   */
+  isPrimarySpeakerInGroup(speakerId) {
+    if (!this.sceneManager.speakerConnectionManager) {
+      return true; // No connection manager, treat as primary
+    }
+
+    // Get all speakers in this group
+    const connectedSpeakers =
+      this.sceneManager.speakerConnectionManager.getConnectedSpeakers(
+        speakerId
+      );
+
+    // If alone, it's primary
+    if (connectedSpeakers.length === 1) {
+      return true;
+    }
+
+    // The primary is the one with the "smallest" ID (alphabetically first)
+    // This ensures consistent primary selection across all clients
+    const sortedSpeakers = [...connectedSpeakers].sort();
+    const primarySpeaker = sortedSpeakers[0];
+
+    return speakerId === primarySpeaker;
+  }
+
+  /**
    * Play next song in queue (auto-play)
    */
   playNextSong(speakerId) {
@@ -1066,7 +1185,11 @@ export class MusicPlayerManager {
     const nextIndex = (currentIndex + 1) % this.availableSongs.length;
     const nextSong = this.availableSongs[nextIndex];
 
-    console.log(`⏭️ Auto-playing next song: ${nextSong.name}`);
+    console.log(
+      `⏭️ Auto-playing next song on speaker ${speakerId.substring(0, 8)}: ${
+        nextSong.name
+      }`
+    );
     this.startSpeakerMusic(speakerId, nextSong.filename, Date.now(), true);
   }
 
