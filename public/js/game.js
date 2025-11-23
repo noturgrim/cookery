@@ -1003,10 +1003,24 @@ window.addEventListener("DOMContentLoaded", () => {
     game.petManager.forceHostControl();
   };
 
+  // Toggle pathfinding debug mode
+  window.togglePathDebug = () => {
+    if (!game.networkManager?.socket) {
+      console.log("❌ Not connected to server");
+      return;
+    }
+    
+    game.networkManager.socket.emit("togglePathDebug");
+    console.log("� Toggling pathfinding debug mode on server...");
+  };
+
   console.log(
-    "💡 Debug: Type checkCats() in console to check cat movement status"
+    "�💡 Debug: Type checkCats() in console to check cat movement status"
   );
   console.log(
     "💡 Debug: Type takeOverCats() to manually take control of cats"
+  );
+  console.log(
+    "💡 Debug: Type togglePathDebug() to see detailed pathfinding info"
   );
 });

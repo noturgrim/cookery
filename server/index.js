@@ -340,7 +340,8 @@ setInterval(async () => {
 const SERVER_TICK_RATE = 20; // Reduced from 30 to 20 updates per second for bandwidth
 const PLAYER_SPEED = 0.22; // Units per tick (increased from 0.15 for faster movement)
 const PLAYER_SIZE = { width: 0.6, height: 2, depth: 0.6 }; // Player AABB dimensions (smaller for better navigation)
-const GRID_SIZE = 0.4; // Grid cell size for pathfinding (smaller = more precise paths)
+const GRID_SIZE = 0.25; // Fine grid for precise obstacle avoidance
+const COARSE_GRID_SIZE = 0.5; // Coarse grid for long-distance pathfinding (faster)
 
 // Helper to get all connected speakers (recursively follows connections)
 const getConnectedSpeakers = (speakerId, connections) => {
@@ -538,6 +539,7 @@ class AStarPathfinder {
   constructor(obstacles, gridSize = GRID_SIZE) {
     this.obstacles = obstacles;
     this.gridSize = gridSize;
+    this.coarseGridSize = COARSE_GRID_SIZE;
     // Store player size for pathfinding (use default, will be updated per-player if needed)
     this.playerSize = { ...PLAYER_SIZE };
   }
@@ -557,10 +559,49 @@ class AStarPathfinder {
     return Math.sqrt(dx * dx + dz * dz);
   }
 
+  // Determine optimal grid size based on distance and nearby obstacles
+  getAdaptiveGridSize(start, goal) {
+    const distance = this.heuristic(start, goal);
+    
+    // For very short distances (< 5 units), always use fine grid
+    if (distance < 5) {
+      return this.gridSize;
+    }
+    
+    // For medium distances (5-15 units), check if there are nearby obstacles
+    if (distance < 15) {
+      // Quick check for obstacles in the general path area
+      const hasNearbyObstacles = this.checkObstaclesInPath(start, goal, 3);
+      return hasNearbyObstacles ? this.gridSize : this.coarseGridSize;
+    }
+    
+    // For long distances (> 15 units), use coarse grid for speed
+    return this.coarseGridSize;
+  }
+
+  // Quick check if there are obstacles in the general path area
+  checkObstaclesInPath(start, goal, checkRadius) {
+    const midX = (start.x + goal.x) / 2;
+    const midZ = (start.z + goal.z) / 2;
+    
+    for (const obstacle of this.obstacles) {
+      if (obstacle.isPassthrough) continue;
+      
+      const dx = obstacle.x - midX;
+      const dz = obstacle.z - midZ;
+      const distanceToPath = Math.sqrt(dx * dx + dz * dz);
+      
+      if (distanceToPath < checkRadius) {
+        return true;
+      }
+    }
+    return false;
+  }
+
   // Calculate penalty for being near obstacles
   getObstacleProximityPenalty(pos) {
     let penalty = 0;
-    const penaltyRadius = this.gridSize * 3; // Check 3 grid cells around (increased range)
+    const penaltyRadius = this.gridSize * 4; // Check 4 grid cells around (wider detection)
 
     // Check obstacles
     for (const obstacle of this.obstacles) {
@@ -573,9 +614,9 @@ class AStarPathfinder {
 
       if (distance < penaltyRadius) {
         // Closer to obstacle = much higher penalty
-        // Use quadratic falloff for stronger avoidance close to obstacles
+        // Use exponential falloff for even stronger avoidance
         const normalizedDist = 1 - distance / penaltyRadius;
-        penalty += normalizedDist * normalizedDist * 2.0; // Quadratic penalty, 2.0 strength
+        penalty += Math.pow(normalizedDist, 3) * 3.0; // Cubic penalty, 3.0 strength
       }
     }
 
@@ -587,15 +628,23 @@ class AStarPathfinder {
 
       if (distance < penaltyRadius) {
         const normalizedDist = 1 - distance / penaltyRadius;
-        penalty += normalizedDist * normalizedDist * 0.5; // Lighter for food
+        penalty += normalizedDist * normalizedDist * 0.8; // Slightly stronger for food
       }
     }
 
     return penalty;
   }
 
-  // Check if a grid position is walkable
+  // Check if a grid position is walkable (with caching)
   isWalkable(x, z) {
+    // Simple cache key based on grid position
+    const cacheKey = `${x.toFixed(2)},${z.toFixed(2)}`;
+    
+    // Check cache first (cache is reset when obstacles change)
+    if (this.walkableCache && this.walkableCache.has(cacheKey)) {
+      return this.walkableCache.get(cacheKey);
+    }
+
     // Check world bounds (use dynamic validation rules)
     if (
       Math.abs(x) > VALIDATION_RULES.WORLD_BOUNDS ||
@@ -622,6 +671,9 @@ class AStarPathfinder {
 
       const obstacleAABB = getObstacleAABB(obstacle);
       if (checkAABBCollision(testAABB, obstacleAABB)) {
+        // Cache the result
+        if (!this.walkableCache) this.walkableCache = new Map();
+        this.walkableCache.set(cacheKey, false);
         return false; // Not walkable
       }
     }
@@ -644,11 +696,25 @@ class AStarPathfinder {
       };
 
       if (checkAABBCollision(testAABB, foodAABB)) {
+        // Cache the result
+        if (!this.walkableCache) this.walkableCache = new Map();
+        this.walkableCache.set(cacheKey, false);
         return false; // Not walkable
       }
     }
 
+    // Cache the walkable result
+    if (!this.walkableCache) this.walkableCache = new Map();
+    this.walkableCache.set(cacheKey, true);
+
     return true; // Walkable
+  }
+
+  // Clear walkable cache (call when obstacles change)
+  clearCache() {
+    if (this.walkableCache) {
+      this.walkableCache.clear();
+    }
   }
 
   // Get neighbors of a node with intelligent pruning
@@ -711,6 +777,11 @@ class AStarPathfinder {
 
   // Find path from start to goal
   findPath(start, goal) {
+    // Determine optimal grid size based on distance
+    const adaptiveGridSize = this.getAdaptiveGridSize(start, goal);
+    const originalGridSize = this.gridSize;
+    this.gridSize = adaptiveGridSize; // Temporarily use adaptive grid
+    
     // Snap to grid
     start = {
       x: Math.round(start.x / this.gridSize) * this.gridSize,
@@ -721,6 +792,11 @@ class AStarPathfinder {
       z: Math.round(goal.z / this.gridSize) * this.gridSize,
     };
 
+    // Quick check: if we have direct line of sight, return straight path
+    if (this.hasLineOfSight(start, goal)) {
+      return [start, goal];
+    }
+
     // Check if start or goal is blocked
     if (!this.isWalkable(start.x, start.z)) {
       // Find nearest walkable position for start
@@ -730,6 +806,11 @@ class AStarPathfinder {
       // Find nearest walkable position for goal
       goal = this.findNearestWalkable(goal);
     }
+
+    // Calculate distance to determine iteration limit
+    const distance = this.heuristic(start, goal);
+    const estimatedCells = Math.ceil(distance / this.gridSize);
+    const MAX_ITERATIONS = Math.min(10000, estimatedCells * 50); // Dynamic limit based on distance
 
     // 🧹 MEMORY LEAK FIX: These are local variables that will be garbage collected
     // after the function completes, preventing memory buildup
@@ -744,23 +825,30 @@ class AStarPathfinder {
     fScore.set(key(start), this.heuristic(start, goal));
 
     let iterations = 0;
-    const MAX_ITERATIONS = 5000; // Increased iterations for smaller grid
 
     while (openSet.length > 0 && iterations < MAX_ITERATIONS) {
       iterations++;
 
-      // Get node with lowest fScore
-      openSet.sort((a, b) => fScore.get(key(a)) - fScore.get(key(b)));
-      const current = openSet.shift();
+      // Get node with lowest fScore (optimized: find min instead of sorting)
+      let minIndex = 0;
+      let minScore = fScore.get(key(openSet[0]));
+      for (let i = 1; i < openSet.length; i++) {
+        const score = fScore.get(key(openSet[i]));
+        if (score < minScore) {
+          minScore = score;
+          minIndex = i;
+        }
+      }
+      const current = openSet.splice(minIndex, 1)[0];
       const currentKey = key(current);
 
       // Add to closed set
       closedSet.add(currentKey);
 
-      // Check if we reached the goal (tighter tolerance for precision)
+      // Check if we reached the goal (adjusted tolerance for smaller grid)
       if (
-        Math.abs(current.x - goal.x) < this.gridSize * 2.0 &&
-        Math.abs(current.z - goal.z) < this.gridSize * 2.0
+        Math.abs(current.x - goal.x) < this.gridSize * 1.5 &&
+        Math.abs(current.z - goal.z) < this.gridSize * 1.5
       ) {
         // Reconstruct path
         const path = [goal];
@@ -776,6 +864,9 @@ class AStarPathfinder {
         fScore.clear();
         closedSet.clear();
         openSet.length = 0;
+
+        // Restore original grid size
+        this.gridSize = originalGridSize;
 
         // Simplify path (remove unnecessary waypoints)
         return this.simplifyPath(path);
@@ -794,7 +885,10 @@ class AStarPathfinder {
         }
 
         // Add obstacle proximity cost to the actual path cost (not just heuristic)
-        const proximityCost = this.getObstacleProximityPenalty(neighbor);
+        // Only calculate every 3rd iteration to improve performance
+        const proximityCost = iterations % 3 === 0 
+          ? this.getObstacleProximityPenalty(neighbor) 
+          : 0;
         const tentativeGScore =
           gScore.get(currentKey) +
           neighborData.cost * this.gridSize +
@@ -819,7 +913,12 @@ class AStarPathfinder {
     }
 
     // No path found, return closest point we could reach
-    console.log(`⚠️ No complete path found after ${iterations} iterations`);
+    const distanceToGoal = this.heuristic(start, goal);
+    console.log(
+      `⚠️ Pathfinding incomplete after ${iterations} iterations - Distance to goal: ${distanceToGoal.toFixed(
+        2
+      )} units, Nodes explored: ${closedSet.size}`
+    );
 
     // Find the closest reachable position to the goal
     let closestNode = start;
@@ -851,6 +950,9 @@ class AStarPathfinder {
       closedSet.clear();
       openSet.length = 0;
 
+      // Restore original grid size
+      this.gridSize = originalGridSize;
+
       return this.simplifyPath(path);
     }
 
@@ -860,6 +962,9 @@ class AStarPathfinder {
     fScore.clear();
     closedSet.clear();
     openSet.length = 0;
+
+    // Restore original grid size
+    this.gridSize = originalGridSize;
 
     return [start]; // Just stay in place if no path at all
   }
@@ -1726,8 +1831,9 @@ io.on("connection", (socket) => {
         opacity: obstacle.opacity,
       });
 
-      // Recreate pathfinder with updated obstacles
+      // Recreate pathfinder with updated obstacles and clear cache
       pathfinder.obstacles = gameState.obstacles;
+      pathfinder.clearCache();
 
       console.log(
         `📦 Obstacle ${obstacle.id} moved to (${obstacle.x.toFixed(
@@ -1857,8 +1963,9 @@ io.on("connection", (socket) => {
         // Save to database (async but don't block)
         const saveSuccess = await saveObstacle(newObstacle);
 
-        // Recreate pathfinder with new obstacles
+        // Recreate pathfinder with new obstacles and clear cache
         pathfinder.obstacles = gameState.obstacles;
+        pathfinder.clearCache();
 
         // Broadcast to all OTHER clients (spawner already has it)
         socket.broadcast.emit("obstacleSpawned", newObstacle);
@@ -1923,8 +2030,9 @@ io.on("connection", (socket) => {
         // Delete from database
         await deleteObstacle(id);
 
-        // Recreate pathfinder
+        // Recreate pathfinder and clear cache
         pathfinder.obstacles = gameState.obstacles;
+        pathfinder.clearCache();
 
         // Broadcast to all OTHER clients (deleter already removed it)
         socket.broadcast.emit("obstacleDeleted", { id });
@@ -2227,10 +2335,32 @@ io.on("connection", (socket) => {
         z: coordsValidation.sanitized.z,
       };
 
+      if (player.debugPath) {
+        console.log(`\n🐛 PATHFINDING DEBUG for ${socket.id}:`);
+        console.log(`   Start: (${start.x.toFixed(2)}, ${start.z.toFixed(2)})`);
+        console.log(`   Goal: (${goal.x.toFixed(2)}, ${goal.z.toFixed(2)})`);
+        console.log(`   Distance: ${Math.sqrt((goal.x - start.x) ** 2 + (goal.z - start.z) ** 2).toFixed(2)} units`);
+        console.log(`   Grid size: ${pathfinder.gridSize}`);
+        console.log(`   Player size: ${player.width}x${player.height}x${player.depth}`);
+      }
+
       // If clicking on an obstacle, find the best interaction point
+      const originalGoal = { ...goal };
       goal = pathfinder.findInteractionPoint(goal);
 
+      if (player.debugPath && (goal.x !== originalGoal.x || goal.z !== originalGoal.z)) {
+        console.log(`   🎯 Adjusted goal for interaction: (${goal.x.toFixed(2)}, ${goal.z.toFixed(2)})`);
+      }
+
       const path = pathfinder.findPath(start, goal);
+
+      if (player.debugPath) {
+        console.log(`   ✅ Path found with ${path.length} waypoints`);
+        if (path.length > 0) {
+          console.log(`   📍 First waypoint: (${path[0].x.toFixed(2)}, ${path[0].z.toFixed(2)})`);
+          console.log(`   📍 Last waypoint: (${path[path.length - 1].x.toFixed(2)}, ${path[path.length - 1].z.toFixed(2)})`);
+        }
+      }
 
       player.path = path;
       player.moveTarget = goal;
@@ -3168,6 +3298,19 @@ io.on("connection", (socket) => {
     if (Math.random() < 0.05) {
       console.log(`🐱 Updated cat positions: ${cats.length} cats`);
     }
+  });
+
+  // Debug toggle for pathfinding
+  socket.on("togglePathDebug", () => {
+    if (!isAuthenticated) return;
+    
+    const player = gameState.players.get(socket.id);
+    if (!player) return;
+    
+    player.debugPath = !player.debugPath;
+    console.log(`🐛 Pathfinding debug ${player.debugPath ? 'ENABLED' : 'DISABLED'} for ${socket.id}`);
+    
+    io.to(socket.id).emit("pathDebugToggled", { enabled: player.debugPath });
   });
 
   socket.on("disconnect", () => {
