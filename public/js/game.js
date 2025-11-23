@@ -889,6 +889,20 @@ class Game {
           return;
         }
 
+        // Check for duplicate platform names
+        const allPlatforms = this.platformManager.getAllPlatforms();
+        const isDuplicate = allPlatforms.some(
+          (platform) => platform.name.toLowerCase() === name.toLowerCase()
+        );
+
+        if (isDuplicate) {
+          alert(
+            `A platform named "${name}" already exists!\nPlease choose a different name.`
+          );
+          nameInput.focus();
+          return;
+        }
+
         if (isNaN(size) || size < 20 || size > 200) {
           alert("Invalid size! Please enter a number between 20 and 200.");
           return;

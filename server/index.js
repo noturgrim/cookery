@@ -3452,6 +3452,17 @@ io.on("connection", (socket) => {
           return;
         }
 
+        // Check for duplicate platform name (case-insensitive)
+        const duplicateName = gameState.platforms.find(
+          (platform) => platform.name.toLowerCase() === data.name.toLowerCase()
+        );
+        if (duplicateName) {
+          socket.emit("platformError", {
+            error: `A platform named "${data.name}" already exists. Please choose a different name.`,
+          });
+          return;
+        }
+
         if (typeof data.x !== "number" || typeof data.z !== "number") {
           socket.emit("platformError", { error: "Invalid platform position" });
           return;
