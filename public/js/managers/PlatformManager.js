@@ -196,16 +196,22 @@ export class PlatformManager {
       ).toFixed(1)}°`
     );
 
-    // Create bridge geometry (make it taller and wider for visibility)
-    const geometry = new THREE.BoxGeometry(length, 0.5, bridgeData.width * 1.5);
+    // Create flat pathway geometry
+    const pathwayWidth = Math.max(bridgeData.width * 1.8, 3);
+    const geometry = new THREE.PlaneGeometry(length, pathwayWidth);
+    geometry.rotateX(-Math.PI / 2); // Lay flat on ground before rotation
 
-    // Create material (much brighter color for high visibility)
+    // Load pathway texture
+    const texture = this.textureLoader.load("/floor/floor3.jpg");
+    texture.wrapS = THREE.RepeatWrapping;
+    texture.wrapT = THREE.RepeatWrapping;
+    texture.repeat.set(Math.max(length / 5, 1), Math.max(pathwayWidth / 3, 1));
+
     const material = new THREE.MeshStandardMaterial({
-      color: 0xd4a574, // Bright tan/beige color
-      roughness: 0.7,
-      metalness: 0.3,
-      emissive: 0x3a2817, // Slight glow
-      emissiveIntensity: 0.2,
+      map: texture,
+      roughness: 0.6,
+      metalness: 0.05,
+      side: THREE.DoubleSide,
     });
 
     // Create mesh
@@ -213,38 +219,10 @@ export class PlatformManager {
     mesh.rotation.y = angle;
     mesh.position.set(
       (bridgeData.startX + bridgeData.endX) / 2,
-      bridgeData.startY + 0.25, // More elevated
+      bridgeData.startY + 0.05,
       (bridgeData.startZ + bridgeData.endZ) / 2
     );
-
-    // Add thick black edge lines for maximum visibility
-    const edges = new THREE.EdgesGeometry(geometry);
-    const lineMaterial = new THREE.LineBasicMaterial({
-      color: 0x000000,
-      linewidth: 3,
-    });
-    const line = new THREE.LineSegments(edges, lineMaterial);
-    mesh.add(line);
-
-    // Add railings on both sides for extra visibility
-    const railingHeight = 0.8;
-    const railingGeometry = new THREE.BoxGeometry(length, railingHeight, 0.1);
-    const railingMaterial = new THREE.MeshStandardMaterial({
-      color: 0x8b6f47,
-      roughness: 0.8,
-    });
-
-    // Left railing
-    const leftRailing = new THREE.Mesh(railingGeometry, railingMaterial);
-    leftRailing.position.set(0, railingHeight / 2, bridgeData.width * 0.75);
-    mesh.add(leftRailing);
-
-    // Right railing
-    const rightRailing = new THREE.Mesh(railingGeometry, railingMaterial);
-    rightRailing.position.set(0, railingHeight / 2, -bridgeData.width * 0.75);
-    mesh.add(rightRailing);
     mesh.receiveShadow = true;
-    mesh.castShadow = true;
 
     // Mark as passthrough (walkable)
     mesh.userData.isPassthrough = true;
