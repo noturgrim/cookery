@@ -689,6 +689,15 @@ export class NetworkManager {
     });
 
     // Handle bridge deleted
+    this.socket.on("bridgeDeleted", (data) => {
+      if (window.game && window.game.platformManager) {
+        window.game.platformManager.deleteBridge(data.bridgeId);
+        console.log(`🗑️ Bridge ${data.bridgeId} deleted`);
+        window.game.refreshAdminPlatformLists?.();
+      }
+    });
+
+    // Handle bridge deleted
 
     // Handle platform errors
     this.socket.on("platformError", (data) => {

@@ -3887,6 +3887,17 @@ io.on("connection", (socket) => {
           io.emit("bridgeDeleted", { bridgeId: bridge.id });
         }
 
+        if (
+          platform.isMain ||
+          platform.id === "platform_main" ||
+          platform.owner === "system"
+        ) {
+          socket.emit("platformError", {
+            error: "Main platform cannot be deleted",
+          });
+          return;
+        }
+
         // Delete platform
         await deletePlatform(platformId);
         gameState.platforms = gameState.platforms.filter(
