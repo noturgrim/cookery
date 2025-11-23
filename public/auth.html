@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>LifeVerse - Login</title>
-    <link rel="stylesheet" href="/css/tailwind.css" />
+    <link rel="stylesheet" href="/css/auth.css?v=1" />
     <link
       href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
       rel="stylesheet"
@@ -12,33 +12,38 @@
 
     <!-- Mobile Detection Script -->
     <script>
-      (function() {
+      (function () {
         function isMobileDevice() {
-          const userAgent = navigator.userAgent || navigator.vendor || window.opera;
-          
+          const userAgent =
+            navigator.userAgent || navigator.vendor || window.opera;
+
           // Check for mobile devices
           if (/android/i.test(userAgent)) return true;
-          if (/iPad|iPhone|iPod/.test(userAgent) && !window.MSStream) return true;
+          if (/iPad|iPhone|iPod/.test(userAgent) && !window.MSStream)
+            return true;
           if (/windows phone/i.test(userAgent)) return true;
-          
+
           // Check for small screens (tablets and mobile)
           if (window.innerWidth <= 1024) return true;
-          
+
           // Check for touch-only devices
-          if ('ontouchstart' in window && window.innerWidth <= 1024) return true;
-          
+          if ("ontouchstart" in window && window.innerWidth <= 1024)
+            return true;
+
           return false;
         }
 
         if (isMobileDevice()) {
           // Prevent page load and show mobile warning
-          document.addEventListener('DOMContentLoaded', function() {
-            document.body.innerHTML = '';
-            document.body.style.cssText = 'margin: 0; padding: 0; font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #0f0f0f; display: flex; align-items: center; justify-content: center; min-height: 100vh;';
-            
-            const container = document.createElement('div');
-            container.style.cssText = 'max-width: 480px; margin: 20px; padding: 48px 40px; background: #1a1a1a; border-radius: 12px; border: 1px solid #2a2a2a; box-shadow: 0 8px 32px rgba(0,0,0,0.4);';
-            
+          document.addEventListener("DOMContentLoaded", function () {
+            document.body.innerHTML = "";
+            document.body.style.cssText =
+              'margin: 0; padding: 0; font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #0f0f0f; display: flex; align-items: center; justify-content: center; min-height: 100vh;';
+
+            const container = document.createElement("div");
+            container.style.cssText =
+              "max-width: 480px; margin: 20px; padding: 48px 40px; background: #1a1a1a; border-radius: 12px; border: 1px solid #2a2a2a; box-shadow: 0 8px 32px rgba(0,0,0,0.4);";
+
             container.innerHTML = `
               <div style="display: flex; justify-content: center; margin-bottom: 32px;">
                 <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="#888" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
@@ -85,337 +90,135 @@
                 Please switch to a desktop device to continue
               </p>
             `;
-            
+
             document.body.appendChild(container);
           });
         }
       })();
     </script>
-
-    <style>
-      body {
-        font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI",
-          Roboto, sans-serif;
-      }
-
-      @keyframes spin {
-        to {
-          transform: rotate(360deg);
-        }
-      }
-
-      .animate-spin {
-        animation: spin 0.6s linear infinite;
-      }
-
-      @keyframes shake {
-        0%,
-        100% {
-          transform: translateX(0);
-        }
-        25% {
-          transform: translateX(-5px);
-        }
-        75% {
-          transform: translateX(5px);
-        }
-      }
-
-      .shake {
-        animation: shake 0.4s ease-in-out;
-      }
-
-      /* GPU-accelerated animations - high performance */
-      @keyframes fadeIn {
-        from {
-          opacity: 0;
-          transform: translateY(10px);
-        }
-        to {
-          opacity: 1;
-          transform: translateY(0);
-        }
-      }
-
-      @keyframes subtleFloat {
-        0%,
-        100% {
-          transform: translateY(0);
-        }
-        50% {
-          transform: translateY(-6px);
-        }
-      }
-
-      @keyframes shimmer {
-        0% {
-          background-position: -200% center;
-        }
-        100% {
-          background-position: 200% center;
-        }
-      }
-
-      .auth-card {
-        animation: fadeIn 0.5s ease-out;
-        will-change: auto; /* Let browser decide */
-      }
-
-      .icon-float {
-        animation: subtleFloat 2.5s ease-in-out infinite;
-        will-change: transform;
-      }
-
-      .btn-shimmer {
-        background-size: 200% 100%;
-        position: relative;
-      }
-
-      .btn-shimmer::before {
-        content: "";
-        position: absolute;
-        top: 0;
-        left: -100%;
-        width: 100%;
-        height: 100%;
-        background: linear-gradient(
-          90deg,
-          transparent,
-          rgba(255, 255, 255, 0.15),
-          transparent
-        );
-        transition: left 0.5s ease;
-      }
-
-      .btn-shimmer:hover::before {
-        left: 100%;
-      }
-
-      /* Smooth input focus with transform instead of box-shadow */
-      .input-focus {
-        position: relative;
-      }
-
-      .input-focus::after {
-        content: "";
-        position: absolute;
-        top: -2px;
-        left: -2px;
-        right: -2px;
-        bottom: -2px;
-        border-radius: 0.5rem;
-        border: 2px solid rgb(192, 132, 252);
-        opacity: 0;
-        transition: opacity 0.2s ease;
-        pointer-events: none;
-      }
-
-      .input-focus:focus-within::after {
-        opacity: 1;
-      }
-    </style>
   </head>
-  <body
-    class="bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 min-h-screen flex items-center justify-center p-4"
-  >
+  <body class="auth-body">
     <!-- Auth Container -->
-    <div class="w-full max-w-sm">
+    <div class="auth-container">
       <!-- Card -->
-      <div
-        class="auth-card bg-slate-800 rounded-xl shadow-xl border-2 border-purple-500/60 overflow-hidden"
-      >
+      <div class="auth-card">
         <!-- Header -->
-        <div
-          class="bg-gradient-to-r from-purple-600 via-violet-600 to-purple-600 p-6 text-center relative overflow-hidden"
-        >
-          <div
-            class="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDAiIGhlaWdodD0iNDAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PGRlZnM+PHBhdHRlcm4gaWQ9ImdyaWQiIHdpZHRoPSI0MCIgaGVpZ2h0PSI0MCIgcGF0dGVyblVuaXRzPSJ1c2VyU3BhY2VPblVzZSI+PHBhdGggZD0iTSAwIDEwIEwgNDAgMTAgTSAxMCAwIEwgMTAgNDAgTSAwIDIwIEwgNDAgMjAgTSAyMCAwIEwgMjAgNDAgTSAwIDMwIEwgNDAgMzAgTSAzMCAwIEwgMzAgNDAiIGZpbGw9Im5vbmUiIHN0cm9rZT0icmdiYSgyNTUsMjU1LDI1NSwwLjAzKSIgc3Ryb2tlLXdpZHRoPSIxIi8+PC9wYXR0ZXJuPjwvZGVmcz48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSJ1cmwoI2dyaWQpIi8+PC9zdmc+')] opacity-30"
-          ></div>
-          <div class="icon-float text-5xl mb-2 relative">🏠</div>
-          <h1 class="text-2xl font-bold text-white relative tracking-tight">
-            <span class="inline-block">L</span
-            ><span class="inline-block">I</span
-            ><span class="inline-block">F</span
-            ><span class="inline-block">E</span
-            ><span class="inline-block">V</span
-            ><span class="inline-block">E</span
-            ><span class="inline-block">R</span
-            ><span class="inline-block">S</span
-            ><span class="inline-block">E</span>
-          </h1>
-          <div class="mt-2 flex items-center justify-center gap-2">
-            <span
-              class="px-2 py-0.5 bg-yellow-400 text-yellow-900 text-xs font-bold rounded"
-              >LVL 1</span
-            >
-            <span
-              class="px-2 py-0.5 bg-purple-900 text-purple-200 text-xs font-bold rounded border border-purple-400"
-              >LIFE SIM</span
-            >
-          </div>
+        <div class="auth-header">
+          <h1 class="auth-title">LifeVerse</h1>
+          <p class="auth-subtitle">Your Virtual Life Awaits</p>
         </div>
 
         <!-- Content -->
-        <div class="p-5 space-y-3">
+        <div class="auth-content">
           <!-- Messages -->
-          <div
-            id="error-message"
-            class="hidden bg-red-500/20 border-2 border-red-500/60 text-red-200 px-3 py-2 rounded-lg text-sm text-center font-medium"
-          ></div>
-          <div
-            id="success-message"
-            class="hidden bg-green-500/20 border-2 border-green-500/60 text-green-200 px-3 py-2 rounded-lg text-sm text-center font-medium"
-          ></div>
+          <div id="error-message" class="auth-message error hidden"></div>
+          <div id="success-message" class="auth-message success hidden"></div>
 
           <!-- Login Form -->
-          <form id="login-form" class="space-y-3">
-            <div>
-              <label
-                class="block text-purple-300 text-xs font-bold mb-1.5 uppercase tracking-wide"
-                for="login-username"
-              >
-                Player ID
-              </label>
+          <form id="login-form" class="auth-form">
+            <div class="form-group">
+              <label class="form-label" for="login-username"> Username </label>
               <input
                 type="text"
                 id="login-username"
-                class="w-full px-3 py-2.5 bg-slate-900/70 border-2 border-purple-500/40 rounded-lg text-white text-sm placeholder-slate-400 focus:border-purple-400 focus:outline-none transition-colors"
+                class="form-input"
                 placeholder="Enter your username"
                 required
                 autocomplete="username"
               />
             </div>
 
-            <div>
-              <label
-                class="block text-purple-300 text-xs font-bold mb-1.5 uppercase tracking-wide"
-                for="login-password"
-              >
-                Password
-              </label>
+            <div class="form-group">
+              <label class="form-label" for="login-password"> Password </label>
               <input
                 type="password"
                 id="login-password"
-                class="w-full px-3 py-2.5 bg-slate-900/70 border-2 border-purple-500/40 rounded-lg text-white text-sm placeholder-slate-400 focus:border-purple-400 focus:outline-none transition-colors"
+                class="form-input"
                 placeholder="Enter your password"
                 required
                 autocomplete="current-password"
               />
             </div>
 
-            <button
-              type="submit"
-              id="login-button"
-              class="btn-shimmer w-full py-3 px-4 bg-gradient-to-r from-purple-600 to-violet-600 hover:from-purple-500 hover:to-violet-500 text-white font-bold text-sm rounded-lg transition-colors shadow-lg border-2 border-purple-400/50 hover:border-purple-300 overflow-hidden"
-            >
-              START GAME
+            <button type="submit" id="login-button" class="auth-button">
+              <span class="auth-button-content">Enter Game</span>
             </button>
 
-            <div class="text-center pt-1 pb-2">
-              <span class="text-slate-400 text-xs">New player? </span>
-              <a
-                class="text-purple-400 hover:text-purple-300 font-bold text-xs cursor-pointer underline"
-                id="show-register"
-              >
-                Build your world
-              </a>
+            <div class="auth-footer">
+              <span class="auth-footer-text">New here? </span>
+              <a class="auth-link" id="show-register">Create Account</a>
             </div>
           </form>
 
           <!-- Register Form -->
-          <form id="register-form" class="space-y-3 hidden">
-            <div>
-              <label
-                class="block text-purple-300 text-xs font-bold mb-1.5 uppercase tracking-wide"
-                for="register-username"
-              >
-                Player ID
+          <form id="register-form" class="auth-form hidden">
+            <div class="form-group">
+              <label class="form-label" for="register-username">
+                Username
               </label>
               <input
                 type="text"
                 id="register-username"
-                class="w-full px-3 py-2.5 bg-slate-900/70 border-2 border-purple-500/40 rounded-lg text-white text-sm placeholder-slate-400 focus:border-purple-400 focus:outline-none transition-colors"
-                placeholder="Choose your username"
+                class="form-input"
+                placeholder="Choose a username"
                 required
                 autocomplete="username"
                 minlength="3"
                 maxlength="50"
               />
-              <p class="text-slate-500 text-xs mt-1">
-                3-50 chars • letters, numbers, - and _
-              </p>
             </div>
 
-            <div>
-              <label
-                class="block text-purple-300 text-xs font-bold mb-1.5 uppercase tracking-wide"
-                for="register-display-name"
-              >
+            <div class="form-group">
+              <label class="form-label" for="register-display-name">
                 Character Name
               </label>
               <input
                 type="text"
                 id="register-display-name"
-                class="w-full px-3 py-2.5 bg-slate-900/70 border-2 border-purple-500/40 rounded-lg text-white text-sm placeholder-slate-400 focus:border-purple-400 focus:outline-none transition-colors"
-                placeholder="Your character's name"
+                class="form-input"
+                placeholder="Enter your display name"
                 required
                 maxlength="50"
               />
             </div>
 
-            <div>
-              <label
-                class="block text-purple-300 text-xs font-bold mb-1.5 uppercase tracking-wide"
-                for="register-password"
-              >
+            <div class="form-group">
+              <label class="form-label" for="register-password">
                 Password
               </label>
               <input
                 type="password"
                 id="register-password"
-                class="w-full px-3 py-2.5 bg-slate-900/70 border-2 border-purple-500/40 rounded-lg text-white text-sm placeholder-slate-400 focus:border-purple-400 focus:outline-none transition-colors"
-                placeholder="Create a password"
+                class="form-input"
+                placeholder="Minimum 6 characters"
                 required
                 autocomplete="new-password"
                 minlength="6"
               />
-              <p class="text-slate-500 text-xs mt-1">Min 6 characters</p>
             </div>
 
-            <div>
-              <label
-                class="block text-purple-300 text-xs font-bold mb-1.5 uppercase tracking-wide"
-                for="register-password-confirm"
-              >
+            <div class="form-group">
+              <label class="form-label" for="register-password-confirm">
                 Confirm Password
               </label>
               <input
                 type="password"
                 id="register-password-confirm"
-                class="w-full px-3 py-2.5 bg-slate-900/70 border-2 border-purple-500/40 rounded-lg text-white text-sm placeholder-slate-400 focus:border-purple-400 focus:outline-none transition-colors"
-                placeholder="Confirm your password"
+                class="form-input"
+                placeholder="Re-enter your password"
                 required
                 autocomplete="new-password"
                 minlength="6"
               />
             </div>
 
-            <button
-              type="submit"
-              id="register-button"
-              class="btn-shimmer w-full py-3 px-4 bg-gradient-to-r from-purple-600 to-violet-600 hover:from-purple-500 hover:to-violet-500 text-white font-bold text-sm rounded-lg transition-colors shadow-lg border-2 border-purple-400/50 hover:border-purple-300 overflow-hidden"
-            >
-              CREATE CHARACTER
+            <button type="submit" id="register-button" class="auth-button">
+              <span class="auth-button-content">Create Account</span>
             </button>
 
-            <div class="text-center pt-1 pb-2">
-              <span class="text-slate-400 text-xs">Already playing? </span>
-              <a
-                class="text-purple-400 hover:text-purple-300 font-bold text-xs cursor-pointer underline"
-                id="show-login"
-              >
-                Enter your world
-              </a>
+            <div class="auth-footer">
+              <span class="auth-footer-text">Have an account? </span>
+              <a class="auth-link" id="show-login">Sign In</a>
             </div>
           </form>
         </div>
@@ -471,7 +274,7 @@
 
         loginButton.disabled = true;
         loginButton.innerHTML =
-          '<span class="flex items-center justify-center">Loading<span class="ml-2 w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></span></span>';
+          '<span class="auth-button-content">Loading<span class="spinner"></span></span>';
 
         try {
           const response = await fetch("/api/auth/login", {
@@ -494,12 +297,14 @@
           } else {
             showError(data.error || "Login failed");
             loginButton.disabled = false;
-            loginButton.textContent = "START GAME";
+            loginButton.innerHTML =
+              '<span class="auth-button-content">Enter Game</span>';
           }
         } catch (error) {
           showError("Connection error. Please try again.");
           loginButton.disabled = false;
-          loginButton.textContent = "START GAME";
+          loginButton.innerHTML =
+            '<span class="auth-button-content">Enter Game</span>';
         }
       });
 
@@ -528,7 +333,7 @@
 
         registerButton.disabled = true;
         registerButton.innerHTML =
-          '<span class="flex items-center justify-center">Creating<span class="ml-2 w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></span></span>';
+          '<span class="auth-button-content">Creating<span class="spinner"></span></span>';
 
         try {
           const response = await fetch("/api/auth/register", {
@@ -556,12 +361,14 @@
           } else {
             showError(data.error || "Registration failed");
             registerButton.disabled = false;
-            registerButton.textContent = "CREATE CHARACTER";
+            registerButton.innerHTML =
+              '<span class="auth-button-content">Create Account</span>';
           }
         } catch (error) {
           showError("Connection error. Please try again.");
           registerButton.disabled = false;
-          registerButton.textContent = "CREATE CHARACTER";
+          registerButton.innerHTML =
+            '<span class="auth-button-content">Create Account</span>';
         }
       });
 
