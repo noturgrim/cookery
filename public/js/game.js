@@ -92,8 +92,19 @@ class Game {
     document.getElementById("welcome-modal").classList.add("hidden");
     this.init();
 
-    document.getElementById("settings-btn").addEventListener("click", () => {
+    const settingsBtn = document.getElementById("settings-btn");
+    settingsBtn.addEventListener("click", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
       this.showSettings();
+    });
+
+    // Prevent mouse events from propagating through settings button
+    settingsBtn.addEventListener("mousedown", (e) => {
+      e.stopPropagation();
+    });
+    settingsBtn.addEventListener("mouseup", (e) => {
+      e.stopPropagation();
     });
   }
 
@@ -1009,7 +1020,7 @@ window.addEventListener("DOMContentLoaded", () => {
       console.log("❌ Not connected to server");
       return;
     }
-    
+
     game.networkManager.socket.emit("togglePathDebug");
     console.log("� Toggling pathfinding debug mode on server...");
   };
@@ -1017,9 +1028,7 @@ window.addEventListener("DOMContentLoaded", () => {
   console.log(
     "�💡 Debug: Type checkCats() in console to check cat movement status"
   );
-  console.log(
-    "💡 Debug: Type takeOverCats() to manually take control of cats"
-  );
+  console.log("💡 Debug: Type takeOverCats() to manually take control of cats");
   console.log(
     "💡 Debug: Type togglePathDebug() to see detailed pathfinding info"
   );

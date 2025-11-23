@@ -1,7 +1,7 @@
 /* Settings Menu - iOS Style */
 
 /* Overlay */
-#settings-menu {
+#settings-modal {
   position: fixed;
   inset: 0;
   background: rgba(0, 0, 0, 0.75);
@@ -14,7 +14,7 @@
   animation: fadeIn 0.2s ease-out;
 }
 
-#settings-menu.active {
+#settings-modal.active {
   display: flex !important;
 }
 
@@ -338,39 +338,81 @@
   transform: translateY(0);
 }
 
-/* Save Button */
+/* Action Buttons Container */
+.settings-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.625rem;
+  padding: 1rem 1.25rem 1.25rem;
+  background: #000000;
+}
+
+/* Save & Logout Buttons */
 .settings-save {
-  margin: 1.25rem;
-  padding: 0.875rem 1.25rem;
-  background: linear-gradient(135deg, #007aff 0%, #0051d5 100%);
+  padding: 0.625rem 1rem;
+  background: #007aff;
   border: none;
-  border-radius: 0.75rem;
+  border-radius: 0.625rem;
   color: #ffffff;
-  font-size: 1rem;
+  font-size: 0.9375rem;
   font-weight: 600;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: all 0.15s ease;
   font-family: inherit;
-  box-shadow: 0 4px 12px rgba(0, 122, 255, 0.3);
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 0.5rem;
+  user-select: none;
 }
 
 .settings-save:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 6px 20px rgba(0, 122, 255, 0.4);
+  background: #0051d5;
+  transform: scale(0.98);
 }
 
 .settings-save:active {
-  transform: translateY(0);
-  box-shadow: 0 2px 8px rgba(0, 122, 255, 0.3);
+  transform: scale(0.95);
+  opacity: 0.8;
 }
 
 .settings-save svg {
-  width: 1.125rem;
-  height: 1.125rem;
+  width: 1rem;
+  height: 1rem;
+}
+
+/* Logout Button Variant */
+.settings-logout {
+  background: #ff3b30;
+  padding: 0.625rem 1rem;
+  border: none;
+  border-radius: 0.625rem;
+  color: #ffffff;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  font-family: inherit;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  user-select: none;
+}
+
+.settings-logout:hover {
+  background: #dc2626;
+  transform: scale(0.98);
+}
+
+.settings-logout:active {
+  transform: scale(0.95);
+  opacity: 0.8;
+}
+
+.settings-logout svg {
+  width: 1rem;
+  height: 1rem;
 }
 
 /* Responsive */

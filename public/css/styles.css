@@ -143,8 +143,8 @@
   height: 50px;
   background: linear-gradient(
     135deg,
-    rgba(0, 0, 0, 0.9),
-    rgba(30, 30, 30, 0.9)
+    rgba(0, 0, 0, 0.95),
+    rgba(30, 30, 30, 0.95)
   );
   border: 1px solid rgba(147, 51, 234, 0.3);
   border-radius: 12px;
@@ -155,7 +155,9 @@
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   backdrop-filter: blur(16px);
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
-  z-index: 101;
+  z-index: 150;
+  pointer-events: auto;
+  user-select: none;
 }
 
 #settings-btn:hover {
