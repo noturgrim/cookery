@@ -25,6 +25,7 @@ Thumbs.db
 # Build outputs
 dist/
 build/
+public/css/tailwind.css
 
 # Testing
 coverage/

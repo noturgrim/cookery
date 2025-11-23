@@ -30,13 +30,27 @@ A browser-based multiplayer cooking game inspired by Overcooked, built with Thre
 npm install
 ```
 
-### 2. Run the Server
+### 2. Build CSS (First Time Setup)
+
+```bash
+npm run build:css
+```
+
+This compiles Tailwind CSS for production. During development, you can use:
+
+```bash
+npm run watch:css
+```
+
+This will watch for changes and rebuild automatically.
+
+### 3. Run the Server
 
 ```bash
 npm run dev
 ```
 
-### 3. Open in Browser
+### 4. Open in Browser
 
 Navigate to `http://localhost:3000`
 
