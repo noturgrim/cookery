@@ -527,7 +527,12 @@ export class PlatformManager {
     this.isDrawingBridge = true;
     this.bridgeWaypoints = [];
 
-    // DON'T auto-add starting waypoint - let user click start point!
+    // Show bridge drawing overlay
+    const overlay = document.getElementById("bridge-drawing-overlay");
+    if (overlay) {
+      overlay.style.display = "block";
+    }
+
     console.log("🎨 Bridge drawing mode started");
     console.log("   1️⃣ Click on NEW platform edge to set START point");
     console.log("   2️⃣ Click waypoints to create path");
@@ -651,7 +656,7 @@ export class PlatformManager {
     // Hide bridge drawing overlay
     const overlay = document.getElementById("bridge-drawing-overlay");
     if (overlay) {
-      overlay.classList.add("hidden");
+      overlay.style.display = "none";
     }
 
     // Remove waypoint markers

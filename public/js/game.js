@@ -853,8 +853,7 @@ class Game {
         sizeInput.value = "40";
 
         // Show modal
-        modal.classList.remove("hidden");
-        modal.classList.add("flex");
+        modal.style.display = "flex";
 
         // Focus on name input
         setTimeout(() => nameInput.focus(), 100);
@@ -862,8 +861,7 @@ class Game {
 
       // Cancel button
       cancelBtn.addEventListener("click", () => {
-        modal.classList.add("hidden");
-        modal.classList.remove("flex");
+        modal.style.display = "none";
       });
 
       // Confirm button
@@ -883,8 +881,7 @@ class Game {
         }
 
         // Hide modal
-        modal.classList.add("hidden");
-        modal.classList.remove("flex");
+        modal.style.display = "none";
 
         // Store name for later use
         this.platformName = name;
