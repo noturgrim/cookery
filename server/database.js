@@ -264,7 +264,8 @@ export async function initializeDatabase() {
       ALTER TABLE food_items 
       ADD COLUMN IF NOT EXISTS width FLOAT DEFAULT 1.0,
       ADD COLUMN IF NOT EXISTS height FLOAT DEFAULT 1.0,
-      ADD COLUMN IF NOT EXISTS depth FLOAT DEFAULT 1.0
+      ADD COLUMN IF NOT EXISTS depth FLOAT DEFAULT 1.0,
+      ADD COLUMN IF NOT EXISTS platform_id VARCHAR(255)
     `);
 
     // Add is_passthrough column to obstacles table if it doesn't exist
@@ -277,6 +278,12 @@ export async function initializeDatabase() {
     await pool.query(`
       ALTER TABLE obstacles 
       ADD COLUMN IF NOT EXISTS opacity FLOAT DEFAULT 1.0
+    `);
+
+    // Add platform_id column to obstacles table if it doesn't exist
+    await pool.query(`
+      ALTER TABLE obstacles 
+      ADD COLUMN IF NOT EXISTS platform_id VARCHAR(255)
     `);
 
     // Create world_time table (single row for global time state)
@@ -316,6 +323,165 @@ export async function initializeDatabase() {
       ON CONFLICT (id) DO NOTHING
     `);
 
+    // Create platforms table
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS platforms (
+        id VARCHAR(255) PRIMARY KEY,
+        owner_username VARCHAR(50) NOT NULL,
+        name VARCHAR(100) NOT NULL,
+        x FLOAT NOT NULL,
+        y FLOAT NOT NULL,
+        z FLOAT NOT NULL,
+        size INTEGER NOT NULL DEFAULT 40,
+        floor_texture VARCHAR(255) DEFAULT 'floor2.jpg',
+        is_main BOOLEAN DEFAULT false,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        CONSTRAINT platform_size_range CHECK (size >= 20 AND size <= 200)
+      )
+    `);
+
+    // Add missing columns to platforms table (comprehensive migration)
+    await pool.query(`
+      ALTER TABLE platforms 
+      ADD COLUMN IF NOT EXISTS owner_username VARCHAR(50) DEFAULT 'unknown',
+      ADD COLUMN IF NOT EXISTS name VARCHAR(100) DEFAULT 'Unnamed Platform',
+      ADD COLUMN IF NOT EXISTS size INTEGER DEFAULT 40,
+      ADD COLUMN IF NOT EXISTS floor_texture VARCHAR(255) DEFAULT 'floor2.jpg',
+      ADD COLUMN IF NOT EXISTS is_main BOOLEAN DEFAULT false,
+      ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    `);
+
+    // Remove the default constraints after adding columns
+    await pool.query(`
+      ALTER TABLE platforms 
+      ALTER COLUMN owner_username DROP DEFAULT,
+      ALTER COLUMN name DROP DEFAULT,
+      ALTER COLUMN size DROP DEFAULT
+    `);
+
+    // Update existing platforms with NULL/missing values
+    await pool.query(`
+      UPDATE platforms 
+      SET owner_username = 'system' 
+      WHERE owner_username IS NULL OR owner_username = 'unknown'
+    `);
+
+    await pool.query(`
+      UPDATE platforms 
+      SET name = 'Platform ' || id 
+      WHERE name IS NULL OR name = 'Unnamed Platform'
+    `);
+
+    await pool.query(`
+      UPDATE platforms 
+      SET size = 40 
+      WHERE size IS NULL OR size = 0
+    `);
+
+    // Create bridges table (auto-generated walkways between platforms)
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS bridges (
+        id VARCHAR(255) PRIMARY KEY,
+        platform1_id VARCHAR(255) NOT NULL,
+        platform2_id VARCHAR(255) NOT NULL,
+        start_x FLOAT NOT NULL,
+        start_y FLOAT NOT NULL,
+        start_z FLOAT NOT NULL,
+        end_x FLOAT NOT NULL,
+        end_y FLOAT NOT NULL,
+        end_z FLOAT NOT NULL,
+        width FLOAT DEFAULT 2.0,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        CONSTRAINT fk_platform1 FOREIGN KEY (platform1_id) REFERENCES platforms(id) ON DELETE CASCADE,
+        CONSTRAINT fk_platform2 FOREIGN KEY (platform2_id) REFERENCES platforms(id) ON DELETE CASCADE,
+        CONSTRAINT unique_bridge UNIQUE(platform1_id, platform2_id)
+      )
+    `);
+
+    // Create platform_permissions table
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS platform_permissions (
+        id SERIAL PRIMARY KEY,
+        platform_id VARCHAR(255) NOT NULL,
+        username VARCHAR(50) NOT NULL,
+        permission VARCHAR(20) NOT NULL DEFAULT 'view',
+        granted_by VARCHAR(50) NOT NULL,
+        granted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        CONSTRAINT fk_platform FOREIGN KEY (platform_id) REFERENCES platforms(id) ON DELETE CASCADE,
+        CONSTRAINT unique_platform_user UNIQUE(platform_id, username),
+        CONSTRAINT valid_permission CHECK (permission IN ('view', 'edit', 'admin'))
+      )
+    `);
+
+    // Add platform_id column to obstacles table if not exists
+    await pool.query(`
+      ALTER TABLE obstacles 
+      ADD COLUMN IF NOT EXISTS platform_id VARCHAR(255)
+    `);
+
+    // Add platform_id column to food_items table if not exists
+    await pool.query(`
+      ALTER TABLE food_items 
+      ADD COLUMN IF NOT EXISTS platform_id VARCHAR(255)
+    `);
+
+    // Insert default main platform if not exists (safe operation - ignore if exists or fails)
+    try {
+      await pool.query(`
+        INSERT INTO platforms (id, owner_username, name, x, y, z, size, is_main)
+        VALUES ('platform_main', 'system', 'Main Platform', 0, 0, 0, 40, true)
+        ON CONFLICT (id) DO NOTHING
+      `);
+    } catch (insertError) {
+      // Platform already exists or columns don't match - this is OK
+      console.log(
+        "ℹ️ Main platform already exists or column structure differs (this is normal)"
+      );
+    }
+
+    // Update main platform size to match world_settings if they differ (safe operation)
+    try {
+      const worldSettings = await pool.query(
+        `SELECT platform_size FROM world_settings WHERE id = 1`
+      );
+      if (worldSettings.rows.length > 0) {
+        const currentSize = worldSettings.rows[0].platform_size;
+        await pool.query(
+          `UPDATE platforms 
+           SET size = $1 
+           WHERE id = 'platform_main' AND size != $1`,
+          [currentSize]
+        );
+      }
+    } catch (updateError) {
+      // Update failed - this is OK, existing platforms will keep their size
+      console.log(
+        "ℹ️ Could not sync main platform size (this is normal for existing platforms)"
+      );
+    }
+
+    // Create indexes for better performance (after tables and data exist)
+    try {
+      await pool.query(`
+        CREATE INDEX IF NOT EXISTS idx_platforms_owner ON platforms(owner_username)
+      `);
+      await pool.query(`
+        CREATE INDEX IF NOT EXISTS idx_obstacles_platform ON obstacles(platform_id)
+      `);
+      await pool.query(`
+        CREATE INDEX IF NOT EXISTS idx_food_platform ON food_items(platform_id)
+      `);
+      await pool.query(`
+        CREATE INDEX IF NOT EXISTS idx_permissions_platform ON platform_permissions(platform_id)
+      `);
+    } catch (indexError) {
+      console.warn(
+        "⚠️ Some indexes may already exist or failed to create:",
+        indexError.message
+      );
+    }
+
     console.log("✅ Database tables initialized");
     console.log("   - users table ready");
     console.log("   - sessions table ready");
@@ -323,6 +489,9 @@ export async function initializeDatabase() {
     console.log("   - food_items table ready");
     console.log("   - world_time table ready");
     console.log("   - world_settings table ready");
+    console.log("   - platforms table ready");
+    console.log("   - bridges table ready");
+    console.log("   - platform_permissions table ready");
   } catch (error) {
     console.error("❌ Error initializing database:", error);
   }
@@ -970,6 +1139,342 @@ export async function deleteSpeakerConnection(speaker1Id, speaker2Id) {
   } catch (error) {
     console.error("❌ Error deleting speaker connection:", error);
     return false;
+  }
+}
+
+/**
+ * Load all platforms
+ */
+export async function loadPlatforms() {
+  try {
+    const result = await pool.query(
+      "SELECT * FROM platforms ORDER BY created_at"
+    );
+    return result.rows.map((row) => ({
+      id: row.id,
+      owner: row.owner_username,
+      name: row.name,
+      x: parseFloat(row.x),
+      y: parseFloat(row.y),
+      z: parseFloat(row.z),
+      size: parseInt(row.size),
+      floorTexture: row.floor_texture,
+      isMain: row.is_main,
+      createdAt: row.created_at,
+      updatedAt: row.updated_at,
+    }));
+  } catch (error) {
+    console.error("❌ Error loading platforms:", error);
+    return [];
+  }
+}
+
+/**
+ * Save or update a platform
+ */
+export async function savePlatform(platform) {
+  try {
+    // Validate data types
+    if (typeof platform.id !== "string" || platform.id.length === 0) {
+      throw new Error("Invalid platform ID");
+    }
+    if (typeof platform.owner !== "string" || platform.owner.length === 0) {
+      throw new Error("Invalid platform owner");
+    }
+    if (typeof platform.name !== "string" || platform.name.length === 0) {
+      throw new Error("Invalid platform name");
+    }
+
+    const result = await pool.query(
+      `INSERT INTO platforms (id, owner_username, name, x, y, z, size, floor_texture, is_main, updated_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, CURRENT_TIMESTAMP)
+       ON CONFLICT (id) 
+       DO UPDATE SET 
+         name = $3,
+         x = $4, 
+         y = $5, 
+         z = $6,
+         size = $7,
+         floor_texture = $8,
+         updated_at = CURRENT_TIMESTAMP
+       RETURNING id`,
+      [
+        platform.id,
+        platform.owner,
+        platform.name,
+        platform.x,
+        platform.y,
+        platform.z,
+        platform.size || 40,
+        platform.floorTexture || "floor2.jpg",
+        platform.isMain || false,
+      ]
+    );
+
+    if (result.rows.length > 0) {
+      console.log(`🏗️ Saved platform: ${platform.id} (${platform.name})`);
+      return true;
+    }
+    return false;
+  } catch (error) {
+    console.error(`❌ Error saving platform ${platform.id}:`, error.message);
+    return false;
+  }
+}
+
+/**
+ * Delete a platform
+ */
+export async function deletePlatform(id) {
+  try {
+    // Validate ID
+    if (typeof id !== "string" || id.length === 0) {
+      throw new Error("Invalid platform ID");
+    }
+
+    // Prevent deleting main platform
+    if (id === "platform_main") {
+      throw new Error("Cannot delete main platform");
+    }
+
+    await pool.query("DELETE FROM platforms WHERE id = $1", [id]);
+    console.log(`🗑️ Deleted platform: ${id}`);
+    return true;
+  } catch (error) {
+    console.error("❌ Error deleting platform:", error);
+    return false;
+  }
+}
+
+/**
+ * Get platform by ID
+ */
+export async function getPlatform(id) {
+  try {
+    const result = await pool.query("SELECT * FROM platforms WHERE id = $1", [
+      id,
+    ]);
+    if (result.rows.length > 0) {
+      const row = result.rows[0];
+      return {
+        id: row.id,
+        owner: row.owner_username,
+        name: row.name,
+        x: parseFloat(row.x),
+        y: parseFloat(row.y),
+        z: parseFloat(row.z),
+        size: parseInt(row.size),
+        floorTexture: row.floor_texture,
+        isMain: row.is_main,
+        createdAt: row.created_at,
+        updatedAt: row.updated_at,
+      };
+    }
+    return null;
+  } catch (error) {
+    console.error("❌ Error getting platform:", error);
+    return null;
+  }
+}
+
+/**
+ * Load all bridges
+ */
+export async function loadBridges() {
+  try {
+    const result = await pool.query(
+      "SELECT * FROM bridges ORDER BY created_at"
+    );
+    return result.rows.map((row) => ({
+      id: row.id,
+      platform1: row.platform1_id,
+      platform2: row.platform2_id,
+      startX: parseFloat(row.start_x),
+      startY: parseFloat(row.start_y),
+      startZ: parseFloat(row.start_z),
+      endX: parseFloat(row.end_x),
+      endY: parseFloat(row.end_y),
+      endZ: parseFloat(row.end_z),
+      width: parseFloat(row.width),
+      createdAt: row.created_at,
+    }));
+  } catch (error) {
+    console.error("❌ Error loading bridges:", error);
+    return [];
+  }
+}
+
+/**
+ * Save a bridge
+ */
+export async function saveBridge(bridge) {
+  try {
+    const result = await pool.query(
+      `INSERT INTO bridges (id, platform1_id, platform2_id, start_x, start_y, start_z, end_x, end_y, end_z, width)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+       ON CONFLICT (platform1_id, platform2_id) 
+       DO UPDATE SET 
+         start_x = $4,
+         start_y = $5,
+         start_z = $6,
+         end_x = $7,
+         end_y = $8,
+         end_z = $9,
+         width = $10
+       RETURNING id`,
+      [
+        bridge.id,
+        bridge.platform1,
+        bridge.platform2,
+        bridge.startX,
+        bridge.startY,
+        bridge.startZ,
+        bridge.endX,
+        bridge.endY,
+        bridge.endZ,
+        bridge.width || 2.0,
+      ]
+    );
+
+    if (result.rows.length > 0) {
+      console.log(`🌉 Saved bridge: ${bridge.id}`);
+      return true;
+    }
+    return false;
+  } catch (error) {
+    console.error(`❌ Error saving bridge ${bridge.id}:`, error.message);
+    return false;
+  }
+}
+
+/**
+ * Delete a bridge
+ */
+export async function deleteBridge(id) {
+  try {
+    await pool.query("DELETE FROM bridges WHERE id = $1", [id]);
+    console.log(`🗑️ Deleted bridge: ${id}`);
+    return true;
+  } catch (error) {
+    console.error("❌ Error deleting bridge:", error);
+    return false;
+  }
+}
+
+/**
+ * Load platform permissions
+ */
+export async function loadPlatformPermissions(platformId) {
+  try {
+    const result = await pool.query(
+      "SELECT * FROM platform_permissions WHERE platform_id = $1",
+      [platformId]
+    );
+    return result.rows.map((row) => ({
+      id: row.id,
+      platformId: row.platform_id,
+      username: row.username,
+      permission: row.permission,
+      grantedBy: row.granted_by,
+      grantedAt: row.granted_at,
+    }));
+  } catch (error) {
+    console.error("❌ Error loading platform permissions:", error);
+    return [];
+  }
+}
+
+/**
+ * Grant platform permission
+ */
+export async function grantPlatformPermission(
+  platformId,
+  username,
+  permission,
+  grantedBy
+) {
+  try {
+    const result = await pool.query(
+      `INSERT INTO platform_permissions (platform_id, username, permission, granted_by)
+       VALUES ($1, $2, $3, $4)
+       ON CONFLICT (platform_id, username) 
+       DO UPDATE SET 
+         permission = $3,
+         granted_by = $4,
+         granted_at = CURRENT_TIMESTAMP
+       RETURNING id`,
+      [platformId, username, permission, grantedBy]
+    );
+
+    if (result.rows.length > 0) {
+      console.log(
+        `🔑 Granted ${permission} permission to ${username} on ${platformId}`
+      );
+      return true;
+    }
+    return false;
+  } catch (error) {
+    console.error("❌ Error granting platform permission:", error.message);
+    return false;
+  }
+}
+
+/**
+ * Revoke platform permission
+ */
+export async function revokePlatformPermission(platformId, username) {
+  try {
+    await pool.query(
+      "DELETE FROM platform_permissions WHERE platform_id = $1 AND username = $2",
+      [platformId, username]
+    );
+    console.log(`🔑 Revoked permission for ${username} on ${platformId}`);
+    return true;
+  } catch (error) {
+    console.error("❌ Error revoking platform permission:", error);
+    return false;
+  }
+}
+
+/**
+ * Check if user has permission on platform
+ */
+export async function checkPlatformPermission(platformId, username) {
+  try {
+    // Get platform owner
+    const platformResult = await pool.query(
+      "SELECT owner_username FROM platforms WHERE id = $1",
+      [platformId]
+    );
+
+    if (platformResult.rows.length === 0) {
+      return { hasPermission: false, level: null };
+    }
+
+    const owner = platformResult.rows[0].owner_username;
+
+    // Owner has full access
+    if (owner === username) {
+      return { hasPermission: true, level: "owner" };
+    }
+
+    // Check permissions table
+    const permResult = await pool.query(
+      "SELECT permission FROM platform_permissions WHERE platform_id = $1 AND username = $2",
+      [platformId, username]
+    );
+
+    if (permResult.rows.length > 0) {
+      return {
+        hasPermission: true,
+        level: permResult.rows[0].permission,
+      };
+    }
+
+    return { hasPermission: false, level: null };
+  } catch (error) {
+    console.error("❌ Error checking platform permission:", error);
+    return { hasPermission: false, level: null };
   }
 }
 

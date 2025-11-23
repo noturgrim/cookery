@@ -261,6 +261,16 @@ export class NetworkManager {
         window.game.loadPets();
       }
 
+      // Initialize platforms and bridges
+      if (data.platforms && data.bridges) {
+        if (window.game && window.game.platformManager) {
+          window.game.platformManager.initialize(data.platforms, data.bridges);
+          console.log(
+            `🏗️ Loaded ${data.platforms.length} platforms and ${data.bridges.length} bridges from server`
+          );
+        }
+      }
+
       // Create all obstacles
       data.obstacles.forEach(async (obstacle) => {
         const obj = await this.sceneManager.createObstacle(obstacle);
@@ -627,6 +637,54 @@ export class NetworkManager {
         this.sceneManager.foodItems.delete(id);
         console.log(`🗑️ Food ${id} deleted by another player`);
       }
+    });
+
+    // ============================================
+    // PLATFORM SOCKET HANDLERS
+    // ============================================
+
+    // Handle platform created by other players
+    this.socket.on("platformCreated", (platformData) => {
+      if (window.game && window.game.platformManager) {
+        window.game.platformManager.createPlatform(platformData);
+        console.log(`🏗️ Platform ${platformData.id} created by another player`);
+      }
+    });
+
+    // Handle platform deleted by other players
+    this.socket.on("platformDeleted", (data) => {
+      if (window.game && window.game.platformManager) {
+        window.game.platformManager.deletePlatform(data.platformId);
+        console.log(`🗑️ Platform ${data.platformId} deleted by another player`);
+      }
+    });
+
+    // Handle bridge created
+    this.socket.on("bridgeCreated", (bridgeData) => {
+      if (window.game && window.game.platformManager) {
+        window.game.platformManager.createBridge(bridgeData);
+        console.log(`🌉 Bridge ${bridgeData.id} created`);
+      }
+    });
+
+    // Handle platform errors
+    this.socket.on("platformError", (data) => {
+      console.error(`❌ Platform error:`, data.error);
+      this.showError(data.error);
+    });
+
+    // Handle platform permission granted
+    this.socket.on("platformPermissionGranted", (data) => {
+      console.log(
+        `🔑 Permission granted: ${data.username} -> ${data.permission} on ${data.platformId}`
+      );
+    });
+
+    // Handle platform permission revoked
+    this.socket.on("platformPermissionRevoked", (data) => {
+      console.log(
+        `🔑 Permission revoked: ${data.username} from ${data.platformId}`
+      );
     });
 
     // Handle emote/voice from other players

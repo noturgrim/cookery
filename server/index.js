@@ -21,6 +21,17 @@ import pool, {
   loadSpeakerConnections,
   saveSpeakerConnection,
   deleteSpeakerConnection,
+  loadPlatforms,
+  savePlatform,
+  deletePlatform,
+  getPlatform,
+  loadBridges,
+  saveBridge,
+  deleteBridge,
+  loadPlatformPermissions,
+  grantPlatformPermission,
+  revokePlatformPermission,
+  checkPlatformPermission,
 } from "./database.js";
 import {
   registerUser,
@@ -315,6 +326,8 @@ const gameState = {
   obstacles: [], // Will be loaded from database
   foodItems: [], // Will be loaded from database
   cats: [], // Shared cat positions across all clients
+  platforms: [], // Will be loaded from database
+  bridges: [], // Will be loaded from database
 };
 
 // Rate limiter instance
@@ -365,6 +378,79 @@ const getConnectedSpeakers = (speakerId, connections) => {
 
   return Array.from(visited);
 };
+
+// ============================================
+// PLATFORM HELPER FUNCTIONS
+// ============================================
+
+/**
+ * Find nearest platform to a given platform
+ */
+const findNearestPlatform = (targetPlatform, allPlatforms) => {
+  let nearest = null;
+  let minDistance = Infinity;
+
+  for (const platform of allPlatforms) {
+    if (platform.id === targetPlatform.id) continue;
+
+    const distance = Math.sqrt(
+      Math.pow(platform.x - targetPlatform.x, 2) +
+        Math.pow(platform.z - targetPlatform.z, 2)
+    );
+
+    if (distance < minDistance) {
+      minDistance = distance;
+      nearest = platform;
+    }
+  }
+
+  return nearest;
+};
+
+/**
+ * Generate bridge between two platforms (edge-to-edge)
+ */
+const generateBridge = (platform1, platform2) => {
+  // Calculate edge points closest to each other
+  const halfSize1 = platform1.size / 2;
+  const halfSize2 = platform2.size / 2;
+
+  // Determine direction vector from platform1 to platform2
+  const dx = platform2.x - platform1.x;
+  const dz = platform2.z - platform1.z;
+  const distance = Math.sqrt(dx * dx + dz * dz);
+
+  // Normalize direction
+  const dirX = dx / distance;
+  const dirZ = dz / distance;
+
+  // Start point: edge of platform1 closest to platform2
+  const startX = platform1.x + dirX * halfSize1;
+  const startZ = platform1.z + dirZ * halfSize1;
+
+  // End point: edge of platform2 closest to platform1
+  const endX = platform2.x - dirX * halfSize2;
+  const endZ = platform2.z - dirZ * halfSize2;
+
+  const bridgeId = `bridge_${platform1.id}_${platform2.id}`;
+
+  return {
+    id: bridgeId,
+    platform1: platform1.id,
+    platform2: platform2.id,
+    startX: startX,
+    startY: 0,
+    startZ: startZ,
+    endX: endX,
+    endY: 0,
+    endZ: endZ,
+    width: 2.0,
+  };
+};
+
+// ============================================
+// COLLISION DETECTION
+// ============================================
 
 // AABB Collision Detection
 const checkAABBCollision = (box1, box2) => {
@@ -562,19 +648,19 @@ class AStarPathfinder {
   // Determine optimal grid size based on distance and nearby obstacles
   getAdaptiveGridSize(start, goal) {
     const distance = this.heuristic(start, goal);
-    
+
     // For very short distances (< 5 units), always use fine grid
     if (distance < 5) {
       return this.gridSize;
     }
-    
+
     // For medium distances (5-15 units), check if there are nearby obstacles
     if (distance < 15) {
       // Quick check for obstacles in the general path area
       const hasNearbyObstacles = this.checkObstaclesInPath(start, goal, 3);
       return hasNearbyObstacles ? this.gridSize : this.coarseGridSize;
     }
-    
+
     // For long distances (> 15 units), use coarse grid for speed
     return this.coarseGridSize;
   }
@@ -583,14 +669,14 @@ class AStarPathfinder {
   checkObstaclesInPath(start, goal, checkRadius) {
     const midX = (start.x + goal.x) / 2;
     const midZ = (start.z + goal.z) / 2;
-    
+
     for (const obstacle of this.obstacles) {
       if (obstacle.isPassthrough) continue;
-      
+
       const dx = obstacle.x - midX;
       const dz = obstacle.z - midZ;
       const distanceToPath = Math.sqrt(dx * dx + dz * dz);
-      
+
       if (distanceToPath < checkRadius) {
         return true;
       }
@@ -639,7 +725,7 @@ class AStarPathfinder {
   isWalkable(x, z) {
     // Simple cache key based on grid position
     const cacheKey = `${x.toFixed(2)},${z.toFixed(2)}`;
-    
+
     // Check cache first (cache is reset when obstacles change)
     if (this.walkableCache && this.walkableCache.has(cacheKey)) {
       return this.walkableCache.get(cacheKey);
@@ -781,7 +867,7 @@ class AStarPathfinder {
     const adaptiveGridSize = this.getAdaptiveGridSize(start, goal);
     const originalGridSize = this.gridSize;
     this.gridSize = adaptiveGridSize; // Temporarily use adaptive grid
-    
+
     // Snap to grid
     start = {
       x: Math.round(start.x / this.gridSize) * this.gridSize,
@@ -886,9 +972,8 @@ class AStarPathfinder {
 
         // Add obstacle proximity cost to the actual path cost (not just heuristic)
         // Only calculate every 3rd iteration to improve performance
-        const proximityCost = iterations % 3 === 0 
-          ? this.getObstacleProximityPenalty(neighbor) 
-          : 0;
+        const proximityCost =
+          iterations % 3 === 0 ? this.getObstacleProximityPenalty(neighbor) : 0;
         const tentativeGScore =
           gScore.get(currentKey) +
           neighborData.cost * this.gridSize +
@@ -1625,6 +1710,8 @@ io.on("connection", (socket) => {
         cats: gameState.cats, // Send cat positions
         obstacles: gameState.obstacles,
         foodItems: gameState.foodItems,
+        platforms: gameState.platforms, // Send all platforms
+        bridges: gameState.bridges, // Send all bridges
         worldTime: worldTime, // Send world time to new player
         worldSettings: worldSettings, // Send world settings to new player
       });
@@ -2339,17 +2426,30 @@ io.on("connection", (socket) => {
         console.log(`\n🐛 PATHFINDING DEBUG for ${socket.id}:`);
         console.log(`   Start: (${start.x.toFixed(2)}, ${start.z.toFixed(2)})`);
         console.log(`   Goal: (${goal.x.toFixed(2)}, ${goal.z.toFixed(2)})`);
-        console.log(`   Distance: ${Math.sqrt((goal.x - start.x) ** 2 + (goal.z - start.z) ** 2).toFixed(2)} units`);
+        console.log(
+          `   Distance: ${Math.sqrt(
+            (goal.x - start.x) ** 2 + (goal.z - start.z) ** 2
+          ).toFixed(2)} units`
+        );
         console.log(`   Grid size: ${pathfinder.gridSize}`);
-        console.log(`   Player size: ${player.width}x${player.height}x${player.depth}`);
+        console.log(
+          `   Player size: ${player.width}x${player.height}x${player.depth}`
+        );
       }
 
       // If clicking on an obstacle, find the best interaction point
       const originalGoal = { ...goal };
       goal = pathfinder.findInteractionPoint(goal);
 
-      if (player.debugPath && (goal.x !== originalGoal.x || goal.z !== originalGoal.z)) {
-        console.log(`   🎯 Adjusted goal for interaction: (${goal.x.toFixed(2)}, ${goal.z.toFixed(2)})`);
+      if (
+        player.debugPath &&
+        (goal.x !== originalGoal.x || goal.z !== originalGoal.z)
+      ) {
+        console.log(
+          `   🎯 Adjusted goal for interaction: (${goal.x.toFixed(
+            2
+          )}, ${goal.z.toFixed(2)})`
+        );
       }
 
       const path = pathfinder.findPath(start, goal);
@@ -2357,8 +2457,16 @@ io.on("connection", (socket) => {
       if (player.debugPath) {
         console.log(`   ✅ Path found with ${path.length} waypoints`);
         if (path.length > 0) {
-          console.log(`   📍 First waypoint: (${path[0].x.toFixed(2)}, ${path[0].z.toFixed(2)})`);
-          console.log(`   📍 Last waypoint: (${path[path.length - 1].x.toFixed(2)}, ${path[path.length - 1].z.toFixed(2)})`);
+          console.log(
+            `   📍 First waypoint: (${path[0].x.toFixed(
+              2
+            )}, ${path[0].z.toFixed(2)})`
+          );
+          console.log(
+            `   📍 Last waypoint: (${path[path.length - 1].x.toFixed(
+              2
+            )}, ${path[path.length - 1].z.toFixed(2)})`
+          );
         }
       }
 
@@ -3303,15 +3411,304 @@ io.on("connection", (socket) => {
   // Debug toggle for pathfinding
   socket.on("togglePathDebug", () => {
     if (!isAuthenticated) return;
-    
+
     const player = gameState.players.get(socket.id);
     if (!player) return;
-    
+
     player.debugPath = !player.debugPath;
-    console.log(`🐛 Pathfinding debug ${player.debugPath ? 'ENABLED' : 'DISABLED'} for ${socket.id}`);
-    
+    console.log(
+      `🐛 Pathfinding debug ${player.debugPath ? "ENABLED" : "DISABLED"} for ${
+        socket.id
+      }`
+    );
+
     io.to(socket.id).emit("pathDebugToggled", { enabled: player.debugPath });
   });
+
+  // ============================================
+  // PLATFORM MANAGEMENT
+  // ============================================
+
+  // Handle creating a new platform
+  socket.on(
+    "createPlatform",
+    requireAuth(async (data) => {
+      try {
+        // Rate limiting
+        if (!rateLimiter.checkLimit(socket.id, "SPAWN_OBSTACLE")) {
+          socket.emit("rateLimitError", {
+            action: "createPlatform",
+            message: "Too many platform creation requests. Please slow down.",
+          });
+          return;
+        }
+
+        const player = gameState.players.get(socket.id);
+        if (!player) return;
+
+        // Validate platform data
+        if (!data.name || typeof data.name !== "string") {
+          socket.emit("platformError", { error: "Invalid platform name" });
+          return;
+        }
+
+        if (typeof data.x !== "number" || typeof data.z !== "number") {
+          socket.emit("platformError", { error: "Invalid platform position" });
+          return;
+        }
+
+        const size = parseInt(data.size) || 40;
+        if (size < 20 || size > 200) {
+          socket.emit("platformError", { error: "Invalid platform size" });
+          return;
+        }
+
+        // Generate platform ID
+        const platformId = `platform_${player.username}_${Date.now()}`;
+
+        const newPlatform = {
+          id: platformId,
+          owner: player.username,
+          name: sanitizeString(data.name, 100),
+          x: data.x,
+          y: 0,
+          z: data.z,
+          size: size,
+          floorTexture: data.floorTexture || "floor2.jpg",
+          isMain: false,
+        };
+
+        // Check for overlapping platforms
+        for (const platform of gameState.platforms) {
+          const distance = Math.sqrt(
+            Math.pow(platform.x - newPlatform.x, 2) +
+              Math.pow(platform.z - newPlatform.z, 2)
+          );
+          const minDistance = (platform.size + newPlatform.size) / 2 + 10; // 10 units gap minimum
+
+          if (distance < minDistance) {
+            socket.emit("platformError", {
+              error: "Platform too close to existing platform",
+            });
+            return;
+          }
+        }
+
+        // Save to database
+        const saveSuccess = await savePlatform(newPlatform);
+        if (!saveSuccess) {
+          socket.emit("platformError", { error: "Failed to save platform" });
+          return;
+        }
+
+        // Add to game state
+        gameState.platforms.push(newPlatform);
+
+        // Generate bridge to nearest platform
+        if (gameState.platforms.length > 1) {
+          const nearestPlatform = findNearestPlatform(
+            newPlatform,
+            gameState.platforms
+          );
+          if (nearestPlatform) {
+            // Check if custom waypoints were provided
+            if (
+              data.bridgeWaypoints &&
+              Array.isArray(data.bridgeWaypoints) &&
+              data.bridgeWaypoints.length >= 2
+            ) {
+              // Create multi-segment bridge from waypoints
+              console.log(
+                `🎨 Creating custom bridge with ${data.bridgeWaypoints.length} waypoints`
+              );
+
+              // Create bridge segments between each waypoint
+              for (let i = 0; i < data.bridgeWaypoints.length - 1; i++) {
+                const start = data.bridgeWaypoints[i];
+                const end = data.bridgeWaypoints[i + 1];
+
+                const segmentBridge = {
+                  id: `bridge_${newPlatform.id}_${nearestPlatform.id}_seg${i}`,
+                  platform1: newPlatform.id,
+                  platform2: nearestPlatform.id,
+                  startX: start.x,
+                  startY: 0,
+                  startZ: start.z,
+                  endX: end.x,
+                  endY: 0,
+                  endZ: end.z,
+                  width: 2.0,
+                };
+
+                await saveBridge(segmentBridge);
+                gameState.bridges.push(segmentBridge);
+                io.emit("bridgeCreated", segmentBridge);
+              }
+            } else {
+              // Create straight bridge (default)
+              const bridge = generateBridge(newPlatform, nearestPlatform);
+              await saveBridge(bridge);
+              gameState.bridges.push(bridge);
+              io.emit("bridgeCreated", bridge);
+            }
+          }
+        }
+
+        // Broadcast to all clients
+        io.emit("platformCreated", newPlatform);
+
+        console.log(`🏗️ Platform created: ${platformId} by ${player.username}`);
+      } catch (error) {
+        console.error("❌ Error creating platform:", error);
+        socket.emit("platformError", { error: "Failed to create platform" });
+      }
+    })
+  );
+
+  // Handle deleting a platform
+  socket.on(
+    "deletePlatform",
+    requireAuth(async (data) => {
+      try {
+        // Rate limiting
+        if (!rateLimiter.checkLimit(socket.id, "DELETE_ACTIONS")) {
+          socket.emit("rateLimitError", {
+            action: "deletePlatform",
+            message: "Too many delete requests. Please slow down.",
+          });
+          return;
+        }
+
+        const player = gameState.players.get(socket.id);
+        if (!player) return;
+
+        const platformId = data.platformId;
+        const platform = gameState.platforms.find((p) => p.id === platformId);
+
+        if (!platform) {
+          socket.emit("platformError", { error: "Platform not found" });
+          return;
+        }
+
+        // Check permissions
+        const permission = await checkPlatformPermission(
+          platformId,
+          player.username
+        );
+        if (
+          !permission.hasPermission ||
+          (permission.level !== "owner" && permission.level !== "admin")
+        ) {
+          socket.emit("platformError", {
+            error: "No permission to delete this platform",
+          });
+          return;
+        }
+
+        // Delete associated bridges
+        const bridgesToDelete = gameState.bridges.filter(
+          (b) => b.platform1 === platformId || b.platform2 === platformId
+        );
+        for (const bridge of bridgesToDelete) {
+          await deleteBridge(bridge.id);
+          gameState.bridges = gameState.bridges.filter(
+            (b) => b.id !== bridge.id
+          );
+        }
+
+        // Delete platform
+        await deletePlatform(platformId);
+        gameState.platforms = gameState.platforms.filter(
+          (p) => p.id !== platformId
+        );
+
+        // Broadcast deletion
+        io.emit("platformDeleted", { platformId });
+
+        console.log(`🗑️ Platform deleted: ${platformId} by ${player.username}`);
+      } catch (error) {
+        console.error("❌ Error deleting platform:", error);
+        socket.emit("platformError", { error: "Failed to delete platform" });
+      }
+    })
+  );
+
+  // Handle granting platform permissions
+  socket.on(
+    "grantPlatformPermission",
+    requireAuth(async (data) => {
+      try {
+        const player = gameState.players.get(socket.id);
+        if (!player) return;
+
+        const { platformId, username, permission } = data;
+
+        // Check if requester is the owner
+        const platform = gameState.platforms.find((p) => p.id === platformId);
+        if (!platform || platform.owner !== player.username) {
+          socket.emit("platformError", {
+            error: "Only the owner can grant permissions",
+          });
+          return;
+        }
+
+        // Grant permission
+        await grantPlatformPermission(
+          platformId,
+          username,
+          permission,
+          player.username
+        );
+
+        // Broadcast permission update
+        io.emit("platformPermissionGranted", {
+          platformId,
+          username,
+          permission,
+        });
+
+        console.log(
+          `🔑 Permission granted: ${username} -> ${permission} on ${platformId}`
+        );
+      } catch (error) {
+        console.error("❌ Error granting platform permission:", error);
+        socket.emit("platformError", { error: "Failed to grant permission" });
+      }
+    })
+  );
+
+  // Handle revoking platform permissions
+  socket.on(
+    "revokePlatformPermission",
+    requireAuth(async (data) => {
+      try {
+        const player = gameState.players.get(socket.id);
+        if (!player) return;
+
+        const { platformId, username } = data;
+
+        // Check if requester is the owner
+        const platform = gameState.platforms.find((p) => p.id === platformId);
+        if (!platform || platform.owner !== player.username) {
+          socket.emit("platformError", {
+            error: "Only the owner can revoke permissions",
+          });
+          return;
+        }
+
+        // Revoke permission
+        await revokePlatformPermission(platformId, username);
+
+        // Broadcast permission revocation
+        io.emit("platformPermissionRevoked", { platformId, username });
+
+        console.log(`🔑 Permission revoked: ${username} from ${platformId}`);
+      } catch (error) {
+        console.error("❌ Error revoking platform permission:", error);
+        socket.emit("platformError", { error: "Failed to revoke permission" });
+      }
+    })
+  );
 
   socket.on("disconnect", () => {
     console.log(`Player disconnected: ${socket.id}`);
@@ -3328,6 +3725,16 @@ async function startServer() {
   try {
     // Initialize database tables
     await initializeDatabase();
+
+    // Load platforms from database
+    const loadedPlatforms = await loadPlatforms();
+    gameState.platforms = loadedPlatforms;
+    console.log(`🏗️ Loaded ${loadedPlatforms.length} platforms from database`);
+
+    // Load bridges from database
+    const loadedBridges = await loadBridges();
+    gameState.bridges = loadedBridges;
+    console.log(`🌉 Loaded ${loadedBridges.length} bridges from database`);
 
     // Load obstacles from database
     const loadedObstacles = await loadObstacles();

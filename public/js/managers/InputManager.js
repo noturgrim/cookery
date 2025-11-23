@@ -21,6 +21,9 @@ export class InputManager {
     this.dragOffset = new THREE.Vector3();
     this.deleteMode = false;
 
+    // Platform placement mode
+    this.platformPlacementMode = false;
+
     // Available models
     this.furnitureModels = [];
     this.foodModels = [];
@@ -76,6 +79,39 @@ export class InputManager {
    * Handle key down events
    */
   handleKeyDown(e) {
+    // Handle bridge drawing mode
+    if (window.game?.platformManager?.isDrawingBridge) {
+      if (e.code === "Enter") {
+        e.preventDefault();
+        window.game.platformManager.finishBridgeDrawing();
+        return;
+      }
+      if (e.code === "Escape") {
+        e.preventDefault();
+        window.game.platformManager.cancelBridgeDrawing();
+        // Use straight bridge instead
+        window.game.platformManager.createPlatformWithBridge(null);
+        return;
+      }
+      // Block all other hotkeys during bridge drawing
+      return;
+    }
+
+    // Handle platform placement mode
+    if (this.platformPlacementMode) {
+      if (e.code === "Escape") {
+        e.preventDefault();
+        if (window.game?.platformManager) {
+          window.game.platformManager.cancelPlacement();
+        }
+        this.platformPlacementMode = false;
+        console.log("❌ Platform placement cancelled");
+        return;
+      }
+      // Block all other hotkeys during placement
+      return;
+    }
+
     // If spawn menu is open
     if (this.isSpawnMenuOpen()) {
       // Check if user is typing in the search field
@@ -423,6 +459,42 @@ export class InputManager {
    * Handle click events
    */
   handleClick(event) {
+    // Handle bridge drawing mode FIRST
+    if (window.game?.platformManager?.isDrawingBridge) {
+      // Update raycaster
+      this.raycaster.setFromCamera(this.mouse, this.sceneManager.camera);
+
+      // Intersect with ground plane
+      const plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
+      const intersection = new THREE.Vector3();
+      this.raycaster.ray.intersectPlane(plane, intersection);
+
+      if (intersection) {
+        // Add waypoint
+        window.game.platformManager.addWaypoint(intersection.x, intersection.z);
+      }
+      return; // Don't process other click actions in bridge drawing mode
+    }
+
+    // Handle platform placement mode
+    if (this.platformPlacementMode && window.game?.platformManager) {
+      const platformName =
+        window.game.platformName ||
+        `${window.game.playerName || "User"}'s Platform`;
+
+      const success =
+        window.game.platformManager.confirmPlacement(platformName);
+      if (success) {
+        this.platformPlacementMode = false;
+        console.log("✅ Platform placed! Now draw the bridge path.");
+      } else {
+        console.warn(
+          "❌ Invalid platform placement. Try again or press ESC to cancel."
+        );
+      }
+      return; // Don't process other click actions in platform mode
+    }
+
     // Check for speaker connection mode FIRST (before any other checks)
     if (this.sceneManager.speakerConnectionManager?.connectionMode) {
       // Update mouse coordinates
@@ -552,6 +624,41 @@ export class InputManager {
     // Calculate mouse position in normalized device coordinates
     this.mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
     this.mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+
+    // Handle bridge drawing mode
+    if (window.game?.platformManager?.isDrawingBridge) {
+      this.raycaster.setFromCamera(this.mouse, this.sceneManager.camera);
+
+      const plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
+      const intersection = new THREE.Vector3();
+      this.raycaster.ray.intersectPlane(plane, intersection);
+
+      if (intersection) {
+        window.game.platformManager.updateBridgePreview(
+          intersection.x,
+          intersection.z
+        );
+      }
+      return;
+    }
+
+    // Handle platform placement mode
+    if (this.platformPlacementMode && window.game?.platformManager) {
+      this.raycaster.setFromCamera(this.mouse, this.sceneManager.camera);
+
+      // Create a large invisible plane to raycast against
+      const plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
+      const intersection = new THREE.Vector3();
+      this.raycaster.ray.intersectPlane(plane, intersection);
+
+      if (intersection) {
+        window.game.platformManager.updateGhostPosition(
+          intersection.x,
+          intersection.z
+        );
+      }
+      return; // Don't process other mouse interactions in placement mode
+    }
 
     // Handle camera panning (right-click drag)
     if (this.isPanning) {

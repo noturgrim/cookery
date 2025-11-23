@@ -10,6 +10,7 @@ import { DayNightUI } from "./managers/DayNightUI.js";
 import { TimeDisplay } from "./managers/TimeDisplay.js";
 import { MusicPlayerManager } from "./managers/MusicPlayerManager.js";
 import { PetManager } from "./managers/PetManager.js";
+import { PlatformManager } from "./managers/PlatformManager.js";
 import { SpeakerConnectionManager } from "./managers/SpeakerConnectionManager.js";
 
 /**
@@ -27,6 +28,7 @@ class Game {
     this.interactionManager = null;
     this.soundManager = new SoundManager();
     this.petManager = null;
+    this.platformManager = null;
 
     // Player customization
     this.playerName = "";
@@ -565,6 +567,9 @@ class Game {
     // Initialize pet manager (will get networkManager later)
     this.petManager = new PetManager(this.sceneManager, null);
 
+    // Initialize platform manager (will get networkManager later)
+    this.platformManager = new PlatformManager(this.sceneManager, null);
+
     // Start animation loop
     this.animate();
 
@@ -600,6 +605,11 @@ class Game {
     // Connect pet manager to network
     if (this.petManager) {
       this.petManager.networkManager = this.networkManager;
+    }
+
+    // Connect platform manager to network
+    if (this.platformManager) {
+      this.platformManager.networkManager = this.networkManager;
     }
 
     // Initialize input manager
@@ -661,6 +671,9 @@ class Game {
 
     // Setup music player UI handlers
     this.setupMusicPlayerUI();
+
+    // Setup platform creation button
+    this.setupPlatformButton();
 
     // If animate loop isn't running yet, start it
     if (!this.sceneManager.renderer) {
@@ -819,6 +832,92 @@ class Game {
 
     // Render the scene
     this.sceneManager.render();
+  }
+
+  /**
+   * Setup platform creation button
+   */
+  setupPlatformButton() {
+    const platformBtn = document.getElementById("create-platform-btn");
+    const modal = document.getElementById("platform-modal");
+    const nameInput = document.getElementById("platform-name-input");
+    const sizeInput = document.getElementById("platform-size-input");
+    const cancelBtn = document.getElementById("platform-modal-cancel");
+    const confirmBtn = document.getElementById("platform-modal-confirm");
+
+    if (platformBtn && modal) {
+      // Show modal when button clicked
+      platformBtn.addEventListener("click", () => {
+        // Set default name
+        nameInput.value = `${this.playerName || "Player"}'s Platform`;
+        sizeInput.value = "40";
+
+        // Show modal
+        modal.classList.remove("hidden");
+        modal.classList.add("flex");
+
+        // Focus on name input
+        setTimeout(() => nameInput.focus(), 100);
+      });
+
+      // Cancel button
+      cancelBtn.addEventListener("click", () => {
+        modal.classList.add("hidden");
+        modal.classList.remove("flex");
+      });
+
+      // Confirm button
+      confirmBtn.addEventListener("click", () => {
+        const name = nameInput.value.trim();
+        const size = parseInt(sizeInput.value);
+
+        // Validate
+        if (!name || name.length === 0) {
+          alert("Please enter a platform name!");
+          return;
+        }
+
+        if (isNaN(size) || size < 20 || size > 200) {
+          alert("Invalid size! Please enter a number between 20 and 200.");
+          return;
+        }
+
+        // Hide modal
+        modal.classList.add("hidden");
+        modal.classList.remove("flex");
+
+        // Store name for later use
+        this.platformName = name;
+
+        // Start placement mode
+        this.platformManager.startPlacementMode(size);
+        this.inputManager.platformPlacementMode = true;
+
+        // Visual feedback
+        platformBtn.classList.add("active");
+
+        console.log(`👻 Platform placement mode activated! Size: ${size}`);
+        console.log("   Click to place, ESC to cancel");
+
+        // Remove active class when placement ends
+        const checkPlacementEnd = setInterval(() => {
+          if (!this.inputManager.platformPlacementMode) {
+            platformBtn.classList.remove("active");
+            clearInterval(checkPlacementEnd);
+          }
+        }, 100);
+      });
+
+      // ESC to close modal
+      window.addEventListener("keydown", (e) => {
+        if (e.key === "Escape" && modal.classList.contains("flex")) {
+          modal.classList.add("hidden");
+          modal.classList.remove("flex");
+        }
+      });
+
+      console.log("🏗️ Platform creation button initialized");
+    }
   }
 
   /**
