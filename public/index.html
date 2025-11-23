@@ -1316,6 +1316,18 @@
         align-items: center;
         justify-content: center;
         padding: 1rem;
+        pointer-events: all;
+      "
+      onclick="
+        if (event.target === this) {
+          this.style.display = 'none';
+          if (window.game) {
+            window.game.isPlatformModalOpen = false;
+          }
+          if (window.game?.inputManager) {
+            window.game.inputManager.isPlatformModalOpen = false;
+          }
+        }
       "
     >
       <div
@@ -1332,7 +1344,9 @@
           width: 100%;
           max-width: 500px;
           overflow: hidden;
+          pointer-events: all;
         "
+        onclick="event.stopPropagation()"
       >
         <!-- Header -->
         <div

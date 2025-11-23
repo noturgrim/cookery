@@ -855,6 +855,13 @@ class Game {
         // Show modal
         modal.style.display = "flex";
 
+        // Disable keyboard shortcuts and input manager
+        this.isPlatformModalOpen = true;
+        if (this.inputManager) {
+          this.inputManager.isPlatformModalOpen = true;
+        }
+        console.log("🔒 Platform modal opened - keyboard shortcuts disabled");
+
         // Focus on name input
         setTimeout(() => nameInput.focus(), 100);
       });
@@ -862,6 +869,13 @@ class Game {
       // Cancel button
       cancelBtn.addEventListener("click", () => {
         modal.style.display = "none";
+
+        // Re-enable keyboard shortcuts and input manager
+        this.isPlatformModalOpen = false;
+        if (this.inputManager) {
+          this.inputManager.isPlatformModalOpen = false;
+        }
+        console.log("🔓 Platform modal closed - keyboard shortcuts enabled");
       });
 
       // Confirm button
@@ -882,6 +896,12 @@ class Game {
 
         // Hide modal
         modal.style.display = "none";
+
+        // Re-enable keyboard shortcuts and input manager
+        this.isPlatformModalOpen = false;
+        if (this.inputManager) {
+          this.inputManager.isPlatformModalOpen = false;
+        }
 
         // Store name for later use
         this.platformName = name;
@@ -907,9 +927,14 @@ class Game {
 
       // ESC to close modal
       window.addEventListener("keydown", (e) => {
-        if (e.key === "Escape" && modal.classList.contains("flex")) {
-          modal.classList.add("hidden");
-          modal.classList.remove("flex");
+        if (e.key === "Escape" && modal.style.display === "flex") {
+          modal.style.display = "none";
+
+          // Re-enable keyboard shortcuts and input manager
+          this.isPlatformModalOpen = false;
+          if (this.inputManager) {
+            this.inputManager.isPlatformModalOpen = false;
+          }
         }
       });
 

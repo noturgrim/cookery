@@ -79,6 +79,39 @@ export class InputManager {
    * Handle key down events
    */
   handleKeyDown(e) {
+    // If platform modal is open, block ALL keyboard shortcuts (except allow typing in inputs)
+    if (this.isPlatformModalOpen) {
+      const nameInput = document.getElementById("platform-name-input");
+      const sizeInput = document.getElementById("platform-size-input");
+      const isTypingInInput =
+        (nameInput && document.activeElement === nameInput) ||
+        (sizeInput && document.activeElement === sizeInput);
+
+      // Allow ESC to close modal even when typing
+      if (e.code === "Escape") {
+        e.preventDefault();
+        const modal = document.getElementById("platform-modal");
+        if (modal) {
+          modal.style.display = "none";
+          this.isPlatformModalOpen = false;
+          if (window.game) {
+            window.game.isPlatformModalOpen = false;
+          }
+        }
+        return;
+      }
+
+      // If typing in input field, allow the key through
+      if (isTypingInInput) {
+        return;
+      }
+
+      // Block ALL other game hotkeys when modal is open
+      e.preventDefault();
+      e.stopPropagation();
+      return;
+    }
+
     // Handle bridge drawing mode
     if (window.game?.platformManager?.isDrawingBridge) {
       if (e.code === "Enter") {
@@ -459,6 +492,11 @@ export class InputManager {
    * Handle click events
    */
   handleClick(event) {
+    // Block ALL clicks if platform modal is open
+    if (this.isPlatformModalOpen) {
+      return;
+    }
+
     // Handle bridge drawing mode FIRST
     if (window.game?.platformManager?.isDrawingBridge) {
       // Update raycaster
