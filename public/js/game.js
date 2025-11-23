@@ -989,9 +989,24 @@ window.addEventListener("DOMContentLoaded", () => {
     });
 
     console.log("\n💡 Type checkCats() again to refresh status");
+    console.log("💡 Type takeOverCats() to force take control of cats");
+  };
+
+  // Allow manual takeover of cat control
+  window.takeOverCats = () => {
+    if (!game.petManager) {
+      console.log("❌ Pet Manager not initialized");
+      return;
+    }
+
+    console.log("👑 Manually taking over cat control...");
+    game.petManager.forceHostControl();
   };
 
   console.log(
     "💡 Debug: Type checkCats() in console to check cat movement status"
+  );
+  console.log(
+    "💡 Debug: Type takeOverCats() to manually take control of cats"
   );
 });

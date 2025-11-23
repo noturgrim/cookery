@@ -234,16 +234,19 @@ export class PetManager {
           console.log(`👥 Not host - receiving cat positions from host player`);
           this.isHost = false;
 
-          // Set up fallback: If we don't receive updates for 5 seconds, take over as fallback host
+          // Set up fallback: If we don't receive updates for 3 seconds, take over as fallback host
           this.lastCatUpdateTime = Date.now();
+          this.lastLoggedSecond = -1; // Track last logged second to avoid spam
           this.fallbackCheckInterval = setInterval(() => {
             const timeSinceUpdate = Date.now() - this.lastCatUpdateTime;
+            const currentSecond = Math.floor(timeSinceUpdate / 1000);
 
-            // If no updates for 5 seconds and we have cats, take over control
-            if (timeSinceUpdate > 5000 && this.pets.size > 0 && !this.isHost) {
+            // If no updates for 3 seconds and we have cats, take over control
+            if (timeSinceUpdate > 3000 && this.pets.size > 0 && !this.isHost) {
               console.log(
-                `👑 No host updates received for 5s - taking over cat control (fallback mode)`
+                `👑 No host updates received for 3s - taking over cat control (fallback mode)`
               );
+              console.log(`   🐱 ${this.pets.size} cats will now be controlled by this client`);
               this.isHost = true;
 
               // Start syncing at higher frequency for smooth movement
@@ -258,8 +261,19 @@ export class PetManager {
                 clearInterval(this.fallbackCheckInterval);
                 this.fallbackCheckInterval = null;
               }
+            } else if (timeSinceUpdate > 3000 && this.pets.size === 0 && !this.isHost) {
+              // If 3 seconds passed but no cats loaded yet, log debug info
+              if (currentSecond === 3) {
+                console.log(`⚠️ 3s elapsed but no cats spawned yet (pets.size: ${this.pets.size})`);
+              }
+            } else if (!this.isHost) {
+              // Log waiting status once per second
+              if (currentSecond > this.lastLoggedSecond && currentSecond <= 3) {
+                console.log(`⏳ Waiting for host... ${currentSecond}s elapsed (cats: ${this.pets.size})`);
+                this.lastLoggedSecond = currentSecond;
+              }
             }
-          }, 1000); // Check every second
+          }, 100); // Check every 100ms for faster response
 
           // Log status to help debug
           setTimeout(() => {
@@ -267,7 +281,7 @@ export class PetManager {
               `🐱 Cat Status (Non-Host): ${this.pets.size} cats loaded, waiting for host updates`
             );
             console.log(
-              `   💡 Will take over control if no updates received for 5 seconds`
+              `   💡 Will take over control if no updates received for 3 seconds`
             );
           }, 2000);
           return;
@@ -401,6 +415,13 @@ export class PetManager {
 
     console.log(`✅ Applied all cat positions from server`);
     this.pendingCats = null;
+
+    // Reset the fallback timer now that cats are spawned
+    if (!this.isHost && this.lastCatUpdateTime) {
+      console.log(`🔄 Resetting fallback timer (3s countdown starts now)`);
+      this.lastCatUpdateTime = Date.now();
+      this.lastLoggedSecond = -1; // Reset log tracking
+    }
   }
 
   /**
@@ -491,6 +512,34 @@ export class PetManager {
       isHost: this.isHost,
       petCount: this.pets.size,
     };
+  }
+
+  /**
+   * Force this client to take control of cats (for debugging or fallback)
+   */
+  forceHostControl() {
+    if (this.isHost) {
+      console.log("✅ Already controlling cats");
+      return;
+    }
+
+    console.log("👑 Taking over cat control...");
+    this.isHost = true;
+
+    // Clear any existing fallback check
+    if (this.fallbackCheckInterval) {
+      clearInterval(this.fallbackCheckInterval);
+      this.fallbackCheckInterval = null;
+    }
+
+    // Start syncing to server
+    if (!this.syncInterval) {
+      this.syncInterval = setInterval(() => {
+        this.syncToServer();
+      }, 100);
+    }
+
+    console.log(`✅ Now controlling ${this.pets.size} cats`);
   }
 
   /**
