@@ -537,6 +537,15 @@ export class PlatformManager {
     this.platforms.delete(platformId);
     this.platformMeshes.delete(platformId);
 
+    // Remove any bridges connected to this platform locally
+    const bridgesToRemove = [];
+    for (const [bridgeId, bridge] of this.bridges) {
+      if (bridge.platform1 === platformId || bridge.platform2 === platformId) {
+        bridgesToRemove.push(bridgeId);
+      }
+    }
+    bridgesToRemove.forEach((bridgeId) => this.deleteBridge(bridgeId));
+
     console.log(`🗑️ Deleted platform: ${platformId}`);
   }
 
