@@ -809,6 +809,22 @@ export class InputManager {
   toggleEditMode() {
     this.editMode = !this.editMode;
 
+    // Show/hide delete mode button
+    const deleteBtn = document.getElementById("delete-mode-btn");
+    if (deleteBtn) {
+      deleteBtn.style.display = this.editMode ? "flex" : "none";
+
+      // Reset delete mode when exiting edit mode
+      if (!this.editMode && this.deleteMode) {
+        this.deleteMode = false;
+        deleteBtn.classList.remove("active");
+        const statusText = deleteBtn.querySelector(".delete-mode-status");
+        if (statusText) {
+          statusText.textContent = "OFF";
+        }
+      }
+    }
+
     // Update all editable objects visual feedback
     const allEditableObjects = this.sceneManager.getAllEditableObjects();
 
@@ -1290,16 +1306,19 @@ export class InputManager {
   toggleDeleteMode() {
     this.deleteMode = !this.deleteMode;
     const btn = document.getElementById("delete-mode-btn");
+    const statusText = btn.querySelector(".delete-mode-status");
 
     if (this.deleteMode) {
-      btn.textContent = "🗑️ Delete Mode (ON)";
-      btn.className =
-        "w-full py-2 px-4 rounded-lg bg-green-500/30 hover:bg-green-500/40 border-2 border-green-500 text-white font-bold text-sm transition-all hover:scale-105 active:scale-95";
+      btn.classList.add("active");
+      if (statusText) {
+        statusText.textContent = "ON";
+      }
       // console.log("🗑️ Delete Mode ON - Click objects to delete them");
     } else {
-      btn.textContent = "🗑️ Delete Mode (OFF)";
-      btn.className =
-        "w-full py-2 px-4 rounded-lg bg-red-500/20 hover:bg-red-500/30 border-2 border-red-500 text-white font-bold text-sm transition-all hover:scale-105 active:scale-95";
+      btn.classList.remove("active");
+      if (statusText) {
+        statusText.textContent = "OFF";
+      }
       // console.log("✅ Delete Mode OFF");
     }
   }
