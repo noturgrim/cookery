@@ -1405,7 +1405,9 @@ export class InputManager {
       // Calculate actual bounding box after scaling
       const bbox = this.sceneManager.calculateBoundingBox(furniture);
 
-      const clientId = `furniture_${modelName}_${Date.now()}`;
+      // Replace slashes with underscores for valid ID
+      const safeModelName = modelName.replace(/\//g, "_");
+      const clientId = `furniture_${safeModelName}_${Date.now()}`;
 
       furniture.userData = {
         id: clientId,

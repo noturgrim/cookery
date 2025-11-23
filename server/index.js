@@ -228,10 +228,32 @@ import { readdir } from "fs/promises";
 app.get("/api/models/furniture", async (req, res) => {
   try {
     const furnitureDir = join(__dirname, "../public/furniture/glb");
-    const files = await readdir(furnitureDir);
-    const models = files
-      .filter((file) => file.endsWith(".glb"))
-      .map((file) => file.replace(".glb", ""));
+
+    // Recursively scan for .glb files in subdirectories
+    const scanDirectory = async (dir, relativePath = "") => {
+      const entries = await readdir(dir, { withFileTypes: true });
+      const models = [];
+
+      for (const entry of entries) {
+        const fullPath = join(dir, entry.name);
+        const relPath = relativePath
+          ? `${relativePath}/${entry.name}`
+          : entry.name;
+
+        if (entry.isDirectory()) {
+          // Recursively scan subdirectories
+          const subModels = await scanDirectory(fullPath, relPath);
+          models.push(...subModels);
+        } else if (entry.isFile() && entry.name.endsWith(".glb")) {
+          // Add model path (without .glb extension)
+          models.push(relPath.replace(".glb", ""));
+        }
+      }
+
+      return models;
+    };
+
+    const models = await scanDirectory(furnitureDir);
     res.json(models);
   } catch (error) {
     console.error("Error reading furniture directory:", error);
