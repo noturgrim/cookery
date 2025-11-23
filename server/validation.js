@@ -7,7 +7,7 @@
 export const VALIDATION_RULES = {
   // World boundaries (half of platform size, will be updated dynamically)
   WORLD_BOUNDS: 20,
-  MAX_WORLD_BOUNDS: 100, // Maximum is half of 200 (max platform size)
+  MAX_WORLD_BOUNDS: 1000, // Allows large multi-platform worlds
 
   // Player constraints
   PLAYER_NAME_MIN_LENGTH: 1,

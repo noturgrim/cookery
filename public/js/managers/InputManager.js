@@ -629,8 +629,41 @@ export class InputManager {
       }
     }
 
-    // If no object clicked, check intersection with floor
-    const intersects = this.raycaster.intersectObject(this.sceneManager.floor);
+    // If no object clicked, check intersection with floor, platforms, and bridges
+    const clickableFloors = [this.sceneManager.floor];
+
+    // Add all platform meshes
+    if (window.game?.platformManager) {
+      // Get platform meshes from Map
+      const platformMeshes = window.game.platformManager.platformMeshes;
+      if (platformMeshes && platformMeshes.size > 0) {
+        platformMeshes.forEach((mesh) => {
+          if (mesh) {
+            clickableFloors.push(mesh);
+          }
+        });
+      }
+
+      // Get bridge meshes from Map
+      const bridgeMeshes = window.game.platformManager.bridgeMeshes;
+      if (bridgeMeshes && bridgeMeshes.size > 0) {
+        bridgeMeshes.forEach((mesh) => {
+          if (mesh) {
+            clickableFloors.push(mesh);
+          }
+        });
+      }
+    }
+
+    console.log(
+      `🔍 Checking ${
+        clickableFloors.length
+      } clickable surfaces (1 main floor + ${
+        clickableFloors.length - 1
+      } platforms/bridges)`
+    );
+
+    const intersects = this.raycaster.intersectObjects(clickableFloors, false);
 
     if (intersects.length > 0) {
       const point = intersects[0].point;
@@ -644,9 +677,9 @@ export class InputManager {
       // Visual feedback
       this.uiManager.createMoveMarker(point.x, point.z);
 
-      // console.log(
-      //   `🎯 Moving to: (${point.x.toFixed(2)}, ${point.z.toFixed(2)})`
-      // );
+      console.log(
+        `🎯 Moving to: (${point.x.toFixed(2)}, ${point.z.toFixed(2)})`
+      );
     }
   }
 

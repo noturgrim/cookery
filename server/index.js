@@ -355,6 +355,9 @@ const PLAYER_SPEED = 0.22; // Units per tick (increased from 0.15 for faster mov
 const PLAYER_SIZE = { width: 0.6, height: 2, depth: 0.6 }; // Player AABB dimensions (smaller for better navigation)
 const GRID_SIZE = 0.25; // Fine grid for precise obstacle avoidance
 const COARSE_GRID_SIZE = 0.5; // Coarse grid for long-distance pathfinding (faster)
+const PLATFORM_EDGE_TOLERANCE = 2.0; // Allow small overlap when transitioning to bridges
+const BRIDGE_WIDTH_TOLERANCE = 1.5; // Extra margin beyond actual bridge width
+const WORLD_BOUNDS_MARGIN = 10; // Additional padding when expanding world bounds to fit content
 
 // Helper to get all connected speakers (recursively follows connections)
 const getConnectedSpeakers = (speakerId, connections) => {
@@ -424,13 +427,16 @@ const generateBridge = (platform1, platform2) => {
   const dirX = dx / distance;
   const dirZ = dz / distance;
 
-  // Start point: edge of platform1 closest to platform2
-  const startX = platform1.x + dirX * halfSize1;
-  const startZ = platform1.z + dirZ * halfSize1;
+  // Extend bridges slightly INTO platforms for seamless transitions
+  const bridgeOverlap = 1.0; // Extend 1 unit into each platform
 
-  // End point: edge of platform2 closest to platform1
-  const endX = platform2.x - dirX * halfSize2;
-  const endZ = platform2.z - dirZ * halfSize2;
+  // Start point: slightly inside platform1 edge
+  const startX = platform1.x + dirX * (halfSize1 - bridgeOverlap);
+  const startZ = platform1.z + dirZ * (halfSize1 - bridgeOverlap);
+
+  // End point: slightly inside platform2 edge
+  const endX = platform2.x - dirX * (halfSize2 - bridgeOverlap);
+  const endZ = platform2.z - dirZ * (halfSize2 - bridgeOverlap);
 
   const bridgeId = `bridge_${platform1.id}_${platform2.id}`;
 
@@ -446,6 +452,139 @@ const generateBridge = (platform1, platform2) => {
     endZ: endZ,
     width: 2.0,
   };
+};
+
+/**
+ * Calculate squared distance from a point to a bridge segment and allowed tolerance
+ */
+const getBridgeDistanceInfo = (
+  x,
+  z,
+  bridge,
+  tolerance = BRIDGE_WIDTH_TOLERANCE
+) => {
+  if (!bridge) return null;
+
+  const width = bridge.width || 2;
+  const allowedDistance = width / 2 + tolerance;
+  const allowedDistanceSq = allowedDistance * allowedDistance;
+
+  const dx = bridge.endX - bridge.startX;
+  const dz = bridge.endZ - bridge.startZ;
+  const lengthSquared = dx * dx + dz * dz;
+
+  if (lengthSquared === 0) {
+    const distanceSq =
+      (x - bridge.startX) * (x - bridge.startX) +
+      (z - bridge.startZ) * (z - bridge.startZ);
+    return {
+      distanceSq,
+      allowedDistanceSq,
+      allowedDistance,
+    };
+  }
+
+  const t =
+    ((x - bridge.startX) * dx + (z - bridge.startZ) * dz) / lengthSquared;
+  const clampedT = Math.max(0, Math.min(1, t));
+  const closestX = bridge.startX + clampedT * dx;
+  const closestZ = bridge.startZ + clampedT * dz;
+
+  const distanceSq =
+    (x - closestX) * (x - closestX) + (z - closestZ) * (z - closestZ);
+
+  return {
+    distanceSq,
+    allowedDistanceSq,
+    allowedDistance,
+  };
+};
+
+/**
+ * Determine if a point lies on (or close enough to) a bridge segment
+ */
+const isPointOnBridge = (x, z, bridge, tolerance = BRIDGE_WIDTH_TOLERANCE) => {
+  const info = getBridgeDistanceInfo(x, z, bridge, tolerance);
+  if (!info) return false;
+  return info.distanceSq <= info.allowedDistanceSq;
+};
+
+const getPlatformExtentRadius = (platform) => {
+  if (!platform) return 0;
+  const halfSize = (platform.size || 40) / 2;
+  return Math.max(
+    Math.abs(platform.x) + halfSize + PLATFORM_EDGE_TOLERANCE,
+    Math.abs(platform.z) + halfSize + PLATFORM_EDGE_TOLERANCE
+  );
+};
+
+const expandWorldBoundsIfNeeded = (radius, reason = "world content") => {
+  if (!Number.isFinite(radius)) return;
+  const desiredRadius = Math.ceil(radius + WORLD_BOUNDS_MARGIN);
+  const clampedRadius = Math.min(
+    VALIDATION_RULES.MAX_WORLD_BOUNDS,
+    Math.max(VALIDATION_RULES.WORLD_BOUNDS, desiredRadius)
+  );
+  if (clampedRadius > VALIDATION_RULES.WORLD_BOUNDS) {
+    VALIDATION_RULES.WORLD_BOUNDS = clampedRadius;
+    console.log(`📏 Expanded world bounds to ±${clampedRadius} (${reason})`);
+  }
+};
+
+const expandBoundsForPlatform = (platform) => {
+  if (!platform) return;
+  const extent = getPlatformExtentRadius(platform);
+  expandWorldBoundsIfNeeded(extent, `platform ${platform.name || platform.id}`);
+};
+
+const expandBoundsForBridge = (bridge) => {
+  if (!bridge) return;
+  const points = [
+    { x: bridge.startX, z: bridge.startZ },
+    { x: bridge.endX, z: bridge.endZ },
+  ];
+  for (const point of points) {
+    const extent =
+      Math.max(Math.abs(point.x), Math.abs(point.z)) + BRIDGE_WIDTH_TOLERANCE;
+    expandWorldBoundsIfNeeded(extent, `bridge ${bridge.id}`);
+  }
+};
+
+const recalculateWorldBoundsFromState = () => {
+  const mainPlatform = gameState.platforms.find((p) => p.is_main);
+  let maxRadius = mainPlatform
+    ? mainPlatform.size / 2
+    : VALIDATION_RULES.WORLD_BOUNDS;
+
+  for (const platform of gameState.platforms) {
+    maxRadius = Math.max(maxRadius, getPlatformExtentRadius(platform));
+  }
+
+  for (const bridge of gameState.bridges) {
+    const points = [
+      { x: bridge.startX, z: bridge.startZ },
+      { x: bridge.endX, z: bridge.endZ },
+    ];
+    for (const point of points) {
+      const extent =
+        Math.max(Math.abs(point.x), Math.abs(point.z)) + BRIDGE_WIDTH_TOLERANCE;
+      maxRadius = Math.max(maxRadius, extent);
+    }
+  }
+
+  const desiredRadius = Math.min(
+    VALIDATION_RULES.MAX_WORLD_BOUNDS,
+    Math.max(0, Math.ceil(maxRadius + WORLD_BOUNDS_MARGIN))
+  );
+
+  if (desiredRadius !== VALIDATION_RULES.WORLD_BOUNDS) {
+    const action =
+      desiredRadius > VALIDATION_RULES.WORLD_BOUNDS ? "Expanded" : "Shrank";
+    VALIDATION_RULES.WORLD_BOUNDS = desiredRadius;
+    console.log(
+      `📏 ${action} world bounds to ±${desiredRadius} (recalculated)`
+    );
+  }
 };
 
 // ============================================
@@ -549,8 +688,70 @@ const validatePlayerMovement = (player, newX, newZ, debug = false) => {
     );
   }
 
-  // Check collision with all obstacles (furniture)
+  // Determine which platform the player is on (with tolerance for smoother transitions)
+  let playerPlatform = null;
+  const platformTolerance = PLATFORM_EDGE_TOLERANCE;
+
+  for (const platform of gameState.platforms) {
+    const halfSize = platform.size / 2 + platformTolerance;
+    if (
+      newX >= platform.x - halfSize &&
+      newX <= platform.x + halfSize &&
+      newZ >= platform.z - halfSize &&
+      newZ <= platform.z + halfSize
+    ) {
+      playerPlatform = platform;
+      break;
+    }
+  }
+
+  // Check if player is on a bridge (always check, even if on platform - for transitions)
+  let onBridge = false;
+  for (const bridge of gameState.bridges || []) {
+    const info = getBridgeDistanceInfo(newX, newZ, bridge);
+    if (info && info.distanceSq <= info.allowedDistanceSq) {
+      onBridge = true;
+      if (debug) {
+        console.log(`   🌉 Player on bridge: ${bridge.id}`);
+        console.log(
+          `      Distance from center: ${Math.sqrt(info.distanceSq).toFixed(
+            2
+          )} units (max: ${Math.sqrt(info.allowedDistanceSq).toFixed(2)})`
+        );
+      }
+      break;
+    }
+  }
+
+  // If not on platform or bridge, deny movement (would fall off)
+  if (!playerPlatform && !onBridge) {
+    if (debug) {
+      console.log("   ❌ Player would fall off platform/bridge");
+    }
+    return false;
+  }
+
+  if (debug && playerPlatform) {
+    console.log(
+      `   ✅ Player on platform: ${playerPlatform.name || playerPlatform.id}`
+    );
+  }
+  if (debug && onBridge) {
+    console.log("   ✅ Player on bridge");
+  }
+
+  // Check collision with obstacles on the same platform (or all if on bridge)
   for (const obstacle of gameState.obstacles) {
+    // Skip obstacles on different platforms (unless player is on bridge)
+    if (
+      !onBridge &&
+      playerPlatform &&
+      obstacle.platform_id &&
+      obstacle.platform_id !== playerPlatform.id
+    ) {
+      continue;
+    }
+
     // Skip passthrough objects (doorways, archways, etc.)
     if (obstacle.isPassthrough) {
       if (debug) {
@@ -584,8 +785,18 @@ const validatePlayerMovement = (player, newX, newZ, debug = false) => {
     }
   }
 
-  // Check collision with all food items
+  // Check collision with food items on the same platform (or all if on bridge)
   for (const foodItem of gameState.foodItems) {
+    // Skip food items on different platforms (unless player is on bridge)
+    if (
+      !onBridge &&
+      playerPlatform &&
+      foodItem.platform_id &&
+      foodItem.platform_id !== playerPlatform.id
+    ) {
+      continue;
+    }
+
     // Create AABB for food item (smaller collision, food is more passable)
     const collisionReduction = 0.3; // 30% of original size for food (very small hitbox)
     const halfWidth = ((foodItem.width || 1) / 2) * collisionReduction;
@@ -736,6 +947,40 @@ class AStarPathfinder {
       Math.abs(x) > VALIDATION_RULES.WORLD_BOUNDS ||
       Math.abs(z) > VALIDATION_RULES.WORLD_BOUNDS
     ) {
+      return false;
+    }
+
+    // Check if position is on a platform or bridge
+    let onPlatformOrBridge = false;
+
+    // Check platforms
+    for (const platform of gameState.platforms) {
+      const halfSize = platform.size / 2 + PLATFORM_EDGE_TOLERANCE;
+      if (
+        x >= platform.x - halfSize &&
+        x <= platform.x + halfSize &&
+        z >= platform.z - halfSize &&
+        z <= platform.z + halfSize
+      ) {
+        onPlatformOrBridge = true;
+        break;
+      }
+    }
+
+    // Check bridges if not on platform
+    if (!onPlatformOrBridge && gameState.bridges) {
+      for (const bridge of gameState.bridges) {
+        if (isPointOnBridge(x, z, bridge)) {
+          onPlatformOrBridge = true;
+          break;
+        }
+      }
+    }
+
+    // If not on platform or bridge, position is not walkable
+    if (!onPlatformOrBridge) {
+      if (!this.walkableCache) this.walkableCache = new Map();
+      this.walkableCache.set(cacheKey, false);
       return false;
     }
 
@@ -1056,8 +1301,8 @@ class AStarPathfinder {
 
   // Find nearest walkable position
   findNearestWalkable(pos) {
-    const searchRadius = 5; // Increased search radius
-    const step = this.gridSize;
+    const searchRadius = 50; // Large search radius for multi-platform support
+    const step = this.gridSize * 2; // Use larger steps for faster searching
     let bestPos = pos;
     let bestDistance = Infinity;
 
@@ -2437,6 +2682,14 @@ io.on("connection", (socket) => {
         );
       }
 
+      // Check if goal is walkable first
+      if (player.debugPath) {
+        console.log(`   🔍 Checking if goal is walkable...`);
+        console.log(
+          `      isWalkable: ${pathfinder.isWalkable(goal.x, goal.z)}`
+        );
+      }
+
       // If clicking on an obstacle, find the best interaction point
       const originalGoal = { ...goal };
       goal = pathfinder.findInteractionPoint(goal);
@@ -2449,6 +2702,9 @@ io.on("connection", (socket) => {
           `   🎯 Adjusted goal for interaction: (${goal.x.toFixed(
             2
           )}, ${goal.z.toFixed(2)})`
+        );
+        console.log(
+          `      New isWalkable: ${pathfinder.isWalkable(goal.x, goal.z)}`
         );
       }
 
@@ -3514,6 +3770,7 @@ io.on("connection", (socket) => {
 
         // Add to game state
         gameState.platforms.push(newPlatform);
+        expandBoundsForPlatform(newPlatform);
 
         // Generate bridge to nearest platform
         if (gameState.platforms.length > 1) {
@@ -3553,6 +3810,7 @@ io.on("connection", (socket) => {
 
                 await saveBridge(segmentBridge);
                 gameState.bridges.push(segmentBridge);
+                expandBoundsForBridge(segmentBridge);
                 io.emit("bridgeCreated", segmentBridge);
               }
             } else {
@@ -3560,6 +3818,7 @@ io.on("connection", (socket) => {
               const bridge = generateBridge(newPlatform, nearestPlatform);
               await saveBridge(bridge);
               gameState.bridges.push(bridge);
+              expandBoundsForBridge(bridge);
               io.emit("bridgeCreated", bridge);
             }
           }
@@ -3632,6 +3891,7 @@ io.on("connection", (socket) => {
         gameState.platforms = gameState.platforms.filter(
           (p) => p.id !== platformId
         );
+        recalculateWorldBoundsFromState();
 
         // Broadcast deletion
         io.emit("platformDeleted", { platformId });
@@ -3760,6 +4020,7 @@ async function startServer() {
     // Load world settings and update validation bounds
     const worldSettings = await getWorldSettings();
     updateWorldBounds(worldSettings.platformSize);
+    recalculateWorldBoundsFromState();
 
     // Recreate pathfinder with loaded obstacles
     pathfinder.obstacles = gameState.obstacles;
