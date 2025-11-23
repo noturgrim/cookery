@@ -549,7 +549,6 @@ class Game {
     if (this.adminControlsInitialized) return;
 
     const platformSelect = document.getElementById("admin-platform-select");
-    const bridgeSelect = document.getElementById("admin-bridge-select");
     const nameInput = document.getElementById("admin-platform-name");
     const sizeInput = document.getElementById("admin-platform-size");
     const textureInput = document.getElementById("admin-platform-texture");
@@ -558,20 +557,15 @@ class Game {
     );
     const updatePlatformBtn = document.getElementById("admin-platform-update");
     const deletePlatformBtn = document.getElementById("admin-platform-delete");
-    const refreshBridgesBtn = document.getElementById("admin-bridge-refresh");
-    const deleteBridgeBtn = document.getElementById("admin-bridge-delete");
 
     if (
       !platformSelect ||
-      !bridgeSelect ||
       !nameInput ||
       !sizeInput ||
       !textureInput ||
       !refreshPlatformsBtn ||
       !updatePlatformBtn ||
-      !deletePlatformBtn ||
-      !refreshBridgesBtn ||
-      !deleteBridgeBtn
+      !deletePlatformBtn
     ) {
       return;
     }
@@ -633,24 +627,6 @@ class Game {
       }
     });
 
-    refreshBridgesBtn.addEventListener("click", () =>
-      this.refreshAdminPlatformLists()
-    );
-
-    deleteBridgeBtn.addEventListener("click", () => {
-      if (!this.adminSelectedBridgeId) {
-        alert("Select a bridge to delete.");
-        return;
-      }
-      if (confirm("Delete this bridge?")) {
-        this.networkManager?.requestBridgeDeletion(this.adminSelectedBridgeId);
-      }
-    });
-
-    bridgeSelect.addEventListener("change", () => {
-      this.adminSelectedBridgeId = bridgeSelect.value || null;
-    });
-
     this.adminControlsInitialized = true;
   }
 
@@ -660,8 +636,7 @@ class Game {
   refreshAdminPlatformLists() {
     if (!this.isAdmin) return;
     const platformSelect = document.getElementById("admin-platform-select");
-    const bridgeSelect = document.getElementById("admin-bridge-select");
-    if (!platformSelect || !bridgeSelect) return;
+    if (!platformSelect) return;
 
     const platforms = this.platformManager
       ? [...this.platformManager.getAllPlatforms()]
@@ -693,44 +668,6 @@ class Game {
     }
 
     this.fillAdminPlatformForm(this.adminSelectedPlatformId);
-
-    const bridges = this.platformManager
-      ? [...this.platformManager.getAllBridges()]
-      : [];
-
-    bridgeSelect.innerHTML = "";
-    if (bridges.length === 0) {
-      const opt = document.createElement("option");
-      opt.textContent = "No bridges available";
-      opt.disabled = true;
-      bridgeSelect.appendChild(opt);
-      this.adminSelectedBridgeId = null;
-    } else {
-      if (
-        !this.adminSelectedBridgeId ||
-        !bridges.find((b) => b.id === this.adminSelectedBridgeId)
-      ) {
-        this.adminSelectedBridgeId = bridges[0].id;
-      }
-
-      bridges.forEach((bridge) => {
-        const platform1 = this.platformManager?.getPlatformById(
-          bridge.platform1
-        );
-        const platform2 = this.platformManager?.getPlatformById(
-          bridge.platform2
-        );
-        const label = `${platform1?.name || bridge.platform1} → ${
-          platform2?.name || bridge.platform2
-        }`;
-
-        const option = document.createElement("option");
-        option.value = bridge.id;
-        option.textContent = label;
-        bridgeSelect.appendChild(option);
-      });
-      bridgeSelect.value = this.adminSelectedBridgeId;
-    }
   }
 
   /**
@@ -846,6 +783,7 @@ class Game {
 
     // Initialize platform manager (will get networkManager later)
     this.platformManager = new PlatformManager(this.sceneManager, null);
+    this.sceneManager.platformManager = this.platformManager;
 
     // Start animation loop
     this.animate();

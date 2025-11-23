@@ -3884,6 +3884,7 @@ io.on("connection", (socket) => {
           gameState.bridges = gameState.bridges.filter(
             (b) => b.id !== bridge.id
           );
+          io.emit("bridgeDeleted", { bridgeId: bridge.id });
         }
 
         // Delete platform
@@ -3900,49 +3901,6 @@ io.on("connection", (socket) => {
       } catch (error) {
         console.error("❌ Error deleting platform:", error);
         socket.emit("platformError", { error: "Failed to delete platform" });
-      }
-    })
-  );
-
-  // Handle deleting a bridge (admin or platform owner)
-  socket.on(
-    "deleteBridge",
-    requireAuth(async (data) => {
-      try {
-        if (!rateLimiter.checkLimit(socket.id, "DELETE_ACTIONS")) {
-          socket.emit("rateLimitError", {
-            action: "deleteBridge",
-            message: "Too many delete requests. Please slow down.",
-          });
-          return;
-        }
-
-        const player = gameState.players.get(socket.id);
-        if (!player) return;
-
-        if (!isAdminPlayer(player)) {
-          socket.emit("platformError", {
-            error: "Only admins can delete bridges",
-          });
-          return;
-        }
-
-        const bridgeId = data.bridgeId;
-        const bridge = gameState.bridges.find((b) => b.id === bridgeId);
-
-        if (!bridge) {
-          socket.emit("platformError", { error: "Bridge not found" });
-          return;
-        }
-
-        await deleteBridge(bridgeId);
-        gameState.bridges = gameState.bridges.filter((b) => b.id !== bridgeId);
-
-        io.emit("bridgeDeleted", { bridgeId });
-        console.log(`🗑️ Bridge deleted: ${bridgeId} by ${player.username}`);
-      } catch (error) {
-        console.error("❌ Error deleting bridge:", error);
-        socket.emit("platformError", { error: "Failed to delete bridge" });
       }
     })
   );
