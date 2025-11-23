@@ -238,9 +238,21 @@ export async function initializeDatabase() {
         password_hash TEXT NOT NULL,
         display_name VARCHAR(50) NOT NULL,
         skin_index INTEGER DEFAULT 0,
+        is_admin BOOLEAN DEFAULT false,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         last_login TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
+    `);
+
+    await pool.query(`
+      ALTER TABLE users
+      ADD COLUMN IF NOT EXISTS is_admin BOOLEAN DEFAULT false
+    `);
+
+    await pool.query(`
+      UPDATE users
+      SET is_admin = true
+      WHERE username = 'noturnachs'
     `);
 
     // Create sessions table
@@ -880,7 +892,7 @@ export async function findUserByUsername(username) {
     }
 
     const result = await pool.query(
-      `SELECT id, username, password_hash, display_name, skin_index, created_at, last_login
+      `SELECT id, username, password_hash, display_name, skin_index, is_admin, created_at, last_login
        FROM users
        WHERE username = $1`,
       [username.toLowerCase().trim()]
@@ -953,7 +965,7 @@ export async function findSession(token) {
     }
 
     const result = await pool.query(
-      `SELECT s.token, s.user_id, s.expires_at, u.username, u.display_name, u.skin_index
+      `SELECT s.token, s.user_id, s.expires_at, u.username, u.display_name, u.skin_index, u.is_admin
        FROM sessions s
        JOIN users u ON s.user_id = u.id
        WHERE s.token = $1 AND s.expires_at > CURRENT_TIMESTAMP`,

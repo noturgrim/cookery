@@ -14,6 +14,7 @@ export class NetworkManager {
     this.playerId = null;
     this.playerName = "";
     this.playerSkin = 0;
+    this.currentUser = null;
   }
 
   /**
@@ -96,6 +97,13 @@ export class NetworkManager {
       console.log("✅ Authenticated with game server");
       this.playerId = data.playerId;
       console.log(`🎮 Player ID: ${this.playerId}`);
+      this.currentUser = data.user || null;
+      if (
+        window.game &&
+        typeof window.game.handleAuthenticatedUser === "function"
+      ) {
+        window.game.handleAuthenticatedUser(this.currentUser);
+      }
     });
 
     // Handle authentication errors
@@ -268,6 +276,7 @@ export class NetworkManager {
           console.log(
             `🏗️ Loaded ${data.platforms.length} platforms and ${data.bridges.length} bridges from server`
           );
+          window.game.refreshAdminPlatformLists?.();
         }
       }
 
@@ -648,6 +657,7 @@ export class NetworkManager {
       if (window.game && window.game.platformManager) {
         window.game.platformManager.createPlatform(platformData);
         console.log(`🏗️ Platform ${platformData.id} created by another player`);
+        window.game.refreshAdminPlatformLists?.();
       }
     });
 
@@ -656,6 +666,16 @@ export class NetworkManager {
       if (window.game && window.game.platformManager) {
         window.game.platformManager.deletePlatform(data.platformId);
         console.log(`🗑️ Platform ${data.platformId} deleted by another player`);
+        window.game.refreshAdminPlatformLists?.();
+      }
+    });
+
+    // Handle platform updated
+    this.socket.on("platformUpdated", (platformData) => {
+      if (window.game && window.game.platformManager) {
+        window.game.platformManager.updatePlatform(platformData);
+        console.log(`✏️ Platform ${platformData.id} updated`);
+        window.game.refreshAdminPlatformLists?.();
       }
     });
 
@@ -664,6 +684,16 @@ export class NetworkManager {
       if (window.game && window.game.platformManager) {
         window.game.platformManager.createBridge(bridgeData);
         console.log(`🌉 Bridge ${bridgeData.id} created`);
+        window.game.refreshAdminPlatformLists?.();
+      }
+    });
+
+    // Handle bridge deleted
+    this.socket.on("bridgeDeleted", (data) => {
+      if (window.game && window.game.platformManager) {
+        window.game.platformManager.deleteBridge(data.bridgeId);
+        console.log(`🗑️ Bridge ${data.bridgeId} deleted`);
+        window.game.refreshAdminPlatformLists?.();
       }
     });
 
@@ -1465,6 +1495,33 @@ export class NetworkManager {
    */
   isConnected() {
     return this.socket && this.socket.connected;
+  }
+
+  /**
+   * Admin helpers for platform/bridge maintenance
+   */
+  requestPlatformUpdate(payload) {
+    if (!this.socket) {
+      console.warn("⚠️ Socket not connected - cannot update platform");
+      return;
+    }
+    this.socket.emit("updatePlatform", payload);
+  }
+
+  requestPlatformDeletion(platformId) {
+    if (!this.socket) {
+      console.warn("⚠️ Socket not connected - cannot delete platform");
+      return;
+    }
+    this.socket.emit("deletePlatform", { platformId });
+  }
+
+  requestBridgeDeletion(bridgeId) {
+    if (!this.socket) {
+      console.warn("⚠️ Socket not connected - cannot delete bridge");
+      return;
+    }
+    this.socket.emit("deleteBridge", { bridgeId });
   }
 
   /**

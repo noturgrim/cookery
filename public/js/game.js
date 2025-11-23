@@ -42,6 +42,11 @@ class Game {
     // Game state
     this.isGameRunning = false;
     this.characterModels = []; // For backwards compatibility with preview
+    this.isAdmin = false;
+    this.currentUser = null;
+    this.adminControlsInitialized = false;
+    this.adminSelectedPlatformId = null;
+    this.adminSelectedBridgeId = null;
 
     // Setup audio unlock notice
     this.setupAudioUnlockNotice();
@@ -140,6 +145,8 @@ class Game {
         this.playerSkin = user.skinIndex;
         this.userId = user.id;
         this.username = user.username;
+        this.isAdmin = Boolean(user.isAdmin);
+        this.currentUser = user;
         this.sessionToken = sessionToken;
         console.log(
           `✅ Authenticated as ${user.displayName} (@${user.username})`
@@ -438,6 +445,22 @@ class Game {
       };
     }
 
+    // Admin controls visibility
+    const adminPanel = document.getElementById("admin-panel");
+    const adminPill = document.getElementById("admin-username-pill");
+    if (adminPanel) {
+      if (this.isAdmin) {
+        adminPanel.classList.remove("hidden");
+        if (adminPill) {
+          adminPill.textContent = this.username ? `@${this.username}` : "Admin";
+        }
+        this.initAdminControls();
+        this.refreshAdminPlatformLists();
+      } else {
+        adminPanel.classList.add("hidden");
+      }
+    }
+
     // Save button
     document.getElementById("settings-save-btn").onclick = () => {
       const newName = document
@@ -497,6 +520,241 @@ class Game {
         closeModal();
       }
     };
+  }
+
+  /**
+   * Handle authenticated user payload from server
+   */
+  handleAuthenticatedUser(user) {
+    this.currentUser = user;
+    const wasAdmin = this.isAdmin;
+    this.isAdmin = Boolean(user?.isAdmin);
+
+    if (this.isAdmin && !this.adminControlsInitialized) {
+      this.initAdminControls();
+    }
+
+    if (
+      this.isAdmin &&
+      (this.adminControlsInitialized || wasAdmin !== this.isAdmin)
+    ) {
+      this.refreshAdminPlatformLists();
+    }
+  }
+
+  /**
+   * Initialize admin control listeners (only once)
+   */
+  initAdminControls() {
+    if (this.adminControlsInitialized) return;
+
+    const platformSelect = document.getElementById("admin-platform-select");
+    const bridgeSelect = document.getElementById("admin-bridge-select");
+    const nameInput = document.getElementById("admin-platform-name");
+    const sizeInput = document.getElementById("admin-platform-size");
+    const textureInput = document.getElementById("admin-platform-texture");
+    const refreshPlatformsBtn = document.getElementById(
+      "admin-platform-refresh"
+    );
+    const updatePlatformBtn = document.getElementById("admin-platform-update");
+    const deletePlatformBtn = document.getElementById("admin-platform-delete");
+    const refreshBridgesBtn = document.getElementById("admin-bridge-refresh");
+    const deleteBridgeBtn = document.getElementById("admin-bridge-delete");
+
+    if (
+      !platformSelect ||
+      !bridgeSelect ||
+      !nameInput ||
+      !sizeInput ||
+      !textureInput ||
+      !refreshPlatformsBtn ||
+      !updatePlatformBtn ||
+      !deletePlatformBtn ||
+      !refreshBridgesBtn ||
+      !deleteBridgeBtn
+    ) {
+      return;
+    }
+
+    platformSelect.addEventListener("change", () => {
+      this.adminSelectedPlatformId = platformSelect.value || null;
+      this.fillAdminPlatformForm(this.adminSelectedPlatformId);
+    });
+
+    refreshPlatformsBtn.addEventListener("click", () =>
+      this.refreshAdminPlatformLists()
+    );
+
+    updatePlatformBtn.addEventListener("click", () => {
+      if (!this.adminSelectedPlatformId) {
+        alert("Select a platform to update.");
+        return;
+      }
+      const payload = {
+        platformId: this.adminSelectedPlatformId,
+      };
+
+      const name = nameInput.value.trim();
+      if (name.length > 0) {
+        payload.name = name;
+      }
+
+      const sizeValue = parseInt(sizeInput.value, 10);
+      if (!Number.isNaN(sizeValue)) {
+        payload.size = sizeValue;
+      }
+
+      const texture = textureInput.value.trim();
+      if (texture.length > 0) {
+        payload.floorTexture = texture;
+      }
+
+      if (Object.keys(payload).length === 1) {
+        alert("Enter at least one field to update.");
+        return;
+      }
+
+      this.networkManager?.requestPlatformUpdate(payload);
+    });
+
+    deletePlatformBtn.addEventListener("click", () => {
+      if (!this.adminSelectedPlatformId) {
+        alert("Select a platform to delete.");
+        return;
+      }
+      if (
+        confirm(
+          "Delete this platform? This will also remove any bridges attached to it."
+        )
+      ) {
+        this.networkManager?.requestPlatformDeletion(
+          this.adminSelectedPlatformId
+        );
+      }
+    });
+
+    refreshBridgesBtn.addEventListener("click", () =>
+      this.refreshAdminPlatformLists()
+    );
+
+    deleteBridgeBtn.addEventListener("click", () => {
+      if (!this.adminSelectedBridgeId) {
+        alert("Select a bridge to delete.");
+        return;
+      }
+      if (confirm("Delete this bridge?")) {
+        this.networkManager?.requestBridgeDeletion(this.adminSelectedBridgeId);
+      }
+    });
+
+    bridgeSelect.addEventListener("change", () => {
+      this.adminSelectedBridgeId = bridgeSelect.value || null;
+    });
+
+    this.adminControlsInitialized = true;
+  }
+
+  /**
+   * Refresh platform/bridge lists in admin panel
+   */
+  refreshAdminPlatformLists() {
+    if (!this.isAdmin) return;
+    const platformSelect = document.getElementById("admin-platform-select");
+    const bridgeSelect = document.getElementById("admin-bridge-select");
+    if (!platformSelect || !bridgeSelect) return;
+
+    const platforms = this.platformManager
+      ? [...this.platformManager.getAllPlatforms()]
+      : [];
+    platforms.sort((a, b) => a.name.localeCompare(b.name));
+
+    platformSelect.innerHTML = "";
+    if (platforms.length === 0) {
+      const opt = document.createElement("option");
+      opt.textContent = "No platforms available";
+      opt.disabled = true;
+      platformSelect.appendChild(opt);
+      this.adminSelectedPlatformId = null;
+    } else {
+      if (
+        !this.adminSelectedPlatformId ||
+        !platforms.find((p) => p.id === this.adminSelectedPlatformId)
+      ) {
+        this.adminSelectedPlatformId = platforms[0].id;
+      }
+
+      platforms.forEach((platform) => {
+        const option = document.createElement("option");
+        option.value = platform.id;
+        option.textContent = `${platform.name} (${platform.owner})`;
+        platformSelect.appendChild(option);
+      });
+      platformSelect.value = this.adminSelectedPlatformId;
+    }
+
+    this.fillAdminPlatformForm(this.adminSelectedPlatformId);
+
+    const bridges = this.platformManager
+      ? [...this.platformManager.getAllBridges()]
+      : [];
+
+    bridgeSelect.innerHTML = "";
+    if (bridges.length === 0) {
+      const opt = document.createElement("option");
+      opt.textContent = "No bridges available";
+      opt.disabled = true;
+      bridgeSelect.appendChild(opt);
+      this.adminSelectedBridgeId = null;
+    } else {
+      if (
+        !this.adminSelectedBridgeId ||
+        !bridges.find((b) => b.id === this.adminSelectedBridgeId)
+      ) {
+        this.adminSelectedBridgeId = bridges[0].id;
+      }
+
+      bridges.forEach((bridge) => {
+        const platform1 = this.platformManager?.getPlatformById(
+          bridge.platform1
+        );
+        const platform2 = this.platformManager?.getPlatformById(
+          bridge.platform2
+        );
+        const label = `${platform1?.name || bridge.platform1} → ${
+          platform2?.name || bridge.platform2
+        }`;
+
+        const option = document.createElement("option");
+        option.value = bridge.id;
+        option.textContent = label;
+        bridgeSelect.appendChild(option);
+      });
+      bridgeSelect.value = this.adminSelectedBridgeId;
+    }
+  }
+
+  /**
+   * Populate admin form inputs for selected platform
+   */
+  fillAdminPlatformForm(platformId) {
+    const nameInput = document.getElementById("admin-platform-name");
+    const sizeInput = document.getElementById("admin-platform-size");
+    const textureInput = document.getElementById("admin-platform-texture");
+    if (!nameInput || !sizeInput || !textureInput) return;
+
+    if (!platformId) {
+      nameInput.value = "";
+      sizeInput.value = "";
+      textureInput.value = "";
+      return;
+    }
+
+    const platform = this.platformManager?.getPlatformById(platformId);
+    if (!platform) return;
+
+    nameInput.value = platform.name || "";
+    sizeInput.value = platform.size || "";
+    textureInput.value = platform.floorTexture || "";
   }
 
   /**

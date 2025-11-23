@@ -224,6 +224,7 @@ export const registerUser = async (
         username: user.username,
         displayName: user.display_name,
         skinIndex: user.skin_index,
+        isAdmin: false,
       },
       sessionToken,
     };
@@ -282,6 +283,7 @@ export const loginUser = async (username, password) => {
         username: user.username,
         displayName: user.display_name,
         skinIndex: user.skin_index,
+        isAdmin: Boolean(user.is_admin),
       },
       sessionToken,
     };
@@ -312,6 +314,7 @@ export const validateSession = async (token) => {
         username: session.username,
         displayName: session.display_name,
         skinIndex: session.skin_index,
+        isAdmin: Boolean(session.is_admin),
       },
     };
   } catch (error) {

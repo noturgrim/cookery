@@ -358,6 +358,7 @@ const COARSE_GRID_SIZE = 0.5; // Coarse grid for long-distance pathfinding (fast
 const PLATFORM_EDGE_TOLERANCE = 2.0; // Allow small overlap when transitioning to bridges
 const BRIDGE_WIDTH_TOLERANCE = 1.5; // Extra margin beyond actual bridge width
 const WORLD_BOUNDS_MARGIN = 10; // Additional padding when expanding world bounds to fit content
+const isAdminPlayer = (player) => !!player?.isAdmin;
 
 // Helper to get all connected speakers (recursively follows connections)
 const getConnectedSpeakers = (speakerId, connections) => {
@@ -1888,6 +1889,7 @@ io.on("connection", (socket) => {
         username: result.user.username,
         name: result.user.displayName,
         skinIndex: result.user.skinIndex,
+        isAdmin: Boolean(result.user.isAdmin),
         x: Math.random() * 4 - 2,
         y: 0,
         z: Math.random() * 4 - 2,
@@ -3858,26 +3860,18 @@ io.on("connection", (socket) => {
         const player = gameState.players.get(socket.id);
         if (!player) return;
 
+        if (!isAdminPlayer(player)) {
+          socket.emit("platformError", {
+            error: "Only admins can delete platforms",
+          });
+          return;
+        }
+
         const platformId = data.platformId;
         const platform = gameState.platforms.find((p) => p.id === platformId);
 
         if (!platform) {
           socket.emit("platformError", { error: "Platform not found" });
-          return;
-        }
-
-        // Check permissions
-        const permission = await checkPlatformPermission(
-          platformId,
-          player.username
-        );
-        if (
-          !permission.hasPermission ||
-          (permission.level !== "owner" && permission.level !== "admin")
-        ) {
-          socket.emit("platformError", {
-            error: "No permission to delete this platform",
-          });
           return;
         }
 
@@ -3906,6 +3900,143 @@ io.on("connection", (socket) => {
       } catch (error) {
         console.error("❌ Error deleting platform:", error);
         socket.emit("platformError", { error: "Failed to delete platform" });
+      }
+    })
+  );
+
+  // Handle deleting a bridge (admin or platform owner)
+  socket.on(
+    "deleteBridge",
+    requireAuth(async (data) => {
+      try {
+        if (!rateLimiter.checkLimit(socket.id, "DELETE_ACTIONS")) {
+          socket.emit("rateLimitError", {
+            action: "deleteBridge",
+            message: "Too many delete requests. Please slow down.",
+          });
+          return;
+        }
+
+        const player = gameState.players.get(socket.id);
+        if (!player) return;
+
+        if (!isAdminPlayer(player)) {
+          socket.emit("platformError", {
+            error: "Only admins can delete bridges",
+          });
+          return;
+        }
+
+        const bridgeId = data.bridgeId;
+        const bridge = gameState.bridges.find((b) => b.id === bridgeId);
+
+        if (!bridge) {
+          socket.emit("platformError", { error: "Bridge not found" });
+          return;
+        }
+
+        await deleteBridge(bridgeId);
+        gameState.bridges = gameState.bridges.filter((b) => b.id !== bridgeId);
+
+        io.emit("bridgeDeleted", { bridgeId });
+        console.log(`🗑️ Bridge deleted: ${bridgeId} by ${player.username}`);
+      } catch (error) {
+        console.error("❌ Error deleting bridge:", error);
+        socket.emit("platformError", { error: "Failed to delete bridge" });
+      }
+    })
+  );
+
+  // Handle updating platform metadata (admin or owner)
+  socket.on(
+    "updatePlatform",
+    requireAuth(async (data) => {
+      try {
+        const player = gameState.players.get(socket.id);
+        if (!player) return;
+
+        if (!isAdminPlayer(player)) {
+          socket.emit("platformError", {
+            error: "Only admins can update platforms",
+          });
+          return;
+        }
+
+        const platformId = data.platformId;
+        const platform = gameState.platforms.find((p) => p.id === platformId);
+
+        if (!platform) {
+          socket.emit("platformError", { error: "Platform not found" });
+          return;
+        }
+
+        const updates = {};
+
+        if (typeof data.name === "string" && data.name.trim().length > 0) {
+          const sanitizedName = sanitizeString(data.name.trim(), 100);
+          if (!sanitizedName) {
+            socket.emit("platformError", { error: "Invalid platform name" });
+            return;
+          }
+          updates.name = sanitizedName;
+        }
+
+        if (data.size !== undefined) {
+          const size = parseInt(data.size, 10);
+          if (Number.isNaN(size) || size < 20 || size > 200) {
+            socket.emit("platformError", {
+              error: "Platform size must be between 20 and 200",
+            });
+            return;
+          }
+          updates.size = size;
+        }
+
+        if (typeof data.floorTexture === "string") {
+          const texture = data.floorTexture.trim();
+          if (!/^[\w.\-]+$/.test(texture)) {
+            socket.emit("platformError", {
+              error: "Invalid texture filename",
+            });
+            return;
+          }
+          updates.floorTexture = texture;
+        }
+
+        if (Object.keys(updates).length === 0) {
+          socket.emit("platformError", { error: "No changes provided" });
+          return;
+        }
+
+        const updatedPlatform = {
+          ...platform,
+          ...updates,
+        };
+
+        const saveResult = await savePlatform(updatedPlatform);
+        if (!saveResult.success) {
+          if (saveResult.errorCode === "DUPLICATE_PLATFORM_NAME") {
+            socket.emit("platformError", {
+              error: `A platform named "${updates.name}" already exists. Please choose a different name.`,
+            });
+          } else {
+            socket.emit("platformError", {
+              error: "Failed to update platform",
+            });
+          }
+          return;
+        }
+
+        Object.assign(platform, updatedPlatform);
+        expandBoundsForPlatform(platform);
+
+        io.emit("platformUpdated", platform);
+        console.log(
+          `✏️ Platform updated: ${platform.id} by ${player.username}`
+        );
+      } catch (error) {
+        console.error("❌ Error updating platform:", error);
+        socket.emit("platformError", { error: "Failed to update platform" });
       }
     })
   );

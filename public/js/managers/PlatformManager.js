@@ -232,6 +232,33 @@ export class PlatformManager {
   }
 
   /**
+   * Update an existing platform's data/visuals
+   */
+  updatePlatform(platformData) {
+    const existingMesh = this.platformMeshes.get(platformData.id);
+    if (existingMesh) {
+      if (existingMesh.userData.gridHelper) {
+        this.sceneManager.scene.remove(existingMesh.userData.gridHelper);
+        existingMesh.userData.gridHelper.geometry.dispose();
+        existingMesh.userData.gridHelper.material.dispose();
+      }
+      if (existingMesh.userData.labelSprite) {
+        this.sceneManager.scene.remove(existingMesh.userData.labelSprite);
+        existingMesh.userData.labelSprite.material.map?.dispose();
+        existingMesh.userData.labelSprite.material.dispose();
+      }
+      this.sceneManager.scene.remove(existingMesh);
+      existingMesh.geometry.dispose();
+      existingMesh.material.map?.dispose();
+      existingMesh.material.dispose();
+      this.platformMeshes.delete(platformData.id);
+    }
+
+    this.platforms.delete(platformData.id);
+    this.createPlatform(platformData);
+  }
+
+  /**
    * Toggle platform label visibility
    */
   setPlatformLabelsVisible(showLabels) {
@@ -553,10 +580,24 @@ export class PlatformManager {
   }
 
   /**
+   * Get platform by ID
+   */
+  getPlatformById(id) {
+    return this.platforms.get(id) || null;
+  }
+
+  /**
    * Get all bridges
    */
   getAllBridges() {
     return Array.from(this.bridges.values());
+  }
+
+  /**
+   * Get bridge by ID
+   */
+  getBridgeById(id) {
+    return this.bridges.get(id) || null;
   }
 
   /**
