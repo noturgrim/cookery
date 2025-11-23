@@ -573,6 +573,72 @@
       .animate-scale-in {
         animation: scale-in 0.2s ease-out;
       }
+      .setting-row.compact-toggle {
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+      }
+
+      .setting-helper {
+        margin-top: 6px;
+        color: rgba(255, 255, 255, 0.55);
+        font-size: 12px;
+      }
+
+      .ios-switch {
+        position: relative;
+        display: inline-block;
+        width: 54px;
+        height: 32px;
+        flex-shrink: 0;
+      }
+
+      .ios-switch input {
+        opacity: 0;
+        width: 0;
+        height: 0;
+      }
+
+      .ios-slider {
+        position: absolute;
+        cursor: pointer;
+        inset: 0;
+        background: rgba(255, 255, 255, 0.18);
+        transition: 0.2s;
+        border-radius: 16px;
+        border: 1px solid rgba(255, 255, 255, 0.15);
+      }
+
+      .ios-slider:before {
+        position: absolute;
+        content: "";
+        height: 26px;
+        width: 26px;
+        left: 3px;
+        bottom: 3px;
+        background-color: #ffffff;
+        border-radius: 50%;
+        transition: 0.2s;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.35);
+      }
+
+      .ios-switch input:checked + .ios-slider {
+        background: linear-gradient(120deg, #6f72ff, #9f65ff);
+        border-color: rgba(255, 255, 255, 0.35);
+      }
+
+      .ios-switch input:checked + .ios-slider:before {
+        transform: translateX(20px);
+      }
+
+      .ios-slider:after {
+        content: "";
+        position: absolute;
+        inset: 0;
+        border-radius: 16px;
+        box-shadow: inset 0 0 8px rgba(0, 0, 0, 0.15);
+        pointer-events: none;
+      }
     </style>
   </head>
   <body>
@@ -873,6 +939,36 @@
                   Apply Size
                 </button>
               </div>
+            </div>
+          </div>
+
+          <!-- Platform Labels Section -->
+          <div class="settings-section">
+            <div class="setting-row compact-toggle">
+              <label class="setting-label">
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
+                  <rect x="3" y="5" width="18" height="14" rx="2" />
+                  <path d="M7 9h10M7 13h6" />
+                </svg>
+                Platform Labels
+              </label>
+              <label
+                class="ios-switch"
+                title="Show platform names in the world"
+              >
+                <input type="checkbox" id="platform-labels-toggle" checked />
+                <span class="ios-slider"></span>
+              </label>
+            </div>
+            <div class="setting-helper">
+              Toggle the floating nameplates above each platform while you play.
             </div>
           </div>
         </div>

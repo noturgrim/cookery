@@ -419,6 +419,25 @@ class Game {
       }
     };
 
+    // Platform label visibility toggle
+    const platformLabelsToggle = document.getElementById(
+      "platform-labels-toggle"
+    );
+    if (platformLabelsToggle) {
+      const labelsVisible =
+        this.platformManager?.labelsVisible !== undefined
+          ? this.platformManager.labelsVisible
+          : true;
+      platformLabelsToggle.checked = labelsVisible;
+      platformLabelsToggle.onchange = () => {
+        if (this.platformManager) {
+          this.platformManager.setPlatformLabelsVisible(
+            platformLabelsToggle.checked
+          );
+        }
+      };
+    }
+
     // Save button
     document.getElementById("settings-save-btn").onclick = () => {
       const newName = document

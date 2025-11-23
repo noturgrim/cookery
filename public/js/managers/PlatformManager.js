@@ -33,6 +33,13 @@ export class PlatformManager {
 
     // Texture loader
     this.textureLoader = new THREE.TextureLoader();
+
+    // Platform label visibility preference
+    const storedPreference = window?.localStorage?.getItem(
+      "platformLabelsVisible"
+    );
+    this.labelsVisible =
+      storedPreference === null ? true : storedPreference === "true";
   }
 
   /**
@@ -128,42 +135,116 @@ export class PlatformManager {
    * Create a visible label for the platform
    */
   createPlatformLabel(platformData) {
+    const mesh = this.platformMeshes.get(platformData.id);
+    if (!mesh) return;
+
+    // Remove previous label if it exists
+    if (mesh.userData.labelSprite) {
+      this.sceneManager.scene.remove(mesh.userData.labelSprite);
+      mesh.userData.labelSprite.material.map?.dispose();
+      mesh.userData.labelSprite.material.dispose();
+      mesh.userData.labelSprite = null;
+    }
+
     const canvas = document.createElement("canvas");
     const context = canvas.getContext("2d");
-    canvas.width = 512;
-    canvas.height = 128;
+    const width = 384;
+    const height = 120;
+    canvas.width = width;
+    canvas.height = height;
 
-    // Draw label background
-    context.fillStyle = "rgba(0, 0, 0, 0.7)";
-    context.roundRect(10, 10, canvas.width - 20, canvas.height - 20, 10);
+    const drawRoundedRect = (ctx, x, y, w, h, r) => {
+      const radius = Math.min(r, w / 2, h / 2);
+      ctx.beginPath();
+      ctx.moveTo(x + radius, y);
+      ctx.lineTo(x + w - radius, y);
+      ctx.quadraticCurveTo(x + w, y, x + w, y + radius);
+      ctx.lineTo(x + w, y + h - radius);
+      ctx.quadraticCurveTo(x + w, y + h, x + w - radius, y + h);
+      ctx.lineTo(x + radius, y + h);
+      ctx.quadraticCurveTo(x, y + h, x, y + h - radius);
+      ctx.lineTo(x, y + radius);
+      ctx.quadraticCurveTo(x, y, x + radius, y);
+      ctx.closePath();
+    };
+
+    // Background with subtle gradient
+    const gradient = context.createLinearGradient(0, 0, width, 0);
+    gradient.addColorStop(0, "rgba(20, 20, 30, 0.95)");
+    gradient.addColorStop(1, "rgba(33, 33, 45, 0.95)");
+
+    context.clearRect(0, 0, width, height);
+    context.shadowColor = "rgba(0, 0, 0, 0.35)";
+    context.shadowBlur = 12;
+    drawRoundedRect(context, 16, 16, width - 32, height - 40, 24);
+    context.fillStyle = gradient;
     context.fill();
+    context.shadowBlur = 0;
 
-    // Draw text
-    context.fillStyle = "#ffffff";
-    context.font = "bold 48px Arial";
+    context.lineWidth = 1.5;
+    context.strokeStyle = "rgba(255, 255, 255, 0.1)";
+    drawRoundedRect(context, 16, 16, width - 32, height - 40, 24);
+    context.stroke();
+
+    // Platform name text (auto-shrink if needed)
+    const name = platformData.name || "Unnamed Platform";
+    let fontSize = 34;
     context.textAlign = "center";
     context.textBaseline = "middle";
-    context.fillText(platformData.name, canvas.width / 2, canvas.height / 2);
+    context.fillStyle = "#ffffff";
+    do {
+      context.font = `600 ${fontSize}px "Inter", "SF Pro Display", Arial`;
+      fontSize -= 2;
+    } while (context.measureText(name).width > width - 120 && fontSize > 22);
+    context.fillText(name, width / 2, height / 2 - 6);
+
+    // Owner text
+    const ownerName =
+      platformData.owner ||
+      platformData.owner_username ||
+      platformData.ownerName ||
+      "unknown";
+    context.font = `500 20px "Inter", "SF Pro Display", Arial`;
+    context.fillStyle = "rgba(255, 255, 255, 0.7)";
+    context.fillText(`by ${ownerName}`, width / 2, height / 2 + 26);
 
     // Create texture from canvas
     const texture = new THREE.CanvasTexture(canvas);
+    texture.needsUpdate = true;
 
     // Create sprite
     const spriteMaterial = new THREE.SpriteMaterial({
       map: texture,
       transparent: true,
+      depthTest: false,
+      depthWrite: false,
     });
     const sprite = new THREE.Sprite(spriteMaterial);
-    sprite.scale.set(10, 2.5, 1);
-    sprite.position.set(platformData.x, 5, platformData.z);
+    sprite.scale.set(5.4, 1.8, 1);
+    sprite.position.set(platformData.x, platformData.y + 4.5, platformData.z);
+    sprite.center.set(0.5, 0);
+    sprite.renderOrder = 999;
+    sprite.visible = this.labelsVisible;
 
-    // Add to scene
+    // Add to scene and store reference
     this.sceneManager.scene.add(sprite);
+    mesh.userData.labelSprite = sprite;
+  }
 
-    // Store sprite reference
-    const mesh = this.platformMeshes.get(platformData.id);
-    if (mesh) {
-      mesh.userData.labelSprite = sprite;
+  /**
+   * Toggle platform label visibility
+   */
+  setPlatformLabelsVisible(showLabels) {
+    this.labelsVisible = !!showLabels;
+    window?.localStorage?.setItem(
+      "platformLabelsVisible",
+      this.labelsVisible ? "true" : "false"
+    );
+
+    for (const mesh of this.platformMeshes.values()) {
+      if (mesh.userData.labelSprite) {
+        mesh.userData.labelSprite.visible = this.labelsVisible;
+      }
     }
   }
 

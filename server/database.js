@@ -156,6 +156,75 @@ pool.on("error", (err) => {
   console.error("❌ Unexpected database error:", err);
 });
 
+const normalizePlatformNames = async () => {
+  try {
+    const duplicates = await pool.query(`
+      SELECT LOWER(name) AS lname
+      FROM platforms
+      GROUP BY LOWER(name)
+      HAVING COUNT(*) > 1
+    `);
+
+    for (const dup of duplicates.rows) {
+      const { rows: platforms } = await pool.query(
+        `
+          SELECT id, name
+          FROM platforms
+          WHERE LOWER(name) = $1
+          ORDER BY created_at ASC, id ASC
+        `,
+        [dup.lname]
+      );
+
+      if (platforms.length <= 1) {
+        continue;
+      }
+
+      const baseName = platforms[0].name || "Platform";
+      for (let i = 1; i < platforms.length; i++) {
+        const platform = platforms[i];
+        let suffix = platform.id.slice(-6).toUpperCase();
+        let newName = `${baseName} #${suffix}`;
+        let attempts = 0;
+
+        while (attempts < 5) {
+          const conflict = await pool.query(
+            `
+              SELECT 1
+              FROM platforms
+              WHERE LOWER(name) = LOWER($1)
+                AND id <> $2
+              LIMIT 1
+            `,
+            [newName, platform.id]
+          );
+
+          if (conflict.rowCount === 0) {
+            break;
+          }
+
+          attempts += 1;
+          suffix = `${platform.id.slice(-4)}${attempts}`;
+          newName = `${baseName} #${suffix}`;
+        }
+
+        await pool.query(`UPDATE platforms SET name = $1 WHERE id = $2`, [
+          newName,
+          platform.id,
+        ]);
+        console.log(
+          `✏️ Renamed duplicate platform "${platform.name}" -> "${newName}"`
+        );
+      }
+    }
+  } catch (error) {
+    console.warn(
+      "⚠️ Could not normalize duplicate platform names:",
+      error.message
+    );
+  }
+};
+
 /**
  * Initialize database tables
  */
@@ -377,6 +446,13 @@ export async function initializeDatabase() {
       UPDATE platforms 
       SET size = 40 
       WHERE size IS NULL OR size = 0
+    `);
+
+    await normalizePlatformNames();
+
+    await pool.query(`
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_platforms_name_unique
+      ON platforms (LOWER(name))
     `);
 
     // Create bridges table (auto-generated walkways between platforms)
@@ -1213,12 +1289,23 @@ export async function savePlatform(platform) {
 
     if (result.rows.length > 0) {
       console.log(`🏗️ Saved platform: ${platform.id} (${platform.name})`);
-      return true;
+      return { success: true };
     }
-    return false;
+    return { success: false, errorCode: "UNKNOWN" };
   } catch (error) {
+    if (
+      error.code === "23505" &&
+      (error.constraint === "idx_platforms_name_unique" ||
+        error.message?.includes("idx_platforms_name_unique"))
+    ) {
+      console.warn(
+        `⚠️ Duplicate platform name prevented: ${platform.name.toLowerCase()}`
+      );
+      return { success: false, errorCode: "DUPLICATE_PLATFORM_NAME" };
+    }
+
     console.error(`❌ Error saving platform ${platform.id}:`, error.message);
-    return false;
+    return { success: false, errorCode: "UNKNOWN", error };
   }
 }
 

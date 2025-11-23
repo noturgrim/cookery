@@ -3762,9 +3762,15 @@ io.on("connection", (socket) => {
         }
 
         // Save to database
-        const saveSuccess = await savePlatform(newPlatform);
-        if (!saveSuccess) {
-          socket.emit("platformError", { error: "Failed to save platform" });
+        const saveResult = await savePlatform(newPlatform);
+        if (!saveResult.success) {
+          if (saveResult.errorCode === "DUPLICATE_PLATFORM_NAME") {
+            socket.emit("platformError", {
+              error: `A platform named "${newPlatform.name}" already exists. Please choose a different name.`,
+            });
+          } else {
+            socket.emit("platformError", { error: "Failed to save platform" });
+          }
           return;
         }
 
