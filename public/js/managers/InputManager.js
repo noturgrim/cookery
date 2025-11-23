@@ -1144,7 +1144,22 @@ export class InputManager {
 
     // Setup delete mode button
     const deleteBtn = document.getElementById("delete-mode-btn");
-    deleteBtn.onclick = () => this.toggleDeleteMode();
+    deleteBtn.onclick = (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      this.toggleDeleteMode();
+    };
+
+    // Prevent any mouse events from propagating through the button
+    deleteBtn.addEventListener("mousedown", (e) => {
+      e.stopPropagation();
+    });
+    deleteBtn.addEventListener("mouseup", (e) => {
+      e.stopPropagation();
+    });
+    deleteBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+    });
 
     // Setup search functionality
     this.setupSearch();
