@@ -111,6 +111,7 @@
     <link rel="stylesheet" href="/css/emote-wheel.css" />
     <link rel="stylesheet" href="/css/action-wheel.css" />
     <link rel="stylesheet" href="/css/spawn-menu.css?v=2" />
+    <link rel="stylesheet" href="/css/settings-menu.css?v=1" />
 
     <style>
       * {
@@ -144,7 +145,7 @@
       }
 
       #controls-info {
-        background: rgba(0, 0, 0, 0.85);
+        background: rgba(0, 0, 0, 0.9);
         color: white;
         padding: 10px 14px;
         border-radius: 8px;
@@ -155,6 +156,9 @@
         pointer-events: auto;
         transition: all 0.3s ease;
         box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+        user-select: none;
+        z-index: 150;
+        position: relative;
       }
 
       #controls-info.minimized {
@@ -703,195 +707,155 @@
       </svg>
     </button>
 
-    <!-- Settings Modal (Compact) -->
-    <div
-      id="settings-modal"
-      class="fixed inset-0 bg-black/85 backdrop-blur-md z-[3000] hidden items-center justify-center p-4"
-    >
-      <div
-        class="bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 rounded-2xl shadow-2xl border border-purple-500/40 w-full max-w-md flex flex-col pointer-events-auto overflow-hidden"
-        style="backdrop-filter: blur(20px)"
-      >
+    <!-- Settings Modal (iOS Style) -->
+    <div id="settings-modal">
+      <div class="settings-container">
         <!-- Header -->
-        <div
-          class="flex items-center justify-between px-5 py-3.5 border-b border-purple-500/20 bg-gradient-to-r from-purple-900/20 to-pink-900/20"
-        >
-          <div class="flex items-center gap-3">
-            <svg
-              viewBox="0 0 24 24"
-              class="w-6 h-6 text-purple-400"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-            >
-              <path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z" />
-              <path
-                d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1Z"
-              />
-            </svg>
-            <h2 class="text-lg font-bold text-purple-400 tracking-wide">
-              Settings
-            </h2>
-          </div>
-          <button
-            id="settings-close-btn"
-            class="w-8 h-8 rounded-lg bg-red-500/20 hover:bg-red-500 border border-red-500/40 hover:border-red-500 text-white text-lg font-bold transition-all duration-200 hover:scale-105 active:scale-95 flex items-center justify-center"
-          >
-            ×
-          </button>
+        <div class="settings-header">
+          <h2 class="settings-title">Settings</h2>
+          <button id="settings-close-btn" class="settings-close">×</button>
         </div>
 
         <!-- Content -->
-        <div class="p-5 space-y-4">
-          <!-- Name Input -->
-          <div>
-            <label
-              class="flex items-center gap-2 text-white text-sm font-semibold mb-2"
-            >
-              <svg
-                viewBox="0 0 24 24"
-                class="w-4 h-4"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-              >
-                <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2" />
-                <circle cx="12" cy="7" r="4" />
-              </svg>
-              Character Name
-            </label>
-            <input
-              type="text"
-              id="settings-player-name"
-              placeholder="Enter your name..."
-              maxlength="20"
-              autocomplete="off"
-              class="w-full py-2.5 px-4 rounded-xl bg-gray-800/40 border border-gray-600/40 text-white placeholder-gray-400 focus:border-purple-500/60 focus:bg-gray-800/60 focus:outline-none transition-all duration-200"
-            />
-          </div>
-
-          <!-- Character Selector -->
-          <div>
-            <label
-              class="flex items-center gap-2 text-white text-sm font-semibold mb-2"
-            >
-              <svg
-                viewBox="0 0 24 24"
-                class="w-4 h-4"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-              >
-                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
-                <circle cx="9" cy="7" r="4" />
-                <path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" />
-              </svg>
-              Choose Character
-            </label>
-            <div
-              id="settings-skin-selector"
-              class="grid grid-cols-4 gap-2 max-h-60 overflow-y-auto p-2.5 bg-gray-800/20 rounded-xl border border-gray-700/30"
-            ></div>
-          </div>
-
-          <!-- Platform Size Control -->
-          <div>
-            <label
-              class="flex items-center gap-2 text-white text-sm font-semibold mb-2"
-            >
-              <svg
-                viewBox="0 0 24 24"
-                class="w-4 h-4"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-              >
-                <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
-                <path d="M3 9h18M3 15h18M9 3v18M15 3v18" />
-              </svg>
-              Platform Size
-              <span
-                id="platform-size-value"
-                class="text-xs text-purple-400 bg-purple-900/30 px-2 py-0.5 rounded-full font-mono"
-                >40x40</span
-              >
-            </label>
-            <div class="flex items-center gap-3">
+        <div class="settings-content">
+          <!-- Name Section -->
+          <div class="settings-section">
+            <div class="setting-row">
+              <label class="setting-label">
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
+                  <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2" />
+                  <circle cx="12" cy="7" r="4" />
+                </svg>
+                Character Name
+              </label>
               <input
-                type="range"
-                id="platform-size-slider"
-                min="20"
-                max="200"
-                step="10"
-                value="40"
-                class="flex-1 h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-500/50"
+                type="text"
+                id="settings-player-name"
+                class="setting-input"
+                placeholder="Enter your name"
+                maxlength="20"
+                autocomplete="off"
               />
-              <button
-                id="platform-size-apply"
-                class="px-3 py-1.5 rounded-lg bg-purple-600 hover:bg-purple-700 text-white text-xs font-semibold transition-all duration-200 hover:scale-105 active:scale-95"
-                title="Apply platform size change"
-              >
-                Apply
-              </button>
-            </div>
-            <div class="flex justify-between text-xs text-gray-400 mt-1 px-1">
-              <span>20x20</span>
-              <span>200x200</span>
             </div>
           </div>
 
-          <!-- Save Button -->
-          <button
-            id="settings-save-btn"
-            class="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white font-semibold text-base transition-all duration-200 hover:scale-[1.02] active:scale-[0.98] shadow-lg flex items-center justify-center gap-2"
-          >
-            <svg
-              viewBox="0 0 24 24"
-              class="w-4 h-4"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-            >
-              <path
-                d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"
-              />
-              <polyline points="17 21 17 13 7 13 7 21" />
-              <polyline points="7 3 7 8 15 8" />
-            </svg>
-            Save Changes
-          </button>
+          <!-- Character Section -->
+          <div class="settings-section">
+            <div class="setting-row">
+              <label class="setting-label">
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
+                  <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+                  <circle cx="9" cy="7" r="4" />
+                  <path
+                    d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"
+                  />
+                </svg>
+                Choose Character
+              </label>
+              <div id="settings-skin-selector" class="character-grid"></div>
+            </div>
+          </div>
 
-          <!-- Logout Button -->
-          <button
-            id="logout-btn"
-            class="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-red-600 to-orange-600 hover:from-red-700 hover:to-orange-700 text-white font-semibold text-base transition-all duration-200 hover:scale-[1.02] active:scale-[0.98] shadow-lg flex items-center justify-center gap-2"
-          >
-            <svg
-              viewBox="0 0 24 24"
-              class="w-4 h-4"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-            >
-              <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
-              <polyline points="16 17 21 12 16 7" />
-              <line x1="21" y1="12" x2="9" y2="12" />
-            </svg>
-            Logout
-          </button>
+          <!-- Platform Size Section -->
+          <div class="settings-section">
+            <div class="setting-row">
+              <div class="slider-container">
+                <div class="slider-header">
+                  <label class="slider-label">
+                    <svg
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="2"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                    >
+                      <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+                      <path d="M3 9h18M3 15h18M9 3v18M15 3v18" />
+                    </svg>
+                    Platform Size
+                  </label>
+                  <span id="platform-size-value" class="slider-value"
+                    >40x40</span
+                  >
+                </div>
+                <input
+                  type="range"
+                  id="platform-size-slider"
+                  class="setting-slider"
+                  min="20"
+                  max="200"
+                  step="10"
+                  value="40"
+                />
+                <div class="slider-range">
+                  <span>20x20</span>
+                  <span>200x200</span>
+                </div>
+                <button id="platform-size-apply" class="apply-button">
+                  Apply Size
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
+
+        <!-- Save & Logout Buttons -->
+        <button id="settings-save-btn" class="settings-save">
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
+            <path
+              d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"
+            />
+            <polyline points="17 21 17 13 7 13 7 21" />
+            <polyline points="7 3 7 8 15 8" />
+          </svg>
+          Save Changes
+        </button>
+
+        <button
+          id="logout-btn"
+          class="settings-save"
+          style="
+            background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+            box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3);
+            margin-top: 0;
+          "
+        >
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
+            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+            <polyline points="16 17 21 12 16 7" />
+            <line x1="21" y1="12" x2="9" y2="12" />
+          </svg>
+          Logout
+        </button>
       </div>
     </div>
 
@@ -973,6 +937,17 @@
             e.preventDefault();
             handleToggle();
           }
+        });
+
+        // Prevent clicks from propagating through controls info
+        controlsInfo.addEventListener("mousedown", (e) => {
+          e.stopPropagation();
+        });
+        controlsInfo.addEventListener("mouseup", (e) => {
+          e.stopPropagation();
+        });
+        controlsInfo.addEventListener("click", (e) => {
+          e.stopPropagation();
         });
       })();
     </script>

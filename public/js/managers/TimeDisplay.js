@@ -26,27 +26,39 @@ export class TimeDisplay {
       display: flex;
       align-items: center;
       gap: 8px;
-      background: rgba(0, 0, 0, 0.65);
+      background: rgba(0, 0, 0, 0.75);
       backdrop-filter: blur(10px);
       padding: 8px 16px;
       border-radius: 20px;
       font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-      z-index: 100;
+      z-index: 150;
       box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
       border: 1px solid rgba(255, 255, 255, 0.15);
       transition: all 0.3s ease;
       cursor: default;
       user-select: none;
+      pointer-events: auto;
     `;
 
     // Add hover effect
     this.container.addEventListener("mouseenter", () => {
-      this.container.style.background = "rgba(0, 0, 0, 0.8)";
+      this.container.style.background = "rgba(0, 0, 0, 0.9)";
       this.container.style.transform = "translateX(-50%) scale(1.05)";
     });
     this.container.addEventListener("mouseleave", () => {
-      this.container.style.background = "rgba(0, 0, 0, 0.65)";
+      this.container.style.background = "rgba(0, 0, 0, 0.75)";
       this.container.style.transform = "translateX(-50%) scale(1)";
+    });
+
+    // Prevent clicks from propagating through time display
+    this.container.addEventListener("mousedown", (e) => {
+      e.stopPropagation();
+    });
+    this.container.addEventListener("mouseup", (e) => {
+      e.stopPropagation();
+    });
+    this.container.addEventListener("click", (e) => {
+      e.stopPropagation();
     });
 
     // Time icon/emoji
