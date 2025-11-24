@@ -1409,12 +1409,46 @@ export class InputManager {
   }
 
   /**
-   * Spawn furniture at center
+   * Get spawn position near player (in front of player, 3 units away)
+   */
+  getPlayerSpawnPosition() {
+    // Get current player
+    const player = this.networkManager.playerManager.players.get(
+      this.networkManager.playerId
+    );
+
+    if (player && player.mesh) {
+      // Get player position and rotation
+      const playerPos = player.mesh.position;
+      const playerRotation = player.mesh.rotation.y;
+
+      // Calculate position 3 units in front of player
+      const distance = 3;
+      const spawnX = playerPos.x + Math.sin(playerRotation) * distance;
+      const spawnZ = playerPos.z + Math.cos(playerRotation) * distance;
+
+      return {
+        x: spawnX,
+        y: 0, // Ground level for furniture
+        z: spawnZ,
+      };
+    }
+
+    // Fallback to center if player not found
+    console.warn("⚠️ Player not found, spawning at center");
+    return { x: 0, y: 0, z: 0 };
+  }
+
+  /**
+   * Spawn furniture near player
    */
   async spawnFurniture(modelName) {
     try {
       const furniture = await this.sceneManager.loadFurnitureModel(modelName);
-      furniture.position.set(0, 0, 0);
+      
+      // Get player position
+      const spawnPos = this.getPlayerSpawnPosition();
+      furniture.position.set(spawnPos.x, spawnPos.y, spawnPos.z);
       furniture.scale.set(4, 4, 4); // Default scale 4 for furniture
 
       // Calculate actual bounding box after scaling
@@ -1466,25 +1500,28 @@ export class InputManager {
         isPassthrough: furniture.userData.isPassthrough || false,
       });
 
-      // console.log(
-      //   `✨ Spawned furniture: ${modelName} at scale 4 size:(${bbox.width.toFixed(
-      //     2
-      //   )}x${bbox.height.toFixed(2)}x${bbox.depth.toFixed(2)})`
-      // );
+      console.log(
+        `✨ Spawned ${modelName} near player at (${spawnPos.x.toFixed(
+          2
+        )}, ${spawnPos.z.toFixed(2)})`
+      );
     } catch (error) {
       console.error(`Failed to spawn furniture ${modelName}:`, error);
     }
   }
 
   /**
-   * Spawn food at center
+   * Spawn food near player
    */
   async spawnFood(foodName) {
+    // Get player position
+    const spawnPos = this.getPlayerSpawnPosition();
+    
     const foodModel = await this.sceneManager.spawnFoodItem(
       foodName,
-      0,
+      spawnPos.x,
       1.5, // Height above ground
-      0,
+      spawnPos.z,
       1.5 // Default scale 1.5 for food
     );
     if (foodModel) {
@@ -1497,16 +1534,20 @@ export class InputManager {
       this.networkManager.spawnFood({
         id: foodModel.userData.id,
         name: foodName,
-        x: 0,
+        x: spawnPos.x,
         y: 1.5,
-        z: 0,
+        z: spawnPos.z,
         scale: 1.5,
         width: foodModel.userData.width,
         height: foodModel.userData.height,
         depth: foodModel.userData.depth,
       });
 
-      // console.log(`✨ Spawned food: ${foodName} at scale 1.5`);
+      console.log(
+        `✨ Spawned ${foodName} near player at (${spawnPos.x.toFixed(
+          2
+        )}, ${spawnPos.z.toFixed(2)})`
+      );
     }
   }
 
