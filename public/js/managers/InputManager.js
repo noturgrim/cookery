@@ -73,6 +73,40 @@ export class InputManager {
 
     // Action wheel
     this.setupActionWheel();
+
+    // Setup delete mode button (initialize early so it works on fresh load)
+    this.setupDeleteModeButton();
+  }
+
+  /**
+   * Setup delete mode button event handlers
+   */
+  setupDeleteModeButton() {
+    const deleteBtn = document.getElementById("delete-mode-btn");
+    if (!deleteBtn) {
+      console.warn("⚠️ Delete mode button not found in DOM");
+      return;
+    }
+
+    // Main click handler
+    deleteBtn.onclick = (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      this.toggleDeleteMode();
+    };
+
+    // Prevent any mouse events from propagating through the button
+    deleteBtn.addEventListener("mousedown", (e) => {
+      e.stopPropagation();
+    });
+    deleteBtn.addEventListener("mouseup", (e) => {
+      e.stopPropagation();
+    });
+    deleteBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+    });
+
+    console.log("🗑️ Delete mode button initialized");
   }
 
   /**
@@ -1318,25 +1352,6 @@ export class InputManager {
       item.dataset.name = model.toLowerCase();
       item.onclick = () => this.spawnFood(model);
       foodContainer.appendChild(item);
-    });
-
-    // Setup delete mode button
-    const deleteBtn = document.getElementById("delete-mode-btn");
-    deleteBtn.onclick = (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-      this.toggleDeleteMode();
-    };
-
-    // Prevent any mouse events from propagating through the button
-    deleteBtn.addEventListener("mousedown", (e) => {
-      e.stopPropagation();
-    });
-    deleteBtn.addEventListener("mouseup", (e) => {
-      e.stopPropagation();
-    });
-    deleteBtn.addEventListener("click", (e) => {
-      e.stopPropagation();
     });
 
     // Setup search functionality
