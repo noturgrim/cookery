@@ -52,7 +52,103 @@ export class MusicPlayerManager {
     // Setup update loop for spatial audio
     this.setupSpatialAudioUpdate();
 
+    // Setup music player UI event listeners
+    this.setupMusicPlayerUI();
+
     console.log("🎵 Music Player Manager initialized");
+  }
+
+  /**
+   * Setup music player UI event listeners
+   */
+  setupMusicPlayerUI() {
+    // Close button
+    const closeBtn = document.getElementById("music-player-close-btn");
+    if (closeBtn) {
+      closeBtn.addEventListener("click", () => {
+        this.closeMusicPlayer();
+      });
+    }
+
+    // Stop button
+    const stopBtn = document.getElementById("music-stop-btn");
+    if (stopBtn) {
+      stopBtn.addEventListener("click", () => {
+        if (this.currentSpeaker) {
+          this.stopSpeakerMusic(this.currentSpeaker, true);
+        }
+      });
+    }
+
+    // Pause button
+    const pauseBtn = document.getElementById("music-pause-btn");
+    if (pauseBtn) {
+      pauseBtn.addEventListener("click", () => {
+        if (this.currentSpeaker) {
+          this.pauseSpeakerMusic(this.currentSpeaker, true);
+        }
+      });
+    }
+
+    // Resume button
+    const resumeBtn = document.getElementById("music-resume-btn");
+    if (resumeBtn) {
+      resumeBtn.addEventListener("click", () => {
+        if (this.currentSpeaker) {
+          this.resumeSpeakerMusic(this.currentSpeaker, true);
+        }
+      });
+    }
+
+    // Volume slider
+    const volumeSlider = document.getElementById("music-volume-slider");
+    if (volumeSlider) {
+      volumeSlider.addEventListener("input", (e) => {
+        if (this.currentSpeaker) {
+          const volume = parseInt(e.target.value);
+          this.setSpeakerVolume(this.currentSpeaker, volume, true);
+        }
+      });
+    }
+
+    // Auto-play checkbox
+    const autoPlayCheckbox = document.getElementById("music-autoplay-checkbox");
+    if (autoPlayCheckbox) {
+      autoPlayCheckbox.addEventListener("change", (e) => {
+        this.autoPlayEnabled = e.target.checked;
+        console.log(
+          `🔄 Auto-play ${this.autoPlayEnabled ? "enabled" : "disabled"}`
+        );
+      });
+    }
+
+    // Pagination buttons
+    const prevBtn = document.getElementById("music-prev-page");
+    const nextBtn = document.getElementById("music-next-page");
+
+    if (prevBtn) {
+      prevBtn.addEventListener("click", () => {
+        this.previousPage();
+      });
+    }
+
+    if (nextBtn) {
+      nextBtn.addEventListener("click", () => {
+        this.nextPage();
+      });
+    }
+
+    // Close modal when clicking outside
+    const modal = document.getElementById("music-player-modal");
+    if (modal) {
+      modal.addEventListener("click", (e) => {
+        if (e.target === modal) {
+          this.closeMusicPlayer();
+        }
+      });
+    }
+
+    console.log("✅ Music player UI event listeners setup complete");
   }
 
   /**
@@ -942,7 +1038,15 @@ export class MusicPlayerManager {
     if (modal) {
       modal.style.display = "flex";
       modal.style.pointerEvents = "auto"; // Ensure it blocks clicks
+      modal.classList.remove("hidden"); // Remove hidden class if present
+      this.populateSongList(); // Populate the song list
       this.updateMusicPlayerUI();
+
+      console.log(`✅ Music player modal opened for speaker ${speakerId}`);
+      console.log(`   Modal display: ${modal.style.display}`);
+      console.log(`   Available songs: ${this.availableSongs.length}`);
+    } else {
+      console.error("❌ Music player modal element not found in DOM");
     }
   }
 
@@ -950,11 +1054,13 @@ export class MusicPlayerManager {
    * Close music player UI
    */
   closeMusicPlayer() {
+    console.log("🔒 Closing music player modal");
     this.currentSpeaker = null;
     const modal = document.getElementById("music-player-modal");
     if (modal) {
       modal.style.display = "none";
       modal.style.pointerEvents = "none"; // Allow clicks through when closed
+      modal.classList.add("hidden"); // Add hidden class for consistency
     }
   }
 
